@@ -42,19 +42,26 @@ export function RepoBrowser() {
     const { currentBranch, filePath } = useMemo(() => {
         if (!splat || !gitRepo) return { currentBranch: (gitRepo?.defaultBranch || "main").replace("refs/heads/", ""), filePath: "" };
 
+        // Normalize: remove common ref prefixes
+        let normalizedSplat = splat;
+        if (normalizedSplat.startsWith("refs/heads/")) {
+            normalizedSplat = normalizedSplat.slice(11);
+        } else if (normalizedSplat.startsWith("heads/")) {
+            normalizedSplat = normalizedSplat.slice(6);
+        }
+
         // Try to find the longest branch name that matches the start of splat
-        // e.g. splat = "feat/ui/src/App.tsx", branches = ["feat/ui"]
         const sortedBranches = [...branches].sort((a, b) => b.name.length - a.name.length);
         for (const b of sortedBranches) {
-            if (splat === b.name) return { currentBranch: b.name, filePath: "" };
-            if (splat.startsWith(b.name + "/")) {
-                return { currentBranch: b.name, filePath: splat.slice(b.name.length + 1) };
+            if (normalizedSplat === b.name) return { currentBranch: b.name, filePath: "" };
+            if (normalizedSplat.startsWith(b.name + "/")) {
+                return { currentBranch: b.name, filePath: normalizedSplat.slice(b.name.length + 1) };
             }
         }
 
         // Fallback: first segment is branch
-        const parts = splat.split("/");
-        return { currentBranch: parts[0], filePath: parts.slice(1).join("/") };
+        const parts = normalizedSplat.split("/");
+        return { currentBranch: parts[0] || "main", filePath: parts.slice(1).join("/") };
     }, [splat, branches, gitRepo]);
 
     // Sync state from URL
