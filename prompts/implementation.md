@@ -1,5 +1,5 @@
-Your job is to orchestrate sub agents to complete phase1 of the project (docs/phases/phase-1/) You should minimize your context and spawn a sub agent per work item. You can read docs/phases/01_core_mvp.md for high level view
+Your job is to complete a **single** work item (docs/phases/phase-2/)
 
-Make sure that agents have the relevant context (docs/architecture, docs/goals, docs/ux-design, their work item, gemini.md)
+Make sure to study (docs/architecture, docs/goals, docs/ux-design)
 
-Work items should be sequential and work should be done on separate branches. We can do stacked prs. Their work item must be updated once their work is done and pull request created inside the phase-1 document.
+Work should be done on separate branches. We can do stacked prs. Work item must be updated once the work is completed for that work item inside the phase-2 document and code must be pushed to the relevant branch.

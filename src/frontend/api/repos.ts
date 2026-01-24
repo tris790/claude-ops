@@ -2,6 +2,7 @@ export interface GitRepository {
     id: string;
     name: string;
     url: string;
+    isCloned?: boolean;
     defaultBranch?: string;
     project: {
         id: string;
@@ -48,4 +49,30 @@ export async function getFileContent(repoId: string, path: string, version?: str
     }
     const data = await res.json();
     return data.content;
+}
+
+export async function cloneRepository(projectName: string, repoName: string, remoteUrl: string): Promise<void> {
+    const res = await fetch("/api/repos/clone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectName, repoName, remoteUrl }),
+    });
+
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || `Failed to clone repository: ${res.statusText}`);
+    }
+}
+
+export async function syncRepository(projectName: string, repoName: string): Promise<void> {
+    const res = await fetch("/api/repos/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectName, repoName }),
+    });
+
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || `Failed to sync repository: ${res.statusText}`);
+    }
 }

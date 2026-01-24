@@ -6,10 +6,10 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
 - [x] **Backend Git Manager**:
   - [x] Logic to manage `~/.claude-ops/repos/`.
   - [x] Background `git fetch` operations.
-- [ ] **Clone UX**:
-  - [ ] UI indicators for cloned vs. remote repos.
-  - [ ] "Sync" buttons and status badges.
-  - [ ] One-click clone actions.
+- [x] **Clone UX**:
+  - [x] UI indicators for cloned vs. remote repos.
+  - [x] "Sync" buttons and status badges.
+  - [x] One-click clone actions.
 
 ## 2. LSP Intelligence (The "Secret Sauce")
 - [ ] **Backend LSP Bridge**:

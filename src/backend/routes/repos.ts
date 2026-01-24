@@ -1,16 +1,61 @@
 import { azureClient } from "../services/azure";
+import { gitService } from "../services/git";
 
 export const repoRoutes = {
     "/api/repos": {
         async GET(req: Request) {
             try {
-                const repos = await azureClient.getRepositories();
-                return Response.json(repos);
+                const [repos, clonedRepos] = await Promise.all([
+                    azureClient.getRepositories(),
+                    gitService.listClonedRepos()
+                ]);
+
+                // Create a set of cloned identifiers "project/repo"
+                const clonedSet = new Set(clonedRepos.map(r => `${r.project}/${r.repo}`));
+
+                const reposWithStatus = repos.map((repo: any) => ({
+                    ...repo,
+                    isCloned: clonedSet.has(`${repo.project.name}/${repo.name}`)
+                }));
+
+                return Response.json(reposWithStatus);
             } catch (error: any) {
                 console.error("Error fetching repos:", error);
                 return Response.json({ error: error.message }, { status: 500 });
             }
         },
+    },
+    "/api/repos/clone": {
+        async POST(req: Request) {
+            try {
+                const { projectName, repoName, remoteUrl } = await req.json();
+                if (!projectName || !repoName || !remoteUrl) {
+                    return Response.json({ error: "Missing required fields" }, { status: 400 });
+                }
+
+                await gitService.clone(projectName, repoName, remoteUrl);
+                return Response.json({ success: true });
+            } catch (error: any) {
+                console.error("Error cloning repo:", error);
+                return Response.json({ error: error.message }, { status: 500 });
+            }
+        }
+    },
+    "/api/repos/sync": {
+        async POST(req: Request) {
+            try {
+                const { projectName, repoName } = await req.json();
+                if (!projectName || !repoName) {
+                    return Response.json({ error: "Missing required fields" }, { status: 400 });
+                }
+
+                await gitService.pull(projectName, repoName);
+                return Response.json({ success: true });
+            } catch (error: any) {
+                console.error("Error syncing repo:", error);
+                return Response.json({ error: error.message }, { status: 500 });
+            }
+        }
     },
     "/api/repo-items": {
         async GET(req: Request) {

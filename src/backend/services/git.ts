@@ -142,13 +142,32 @@ export class GitService {
 
         const output = await new Response(proc.stdout).text();
         const parts = output.trim().split(/\s+/);
-        if (parts.length === 2) {
+        if (parts.length === 2 && parts[0] && parts[1]) {
             return {
                 ahead: parseInt(parts[0], 10),
                 behind: parseInt(parts[1], 10)
             };
         }
         return { ahead: 0, behind: 0 };
+    }
+    async pull(projectName: string, repoName: string) {
+        const path = this.getRepoPath(projectName, repoName);
+
+        if (!(await this.isCloned(projectName, repoName))) {
+            throw new Error("Repository is not cloned locally");
+        }
+
+        const proc = Bun.spawn(["git", "pull"], {
+            cwd: path,
+            stdout: "pipe",
+            stderr: "pipe",
+        });
+
+        const exitCode = await proc.exited;
+        if (exitCode !== 0) {
+            const stderr = await new Response(proc.stderr).text();
+            throw new Error(`Git pull failed: ${stderr}`);
+        }
     }
 }
 
