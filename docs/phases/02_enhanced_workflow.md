@@ -12,9 +12,9 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
   - [x] One-click clone actions.
 
 ## 2. LSP Intelligence (The "Secret Sauce")
-- [ ] **Backend LSP Bridge**:
-  - [ ] Setup architecture to spawn/manage language servers (tsserver, gopls, etc.).
-  - [ ] WebSocket communication channel.
+- [x] **Backend LSP Bridge**:
+  - [x] Setup architecture to spawn/manage language servers (tsserver, gopls, etc.).
+  - [x] WebSocket communication channel.
 - [ ] **Frontend Integration**:
   - [ ] Connect CodeMirror to LSP events.
   - [ ] Implement Hover (Go to Definition, Type info).

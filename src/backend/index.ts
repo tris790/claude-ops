@@ -1,12 +1,18 @@
-import { serve } from "bun";
+import { serve, type Server } from "bun";
 import index from "../frontend/index.html";
 import { authRoutes } from "./routes/auth";
 import { repoRoutes } from "./routes/repos";
 import { workItemRoutes } from "./routes/work-items";
 import { prRoutes } from "./routes/prs";
 import { pipelineRoutes } from "./routes/pipelines";
+import { lspService } from "./services/lsp";
 
-const server = serve({
+interface WebSocketData {
+  rootPath: string;
+  language: string;
+}
+
+const server = serve<WebSocketData>({
   routes: {
     // Auth Routes
     ...authRoutes,
@@ -20,7 +26,7 @@ const server = serve({
     ...pipelineRoutes,
 
     "/api/hello": {
-      async GET(req) {
+      async GET(req: Request) {
         return Response.json({
           message: "Hello, world!",
           method: "GET",
@@ -28,8 +34,41 @@ const server = serve({
       },
     },
 
+    "/api/lsp": {
+      async GET(req: Request, server: Server<WebSocketData>) {
+        const url = new URL(req.url);
+        const rootPath = url.searchParams.get("rootPath");
+        const language = url.searchParams.get("language");
+
+        if (!rootPath || !language) {
+          return new Response("Missing rootPath or language", { status: 400 });
+        }
+
+        const success = server.upgrade(req, {
+          data: { rootPath, language }
+        });
+
+        if (success) {
+          return undefined;
+        }
+        return new Response("WebSocket upgrade failed", { status: 500 });
+      },
+    },
+
     // Serve index.html for all unmatched routes (SPA Fallback)
     "/*": index,
+  },
+
+  websocket: {
+    open(ws) {
+      lspService.handleConnection(ws, ws.data.rootPath, ws.data.language);
+    },
+    message(ws, message) {
+      lspService.handleMessage(ws, ws.data.rootPath, ws.data.language, message);
+    },
+    close(ws) {
+      lspService.handleClose(ws, ws.data.rootPath, ws.data.language);
+    },
   },
 
   development: process.env.NODE_ENV !== "production" && {
