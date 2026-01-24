@@ -7,6 +7,8 @@ export interface LSPInstance {
     rootPath: string;
     clients: Set<ServerWebSocket<any>>;
     buffer: string;
+    isInitialized: boolean;
+    pendingNotifications: any[];
 }
 
 export class LSPService {
@@ -57,12 +59,17 @@ export class LSPService {
                 return uri;
             });
         } catch (e) {
-            // If not JSON, just forward as is (unlikely for LSP)
             this.forwardToProcess(instance, json);
             return;
         }
 
-        this.forwardToProcess(instance, JSON.stringify(payload));
+        if (!instance.isInitialized && payload.method !== 'initialize') {
+            console.log(`[LSP] Buffering message: ${payload.method}`);
+            instance.pendingNotifications.push(payload);
+        } else {
+            console.log(`[LSP] >> ${payload.method || ('id:' + payload.id)}`);
+            this.forwardToProcess(instance, JSON.stringify(payload));
+        }
     }
 
     private forwardToProcess(instance: LSPInstance, json: string) {
@@ -113,7 +120,7 @@ export class LSPService {
             const localBin = resolve(projectRoot, "node_modules/.bin/typescript-language-server");
             if (await Bun.file(localBin).exists()) {
                 console.log(`[LSP] Found local typescript-language-server at ${localBin}`);
-                return [localBin, "--stdio"];
+                return ["node", localBin, "--stdio"];
             }
 
             const bin = Bun.which("typescript-language-server");
@@ -164,7 +171,10 @@ export class LSPService {
             throw e;
         }
 
-        console.log(`[LSP] Spawning: ${cmd.join(' ')} in ${rootPath}`);
+        console.log(`[LSP] Spawning ${language} server`);
+        console.log(`[LSP] Root Path: ${rootPath}`);
+        console.log(`[LSP] Command: ${cmd.join(' ')}`);
+
         const process = Bun.spawn(cmd, {
             cwd: rootPath,
             stdin: "pipe",
@@ -177,7 +187,9 @@ export class LSPService {
             language,
             rootPath,
             clients: new Set(),
-            buffer: ""
+            buffer: "",
+            isInitialized: false,
+            pendingNotifications: []
         };
 
         // Start processing stdout
@@ -189,11 +201,17 @@ export class LSPService {
         // Send 'initialize'
         const initMsg = {
             jsonrpc: "2.0",
-            id: 0,
+            id: "internal-init",
             method: "initialize",
             params: {
                 processId: process.pid,
                 rootUri: `file://${rootPath}`,
+                workspaceFolders: [
+                    {
+                        name: "root",
+                        uri: `file://${rootPath}`
+                    }
+                ],
                 capabilities: {
                     textDocument: {
                         hover: {
@@ -228,16 +246,6 @@ export class LSPService {
 
         this.sendToInstance(instance, initMsg);
 
-        // We technically should wait for response, but for now we immediately send 'initialized'
-        // to ensure the server enters the ready state.
-        // Most servers handle this pipelining fine.
-        const initializedMsg = {
-            jsonrpc: "2.0",
-            method: "initialized",
-            params: {}
-        };
-        this.sendToInstance(instance, initializedMsg);
-
         return instance;
     }
 
@@ -265,6 +273,7 @@ export class LSPService {
                 if (done) break;
 
                 const chunk = decoder.decode(value, { stream: true });
+                // console.log(`[LSP] STDOUT Chunk: ${chunk.length} bytes`);
                 instance.buffer += chunk;
                 this.processBuffer(instance);
             }
@@ -275,27 +284,78 @@ export class LSPService {
 
     private processBuffer(instance: LSPInstance) {
         while (true) {
-            // Check for Content-Length header
-            // Note: Use a more robust check in production, but this works for standard LSP
-            const lengthMatch = instance.buffer.match(/Content-Length: (\d+)\r\n\r\n/);
+            // Find the start of the headers (case-insensitive search)
+            const lowBuffer = instance.buffer.toLowerCase();
+            const headerStartIndex = lowBuffer.indexOf("content-length:");
 
-            if (!lengthMatch) return; // Wait for more data
+            if (headerStartIndex === -1) {
+                // If we have a lot of data but no header, maybe it's noise?
+                if (instance.buffer.length > 1000) {
+                    console.log(`[LSP] Discarding ${instance.buffer.length} bytes of non-LSP data from stdout`);
+                    instance.buffer = "";
+                }
+                break;
+            }
 
-            const contentLength = parseInt(lengthMatch[1]!, 10);
-            const headerSize = lengthMatch[0].length;
-            const idx = lengthMatch.index || 0;
+            // If there's garbage before the header, discard it
+            if (headerStartIndex > 0) {
+                const junk = instance.buffer.slice(0, headerStartIndex);
+                if (junk.trim()) {
+                    console.log(`[LSP] Discarded noise before header: ${junk.slice(0, 50)}...`);
+                }
+                instance.buffer = instance.buffer.slice(headerStartIndex);
+            }
+
+            // Find the end of the headers (\r\n\r\n)
+            const headerEndIndex = instance.buffer.indexOf("\r\n\r\n");
+            if (headerEndIndex === -1) break;
+
+            // Extract headers
+            const headers = instance.buffer.slice(0, headerEndIndex);
+            const contentLengthMatch = headers.match(/content-length:\s*(\d+)/i);
+
+            if (!contentLengthMatch) {
+                // Should not happen if we found Content-Length, but skip to be safe
+                instance.buffer = instance.buffer.slice(headerEndIndex + 4);
+                continue;
+            }
+
+            const contentLength = parseInt(contentLengthMatch[1] || "0", 10);
+            const totalHeaderSize = headerEndIndex + 4;
 
             // If we have the full message
-            if (instance.buffer.length >= idx + headerSize + contentLength) {
-                // Extract message
-                const message = instance.buffer.slice(idx + headerSize, idx + headerSize + contentLength);
+            if (instance.buffer.length >= totalHeaderSize + contentLength) {
+                // Extract message body
+                const message = instance.buffer.slice(totalHeaderSize, totalHeaderSize + contentLength);
 
-                // Remove processed part from buffer
-                instance.buffer = instance.buffer.slice(idx + headerSize + contentLength);
+                // Remove everything processed
+                instance.buffer = instance.buffer.slice(totalHeaderSize + contentLength);
 
                 let payload: any;
                 try {
                     payload = JSON.parse(message);
+                    if (payload.method !== 'textDocument/publishDiagnostics') {
+                        console.log(`[LSP] << ${payload.method || ('id:' + payload.id)}`);
+                    }
+
+                    // Internal initialization handling
+                    if (payload.id === "internal-init" && !instance.isInitialized) {
+                        console.log(`[LSP] Server initialized successfully`);
+                        instance.isInitialized = true;
+                        this.sendToInstance(instance, {
+                            jsonrpc: "2.0",
+                            method: "initialized",
+                            params: {}
+                        });
+
+                        // Send buffered client messages
+                        for (const msg of instance.pendingNotifications) {
+                            console.log(`[LSP] Replay buffered message: ${msg.method || 'request'}`);
+                            this.forwardToProcess(instance, JSON.stringify(msg));
+                        }
+                        instance.pendingNotifications = [];
+                    }
+
                     this.rewriteURIs(payload, (uri) => {
                         if (uri.startsWith(`file://${instance.rootPath}`)) {
                             let rel = uri.slice(`file://${instance.rootPath}`.length);
@@ -304,18 +364,17 @@ export class LSPService {
                         }
                         return uri;
                     });
+
+                    const finalMessage = JSON.stringify(payload);
+                    for (const client of instance.clients) {
+                        client.send(finalMessage);
+                    }
                 } catch (e) {
-                    // ignore parse error, send original (should not happen in valid LSP)
-                }
-
-                const finalMessage = payload ? JSON.stringify(payload) : message;
-
-                // Broadcast to clients
-                for (const client of instance.clients) {
-                    client.send(finalMessage);
+                    console.error(`[LSP] Failed to parse/forward message: ${e}`);
+                    // Fallback to forwarding raw message if it wasn't JSON but somehow valid LSP
                 }
             } else {
-                return; // Wait for more data
+                break; // Wait for more data
             }
         }
     }

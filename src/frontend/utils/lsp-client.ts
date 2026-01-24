@@ -1,6 +1,8 @@
+const REQUEST_TIMEOUT = 5000;
+
 export interface LSPMessage {
     jsonrpc: "2.0";
-    id?: number;
+    id?: number | string;
     method?: string;
     params?: any;
     result?: any;
@@ -25,31 +27,17 @@ export class LSPClient {
         return new Promise((resolve, reject) => {
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             const host = window.location.host;
-            // Use query params: ?project=...&repo=...&language=...
             const url = `${protocol}//${host}/api/lsp?project=${encodeURIComponent(this.projectName)}&repo=${encodeURIComponent(this.repoName)}&language=${encodeURIComponent(this.language)}`;
 
             this.ws = new WebSocket(url);
 
-            this.ws.onopen = () => {
-                console.log("[LSP] Connected");
-                resolve();
-            };
-
-            this.ws.onerror = (err) => {
-                console.error("[LSP] Connection error", err);
-                reject(err);
-            };
-
-            this.ws.onclose = () => {
-                console.log("[LSP] Disconnected");
-            };
-
+            this.ws.onopen = () => resolve();
+            this.ws.onerror = (err) => reject(err);
             this.ws.onmessage = (event) => {
                 try {
-                    const message = JSON.parse(event.data);
-                    this.handleMessage(message);
+                    this.handleMessage(JSON.parse(event.data));
                 } catch (e) {
-                    console.error("[LSP] Failed to parse message", e);
+                    // Ignore malformed messages
                 }
             };
         });
@@ -71,21 +59,17 @@ export class LSPClient {
     }
 
     off(method: string, handler: LSPEventHandler) {
-        const set = this.handlers.get(method);
-        if (set) {
-            set.delete(handler);
-        }
+        this.handlers.get(method)?.delete(handler);
     }
 
     sendNotification(method: string, params: any) {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
-        const msg: LSPMessage = {
+        this.ws.send(JSON.stringify({
             jsonrpc: "2.0",
             method,
             params
-        };
-        this.ws.send(JSON.stringify(msg));
+        }));
     }
 
     sendRequest(method: string, params: any): Promise<any> {
@@ -97,42 +81,62 @@ export class LSPClient {
             const id = this.messageId++;
             this.pendingRequests.set(id, { resolve, reject });
 
-            const msg: LSPMessage = {
+            this.ws.send(JSON.stringify({
                 jsonrpc: "2.0",
                 id,
                 method,
                 params
-            };
-            this.ws.send(JSON.stringify(msg));
+            }));
 
-            // Timeout after 5s?
             setTimeout(() => {
-                if (this.pendingRequests.has(id)) {
-                    this.pendingRequests.get(id)?.reject(new Error("LSP request timed out"));
+                const pending = this.pendingRequests.get(id);
+                if (pending) {
+                    pending.reject(new Error(`LSP request timed out: ${method}`));
                     this.pendingRequests.delete(id);
                 }
-            }, 5000);
+            }, REQUEST_TIMEOUT);
         });
     }
 
+    private sendResponse(id: number | string, result: any) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        this.ws.send(JSON.stringify({
+            jsonrpc: "2.0",
+            id,
+            result
+        }));
+    }
+
     private handleMessage(message: LSPMessage) {
-        // Response
-        if (typeof message.id === "number" && (message.result !== undefined || message.error !== undefined)) {
-            const pending = this.pendingRequests.get(message.id);
+        // Response to client-initiated request
+        if (message.id !== undefined && (message.result !== undefined || message.error !== undefined)) {
+            const id = typeof message.id === 'string' ? parseInt(message.id, 10) : message.id;
+            const pending = this.pendingRequests.get(id as number);
+
             if (pending) {
                 if (message.error) pending.reject(message.error);
                 else pending.resolve(message.result);
-                this.pendingRequests.delete(message.id);
+                this.pendingRequests.delete(id as number);
             }
             return;
         }
 
         // Notification / Request from Server
         if (message.method) {
-            const handlers = this.handlers.get(message.method);
-            if (handlers) {
-                handlers.forEach(h => h(message.params));
+            // Automatic responses to server requests
+            if (message.id !== undefined) {
+                if (message.method === 'workspace/configuration') {
+                    const result = message.params?.items?.map(() => ({}));
+                    this.sendResponse(message.id, result || []);
+                } else if (message.method === 'client/registerCapability') {
+                    this.sendResponse(message.id, null);
+                } else if (message.method === 'workspace/workspaceFolders') {
+                    this.sendResponse(message.id, []);
+                }
             }
+
+            this.handlers.get(message.method)?.forEach(h => h(message.params));
         }
     }
 }
+
