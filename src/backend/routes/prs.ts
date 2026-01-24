@@ -117,6 +117,25 @@ export const prRoutes = {
                 console.error(`[API] Error fetching threads for PR ${id}:`, error);
                 return Response.json({ error: error.message }, { status: 500 });
             }
+        },
+        async POST(req: Request, params: any) {
+            const id = getPrId(req, params);
+            if (!id) return Response.json({ error: "Invalid PR ID" }, { status: 400 });
+
+            try {
+                const body = await req.json();
+                const { repoId, content } = body;
+
+                if (!repoId || !content) {
+                    return Response.json({ error: "Missing required fields (repoId, content)" }, { status: 400 });
+                }
+
+                const thread = await azureClient.createPullRequestThread(repoId, id, content);
+                return Response.json(thread);
+            } catch (error: any) {
+                console.error(`[API] Error creating thread for PR ${id}:`, error);
+                return Response.json({ error: error.message }, { status: 500 });
+            }
         }
     },
 

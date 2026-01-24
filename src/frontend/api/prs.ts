@@ -26,6 +26,19 @@ export async function getPullRequestThreads(id: string, repoId: string) {
     return res.json();
 }
 
+export async function createPullRequestThread(id: string, repoId: string, content: string) {
+    const res = await fetch(`/api/prs/${id}/threads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoId, content }),
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to create thread");
+    }
+    return res.json();
+}
+
 export async function votePullRequest(id: string, repoId: string, reviewerId: string, vote: number) {
     const res = await fetch(`/api/prs/${id}/vote`, {
         method: "POST",

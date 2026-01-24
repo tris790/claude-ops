@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits } from "../api/prs";
+import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread } from "../api/prs";
 import {
     ArrowLeft,
     GitPullRequest,
@@ -32,6 +32,8 @@ export function PRDetail() {
     const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"overview" | "files" | "commits">("overview");
+    const [newComment, setNewComment] = useState("");
+    const [postingComment, setPostingComment] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +78,25 @@ export function PRDetail() {
             alert("Voting functionality requires current user context (Reviewer ID)");
         } catch (err) {
             console.error(err);
+        }
+    }
+
+    async function handlePostComment() {
+        if (!newComment.trim() || !pr || !id) return;
+
+        setPostingComment(true);
+        try {
+            await createPullRequestThread(id, pr.repository.id, newComment);
+            setNewComment("");
+
+            // Refresh threads
+            const threadData = await getPullRequestThreads(id, pr.repository.id);
+            setThreads(threadData);
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to post comment: " + err.message);
+        } finally {
+            setPostingComment(false);
         }
     }
 
@@ -179,6 +200,25 @@ export function PRDetail() {
                                     </div>
 
                                     <div className="space-y-4">
+                                        {/* New Comment Input */}
+                                        <div className="bg-zinc-900/30 rounded-xl border border-zinc-800 p-4 space-y-3">
+                                            <textarea
+                                                value={newComment}
+                                                onChange={(e) => setNewComment(e.target.value)}
+                                                placeholder="Leave a comment..."
+                                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none min-h-[100px] resize-y placeholder-zinc-600"
+                                            />
+                                            <div className="flex justify-end">
+                                                <button
+                                                    onClick={handlePostComment}
+                                                    disabled={postingComment || !newComment.trim()}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all"
+                                                >
+                                                    {postingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                                                    Comment
+                                                </button>
+                                            </div>
+                                        </div>
                                         {threads.filter(t => !t.isDraft && t.comments.some((c: any) => c.content)).map((thread: any) => (
                                             <div key={thread.id} className="bg-zinc-900/30 rounded-xl border border-zinc-800 overflow-hidden">
                                                 <div className="space-y-4 p-4">

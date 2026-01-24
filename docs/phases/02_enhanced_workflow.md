@@ -23,8 +23,8 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
 ## 3. Interactive Code Review
 - [ ] **Rich Commenting**:
   - [ ] Multi-line selection comments.
-  - [ ] Markdown support in comments.
-  - [ ] Threaded replies.
+  - [x] Markdown support in comments.
+  - [x] Threaded replies.
 - [ ] **Review Submission**:
   - [ ] Draft comments status.
   - [ ] Submit Review (Approve/Reject/Wait).
