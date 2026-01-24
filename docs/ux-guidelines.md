@@ -1,121 +1,126 @@
-# UX Guidelines
+# UX Guidlines
 
 ## Design Philosophy
 
-Claude-Ops should feel like a **premium developer tool** - fast, focused, and visually refined. The UI should get out of the way while providing powerful capabilities.
+Claude-Ops must feel like a **precision-engineered instrument**—unapologetically technical yet beautifully refined. It should embody "Invisible Power": the interface recedes, highlighting the code and work items.
+
+**Core Values:**
+-   **Speed as a Feature:** Every interaction must feel instantaneous (under 100ms response).
+-   **High Information Density:** Developers read code; they can handle dense execution, but it must be orderly.
+-   **Visual Clarity:** Syntax highlighting and status indicators take precedence over decorative elements.
 
 ## Visual Identity
 
 ### Color Palette
 
-**Avoid:**
-- Purple (too common, Azure DevOps association)
-- Claude-style orange/warm beige
-- Gemini-style blue/teal
-- Generic "AI product" gradients
+**Primary Accent: Sapphire Blue**
+-   **Usage:** Primary buttons, active states, focus rings, key loading indicators.
+-   **Reference:** Tailwind `blue-600` (`#2563EB`) for light/default, `blue-500` (`#3B82F6`) for dark mode elements requiring higher contrast.
+-   **Why:** It is sharp, modern, and trustworthy without being corporate-boring or "default bootstrap."
 
-**Recommended Direction:**
-- Deep, rich backgrounds (not pure black)
-- High-contrast syntax highlighting
-- Accent color TBD (consider: emerald, amber, cyan, or warm neutral)
-- Subtle gradients for depth, not decoration
+**Secondary Accents:**
+-   **Red/Rose:** Destructive actions and blocking errors.
+-   **Amber:** Warnings and "Draft" states.
+
+**Neutrals (The "Stage"):**
+-   **Backgrounds:** Rich, deep charcoals ex: `zinc-900` (`#18181b`) and `zinc-950` (`#09090b`). **Never pure black (`#000000`)**.
+-   **Surface:** Softened dark grays `zinc-800/50` for cards and panels.
+-   **Borders:** Subtle separation `white/10` or `zinc-800`.
+
+**Avoid:**
+-   Claude-style Orange/Beige (confuses brand).
+-   Gemini/Google Teal (too distinctively Google).
+-   Purple
 
 ### Theme Support
-
-- **Dark Mode**: Default, primary design target
-- **Light Mode**: Available via toggle, fully supported
+-   **Dark Mode First:** Designed primarily for dark mode. Light mode is a secondary citizen but fully supported.
 
 ## Typography
 
-- Clean, modern sans-serif for UI
-- Monospace for code (consider: JetBrains Mono, Fira Code, or similar)
-- Clear hierarchy with size and weight
+-   **UI Font:** Inter, Roboto, or system sans-serif. Legible at small sizes (11px-13px).
+-   **Code Font:** JetBrains Mono (preferred), Fira Code, or generic monospace. **Must support ligatures.**
+-   **Weights:** Use weight to denote hierarchy, not just size. Bold for headings, Semibold for active items, Regular for body.
 
-## Layout Principles
+## Layout & Spatial System
 
-### Information Density
-- Developers prefer information density over whitespace
-- Balance readability with efficiency
-- Collapsible panels for optional context
+### The "Command Center" Layout
+The app is framed by a stable, predictable shell.
 
-### Navigation
-- Command palette as primary navigation method
-- Minimal click depth to common actions
-- Breadcrumbs for context awareness
+1.  **Sidebar (Left):**
+    -   Width: Collapsible, default ~260px.
+    -   Content: Navigation tree (Project > Repos).
+    -   Behavior: Sticky, independent scroll.
+2.  **Activity Bar (optional):**
+    -   Thin strip for high-level context switching (Repos, PRs, Pipelines).
+3.  **Main Stage (Center):**
+    -   Where the work happens.
+    -   Maximum width constraint for readability (e.g., `max-w-7xl` centered) but allows full-width for diffs/logs.
+4.  **Status Bar (Bottom):**
+    -   Height: ~24px.
+    -   Content: Connection status, current branch, quick actions.
 
-### Responsive Behavior
-- Optimized for large screens (developers typically use wide monitors)
-- Minimum viable width: 1024px
-- Panels resize gracefully
-
-## Interaction Patterns
-
-### Command Palette
-- Opens with Ctrl+K or Ctrl+P
-- Fuzzy search across all entity types
-- Recent items shown by default
-- Type-ahead filtering
-- Keyboard navigation (up/down arrows, enter to select)
-
-### Keyboard Shortcuts
-- Standard shortcuts only (no vim-style in v1)
-- Arrow keys for list navigation
-- Tab for focus movement
-- Enter to confirm/open
-- Escape to close/cancel
-
-### Real-time Updates
-- In-view content updates automatically
-- Subtle visual indicator when content refreshes
-- No disruptive notifications or toasts
-- Loading states should be unobtrusive
-
-### Forms & Inputs
-- Markdown preview for text areas (comments, descriptions)
-- @mention autocomplete with avatar + name
-- Inline validation
-- Clear error states
+### Spacing (Tailwind Scale)
+-   **Tight:** `gap-1` (4px) or `gap-2` (8px) for related items (icons + text).
+-   **Structure:** `p-4` (16px) or `p-6` (24px) for container padding.
+-   **Separation:** `my-8` (32px) to distinct major sections.
 
 ## Component Guidelines
 
+### Buttons
+-   **Primary:** Solid Sapphire Blue background. White text. Subtle hover lift or brightness boost.
+    -   `bg-blue-600 hover:bg-blue-500 text-white rounded-md px-3 py-1.5 font-medium shadow-sm transition-all`
+-   **Secondary:** Transparent/Outline. Zinc border.
+    -   `border border-zinc-700 hover:bg-zinc-800 text-zinc-300`
+-   **Ghost:** Text only, background on hover. Used for list actions.
+    -   `text-zinc-400 hover:text-white hover:bg-zinc-800/50`
+
+### Inputs & Forms
+-   **Style:** Minimalist, no heavy borders.
+-   **Background:** Darker than the page background (`bg-zinc-950` on a `zinc-900` page).
+-   **Focus:** Sharp Sapphire Blue ring (`ring-2 ring-blue-600/50`).
+-   **Validation:** Inline, immediate. Red text helper below input.
+
 ### Lists & Tables
-- Sortable columns
-- Filterable content
-- Infinite scroll or pagination (TBD)
-- Row hover states
-- Quick actions on hover
+-   **Density:** Compact. 32px-40px row height.
+-   **Hover:** Highlight entire row with `bg-white/5`.
+-   **Separators:** Minimal or no border between rows; use alignment.
+-   **Virtualization:** Mandatory for lists > 100 items.
 
-### Code Display
-- Syntax highlighting (language-aware)
-- Line numbers
-- Clickable line numbers for sharing
-- Diff view with side-by-side option
-- Blame annotations
+### Panels & Cards
+-   **Appearance:** Flat or subtle border. `bg-zinc-900` border `zinc-800`.
+-   **Glassmorphism:** Use sparingly. Maybe for floating headers or the Command Palette.
+    -   `backdrop-blur-md bg-zinc-900/80`
 
-### Status Indicators
-- Pipeline status: Clear iconography (running, success, failed, cancelled)
-- PR status: Approved, needs work, draft, merged
-- Work item states: Visual color coding
+## Interaction Patterns
 
-## Animation & Transitions
+### Command Palette (The Heart)
+-   **Design:** Floating modal, centered top-third. Large input text. Use icons to distinguish types (File, PR, Work Item).
+-   **Behavior:** Immediate appearance. Zero lag.
 
-- Subtle, fast transitions (150-200ms)
-- No gratuitous animation
-- Loading skeletons over spinners where appropriate
-- Smooth scroll behavior
+### Feedback & States
+-   **Loading:**
+    -   **Global:** Thin blue progress bar at the very top of the window (GitHub style).
+    -   **Local:** Skeleton screens (pulsing gray blocks) matching text line-heights.
+    -   **Avoid:** Full-screen spinners.
+-   **Empty States:**
+    -   Don't just say "No items".
+    -   Provide a call to action: "No PRs found. *Create one?*"
+    -   Use a subtle, desaturated illustration.
 
-## Accessibility Considerations
+### Transitions
+-   **Duration:** Fast. 100ms-150ms.
+-   **Easing:** `ease-out`.
+-   **Properties:** Opacity and Transform (scale 0.98 -> 1.00).
+-   **Touch:** All clickable elements must have a visual feedback state (:active).
 
-- Keyboard navigable
-- Sufficient color contrast
-- Focus indicators
-- Screen reader compatible labels (stretch goal)
+## Accessibility
+-   **Keyboard First:** Every single action must be doable without a mouse.
+-   **Focus Indicators:** High contrast, usually Blue ring. Never suppress outline without providing an alternative.
+-   **Contrast:** Text `zinc-400` minimum on dark backgrounds. Primary actions `white` on Blue.
 
-## Anti-Patterns to Avoid
+## Anti-Patterns
+-   **Scrolljacking:** Never mess with native scroll.
+-   **Modals on Modals:** Maximum 1 level of modal depth.
+-   **Mystery Meat Navigation:** All icons must have tooltips.
+-   **Confirm Shaming:** "Are you sure you want to be unproductive?" -> Don't do this.
 
-- Modal overload (prefer inline editing)
-- Deep navigation hierarchies
-- Forced workflows
-- Unnecessary confirmation dialogs
-- Auto-playing anything
-- Tooltip overload

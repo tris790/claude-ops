@@ -36,18 +36,37 @@
 
 ### Key Components
 
+- **Landing Page**: Repository list showing all repos in the organization
 - **Command Palette**: Global search and navigation hub
 - **Views**: PR, Work Items, Pipelines, Repository Browser
 - **Settings Page**: Dedicated full page for configuration (org URL, PAT, clone directory, etc.)
 - **Real-time Updates**: Polling-based updates for in-view content
 
-### State Management
-
-- TBD: Consider Zustand, Jotai, or React Query for server state
-
 ### Routing
 
-- TBD: React Router or TanStack Router
+**Clean human-readable URLs** for shareable links:
+- `/repos` - Repository list (**default landing/home page**)
+- `/repos/:project/:repo` - Repository browser
+- `/repos/:project/:repo/blob/:branch/:path` - File view
+- `/pr/:id` - Pull request detail
+- `/workitem/:id` - Work item detail
+- `/pipelines/:id` - Pipeline detail
+- `/settings` - Settings page
+- `/workitems` - Work item list
+- `/prs` - Pull request list
+- `/pipelines` - Pipeline list
+
+### State Management
+
+- **Philosophy**: Minimalist. Use React Context and Hooks.
+- **Global State**: Managed via custom lightweight stores where strictly necessary.
+- **Avoid**: Redux, MobX, or other heavy bundle-size libraries.
+
+### User Display
+
+- **Avatar + name inline**: No popover cards or profile links
+- Clicking users does not navigate anywhere
+- @mentions in comments autocomplete with avatar + name
 
 ## Backend
 
@@ -122,9 +141,18 @@ User provides PAT → Stored in .env file → Injected into Azure DevOps API cal
 - All Azure DevOps API calls routed through backend proxy
 - Local clones respect Azure DevOps permissions
 
-## Open Technical Decisions
+## Logging
 
-1. **Search Index**: Local ripgrep vs Azure Search API vs hybrid
-2. **LSP Server Management**: Bundle servers vs expect system install
-3. **Cache Strategy**: What to cache, TTL, invalidation
-4. **WebSocket vs Polling**: For real-time updates
+- **Backend Log Level**: Errors only (minimal logging)
+- Logs stored in `~/.claude-ops/logs/`
+- No sensitive data (PAT, credentials) in logs
+
+## Resolved Technical Decisions
+
+1. **Search Strategy**: Azure DevOps Code Search API (enabled on org) + local ripgrep for cloned repos
+2. **Cache Strategy**: Hybrid (event-driven invalidation + background polling)
+3. **Settings Storage**: `config.json` file in app directory
+4. **HTTP Proxy**: Not needed (backend makes direct calls)
+5. **LSP Server Management**: Tiered discovery (System Path -> VS Code Extensions -> Managed Download). No bundling.
+6. **Real-time Updates**: Hybrid approach. WebSocket for LSP (latency critical), HTTP Polling + Streaming for entities/logs.
+7. **State Management**: React Context + Custom Hooks. Avoid external state libraries (Zustand/Redux) to keep bundle small (Goal: <1MB).
