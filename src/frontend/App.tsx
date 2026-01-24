@@ -1,31 +1,64 @@
-import { APITester } from "./APITester";
-import "./index.css";
-
-import logo from "./logo.svg";
-import reactLogo from "./react.svg";
+import { MainLayout } from "./layouts/MainLayout";
+import { Button } from "./components/ui/Button";
+import { Card } from "./components/ui/Card";
+import { Input } from "./components/ui/Input";
+import { Badge } from "./components/ui/Badge";
+import { Spinner } from "./components/ui/Spinner";
 
 export function App() {
   return (
-    <div className="max-w-7xl mx-auto p-8 text-center relative z-10">
-      <div className="flex justify-center items-center gap-8 mb-8">
-        <img
-          src={logo}
-          alt="Bun Logo"
-          className="h-24 p-6 transition-all duration-300 hover:drop-shadow-[0_0_2em_#646cffaa] scale-120"
-        />
-        <img
-          src={reactLogo}
-          alt="React Logo"
-          className="h-24 p-6 transition-all duration-300 hover:drop-shadow-[0_0_2em_#61dafbaa] animate-[spin_20s_linear_infinite]"
-        />
-      </div>
+    <MainLayout>
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-white mb-2">Design System</h1>
+          <p className="text-zinc-400">Foundation components and layout verification.</p>
+        </div>
 
-      <h1 className="text-5xl font-bold my-4 leading-tight">Bun + React</h1>
-      <p>
-        Edit <code className="bg-[#1a1a1a] px-2 py-1 rounded font-mono">src/frontend/App.tsx</code> and save to test HMR
-      </p>
-      <APITester />
-    </div>
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold text-zinc-100">Buttons</h2>
+          <div className="flex flex-wrap gap-4">
+            <Button variant="primary">Primary Action</Button>
+            <Button variant="secondary">Secondary Action</Button>
+            <Button variant="ghost">Ghost Button</Button>
+            <Button variant="danger">Destructive</Button>
+            <Button isLoading>Loading</Button>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold text-zinc-100">Inputs</h2>
+          <div className="grid max-w-md gap-4">
+            <Input label="Email Address" placeholder="name@example.com" />
+            <Input label="Password" type="password" defaultValue="secret" error="Password matches previous password" />
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold text-zinc-100">Cards & Badges</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card hoverable className="space-y-3">
+              <div className="flex justify-between items-start">
+                <h3 className="font-medium text-white">Pull Request #42</h3>
+                <Badge variant="success">Open</Badge>
+              </div>
+              <p className="text-sm text-zinc-400">Refactoring the navigation component for better accessibility.</p>
+              <div className="text-xs text-zinc-500">Updated 2h ago</div>
+            </Card>
+            <Card className="space-y-3">
+              <div className="flex justify-between items-start">
+                <h3 className="font-medium text-white">Issue #128</h3>
+                <Badge variant="warning">Blocked</Badge>
+              </div>
+              <p className="text-sm text-zinc-400">Waiting on API documentation update.</p>
+              <div className="flex items-center gap-2 text-xs text-zinc-500 border-t border-zinc-800/50 pt-3">
+                <Spinner size="sm" />
+                <span>Syncing...</span>
+              </div>
+            </Card>
+          </div>
+        </section>
+      </div>
+    </MainLayout>
   );
 }
 
