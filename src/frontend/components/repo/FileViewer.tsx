@@ -1,4 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { getEditorTheme } from "../../styles/code-themes";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, drawSelection, hoverTooltip, type Tooltip } from "@codemirror/view";
@@ -14,6 +17,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getFileContent, type GitItem } from "../../api/repos";
 import { LSPClient } from "../../utils/lsp-client";
+import { getHighlighter } from "../../utils/shiki";
 
 interface FileViewerProps {
     repoId: string;
@@ -28,6 +32,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"code" | "markdown">("code");
+
+    const [lspStatus, setLspStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
 
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
@@ -60,7 +66,10 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
 
     // LSP Connection Effect
     useEffect(() => {
-        if (!isCloned || !projectName || !repoName || !file.path || viewMode !== "code") {
+        console.log("[FileViewer] LSP Effect Triggered", { isCloned, projectName, repoName, path: file.path, viewMode, loading });
+
+        if (!isCloned || !projectName || !repoName || !file.path || viewMode !== "code" || loading) {
+            setLspStatus("disconnected");
             return;
         }
 
@@ -70,25 +79,45 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         else if (ext === 'go') language = 'go';
         else if (ext === 'py') language = 'python';
 
-        if (!language) return;
+        if (!language) {
+            console.log("[FileViewer] No mapping for extension", ext);
+            return;
+        }
 
+        setLspStatus("connecting");
         const client = new LSPClient(projectName, repoName, language);
         lspRef.current = client;
 
         client.connect().then(() => {
+            console.log("[FileViewer] LSP Connected");
+            setLspStatus("connected");
+
             // Initialize
             // Note: In a real LSP scenario, we send 'initialize' request with capabilities
             // For this phase, we assume the backend handles the lifecycle or is simpler
 
-            // For this MVP, we just notify opened file
-            // client.sendNotification('textDocument/didOpen', ...);
-        }).catch(err => console.error(err));
+            // Notify opened file so the server treats it as open (and in-memory)
+            // Ensure path starts with / for file URI
+            const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+            client.sendNotification('textDocument/didOpen', {
+                textDocument: {
+                    uri: `file://${normalizedPath}`,
+                    languageId: language,
+                    version: 1,
+                    text: content
+                }
+            });
+        }).catch(err => {
+            console.error("[FileViewer] LSP Connection Failed", err);
+            setLspStatus("disconnected");
+        });
 
         return () => {
             client.disconnect();
             lspRef.current = null;
+            setLspStatus("disconnected");
         };
-    }, [repoId, file.path, projectName, repoName, isCloned, viewMode]);
+    }, [repoId, file.path, projectName, repoName, isCloned, viewMode, loading, content]);
 
 
     useEffect(() => {
@@ -105,43 +134,176 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
             const character = pos - line.from;
 
             try {
-                // Request hover from LSP
+                const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
                 const result = await lspRef.current.sendRequest("textDocument/hover", {
-                    textDocument: { uri: `file://${file.path}` }, // Backend needs to map this if needed
+                    textDocument: { uri: `file://${normalizedPath}` },
                     position: { line: line.number - 1, character }
                 });
 
                 if (!result || !result.contents) return null;
 
-                let markdown = "";
-                if (typeof result.contents === "string") markdown = result.contents;
-                else if (result.contents.kind === "markdown") markdown = result.contents.value;
-                else if (Array.isArray(result.contents)) {
-                    markdown = result.contents.map((c: any) => typeof c === 'string' ? c : c.value).join('\n');
+                let signatureMarkdown = "";
+                let docMarkdown = "";
+
+                const processMarkedString = (s: any) => {
+                    if (typeof s === 'string') return s;
+                    if (s.language) return `\`\`\`${s.language}\n${s.value}\n\`\`\``;
+                    return s.value || "";
+                };
+
+                if (Array.isArray(result.contents)) {
+                    signatureMarkdown = processMarkedString(result.contents[0]);
+                    docMarkdown = result.contents.slice(1).map(processMarkedString).join('\n\n');
+                } else if (result.contents.kind === "markdown") {
+                    docMarkdown = result.contents.value;
                 } else {
-                    markdown = result.contents.value || "";
+                    docMarkdown = processMarkedString(result.contents);
                 }
 
-                if (!markdown) return null;
+                if (!signatureMarkdown && !docMarkdown.trim()) return null;
 
                 return {
                     pos,
-                    end: pos, // We could use range from result if available
+                    end: pos,
                     above: true,
                     create(view) {
                         const dom = document.createElement("div");
-                        dom.className = "p-2 max-w-sm prose prose-sm prose-invert bg-zinc-900 border border-zinc-700 rounded shadow-xl";
-                        // Basic markdown rendering or just text
-                        dom.textContent = markdown;
-                        // Note: For full markdown we'd need a parser, but textContent is safe for now
-                        return { dom };
+                        dom.className = "cm-lsp-tooltip-container group p-0 max-w-2xl bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden transition-all duration-300 animate-in fade-in zoom-in-95";
+
+                        // Interactive behavior: While the mouse is over the tooltip, we want to keep it.
+                        // However, CM6 hoverTooltip manages the lifecycle by distance.
+                        // By giving the DOM a bit of 'interactive' status or just making it large enough, it helps.
+
+                        const root = createRoot(dom);
+
+                        const TooltipContent = () => {
+                            const [highlighter, setHighlighter] = useState<any>(null);
+
+                            useEffect(() => {
+                                getHighlighter().then(setHighlighter);
+                            }, []);
+
+                            return (
+                                <div className="max-h-[400px] overflow-y-auto">
+                                    {signatureMarkdown && (
+                                        <div className="bg-zinc-800/50 px-4 py-2 border-b border-zinc-700/30">
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    code({ node, inline, className, children, ...props }: any) {
+                                                        const lang = /language-(\w+)/.exec(className || "")?.[1] || "typescript";
+                                                        const code = String(children).replace(/\n$/, "");
+                                                        if (!inline && highlighter) {
+                                                            const html = highlighter.codeToHtml(code, { lang, theme: 'github-dark' });
+                                                            return <div dangerouslySetInnerHTML={{ __html: html }} className="text-xs font-mono" />;
+                                                        }
+                                                        return <code className="text-xs font-mono text-blue-300 font-bold">{children}</code>;
+                                                    }
+                                                }}
+                                            >
+                                                {signatureMarkdown}
+                                            </ReactMarkdown>
+                                        </div>
+                                    )}
+                                    <div className="p-4 prose prose-sm prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-headings:text-zinc-100 prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline">
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                                code({ node, inline, className, children, ...props }: any) {
+                                                    const match = /language-(\w+)/.exec(className || "");
+                                                    const lang = match ? match[1] : "";
+                                                    const code = String(children).replace(/\n$/, "");
+
+                                                    if (!inline && lang && highlighter) {
+                                                        const html = highlighter.codeToHtml(code, {
+                                                            lang: lang,
+                                                            theme: 'github-dark'
+                                                        });
+                                                        return <div className="shiki-tooltip-code rounded overflow-hidden shadow-inner bg-black/20" dangerouslySetInnerHTML={{ __html: html }} />;
+                                                    }
+
+                                                    return inline ?
+                                                        <code className="bg-zinc-800/80 px-1 py-0.5 rounded text-blue-300 font-mono text-[0.9em]" {...props}>{children}</code> :
+                                                        <pre className="bg-zinc-950/50 p-3 rounded-md overflow-x-auto border border-zinc-800/50" {...props}><code className={className}>{children}</code></pre>;
+                                                },
+                                                a({ href, children }: any) {
+                                                    const handleClick = (e: React.MouseEvent) => {
+                                                        e.preventDefault();
+                                                        if (href?.startsWith("file://") || href?.startsWith("http")) {
+                                                            window.open(href, "_blank");
+                                                        }
+                                                    };
+                                                    return (
+                                                        <a href={href} onClick={handleClick}>
+                                                            {children}
+                                                        </a>
+                                                    );
+                                                }
+                                            }}
+                                        >
+                                            {docMarkdown}
+                                        </ReactMarkdown>
+                                    </div>
+                                </div>
+                            );
+                        };
+
+                        root.render(<TooltipContent />);
+
+                        return {
+                            dom,
+                            overlap: true
+                        };
                     }
                 };
             } catch (e) {
                 console.error(e);
                 return null;
             }
-        });
+        }, { hoverTime: 300 });
+
+        const handleGoToDefinition = async (view: EditorView) => {
+            if (!lspRef.current) return false;
+            const pos = view.state.selection.main.head;
+            const line = view.state.doc.lineAt(pos);
+            const character = pos - line.from;
+
+            try {
+                const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+                const result = await lspRef.current.sendRequest("textDocument/definition", {
+                    textDocument: { uri: `file://${normalizedPath}` },
+                    position: { line: line.number - 1, character }
+                });
+
+                if (!result) return false;
+
+                // result can be Location | Location[] | LocationLink[]
+                const location = Array.isArray(result) ? result[0] : result;
+                if (!location) return false;
+
+                // Handle navigation
+                // In a real app, we might need to change the active file.
+                // For now, if it's the same file, we can jump.
+                const targetUri = 'uri' in location ? location.uri : (location as any).targetUri;
+                const range = 'range' in location ? location.range : (location as any).targetSelectionRange;
+
+                if (targetUri === `file://${normalizedPath}`) {
+                    const targetPos = view.state.doc.line(range.start.line + 1).from + range.start.character;
+                    view.dispatch({
+                        selection: { anchor: targetPos },
+                        scrollIntoView: true
+                    });
+                    return true;
+                } else {
+                    // TODO: Navigation to other files
+                    console.log("[LSP] Navigate to other file", targetUri, range);
+                    return false;
+                }
+            } catch (e) {
+                console.error("[LSP] Definition request failed", e);
+                return false;
+            }
+        };
 
         const getExtensions = () => {
             const ext = file.path.split('.').pop()?.toLowerCase();
@@ -151,7 +313,11 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                 drawSelection(),
                 bracketMatching(),
                 ...getEditorTheme(true),
-                keymap.of([...defaultKeymap, ...historyKeymap]),
+                keymap.of([
+                    ...defaultKeymap,
+                    ...historyKeymap,
+                    { key: "F12", run: (view) => { handleGoToDefinition(view); return true; } }
+                ]),
                 EditorState.readOnly.of(true),
                 hoverExtension,
                 linter(async (view) => {
@@ -200,6 +366,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         // Setup Diagnostics Listener
         if (lspRef.current) {
             lspRef.current.on('textDocument/publishDiagnostics', (params: any) => {
+                console.log("[LSP] Received Diagnostics", params);
                 if (!viewRef.current) return;
                 // params.uri matching logic could be added here
 
@@ -225,31 +392,42 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         return () => {
             view.destroy();
         };
-    }, [content, loading, viewMode, file.path]); // Added file.path dependency to safely recreate view on file switch
+    }, [content, loading, viewMode, file.path, lspStatus]); // Added lspStatus to re-bind helpers if connection changes
 
     if (loading) return <div className="p-8 text-center text-zinc-500">Loading content...</div>;
     if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
 
     return (
         <div className="flex flex-col h-full bg-zinc-950">
-            {isMarkdown && (
-                <div className="flex items-center justify-end px-4 py-2 bg-zinc-900 border-b border-zinc-800">
-                    <div className="flex space-x-2 bg-zinc-800 rounded p-1">
-                        <button
-                            onClick={() => setViewMode("markdown")}
-                            className={`px-3 py-1 text-xs rounded ${viewMode === "markdown" ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
-                        >
-                            Preview
-                        </button>
-                        <button
-                            onClick={() => setViewMode("code")}
-                            className={`px-3 py-1 text-xs rounded ${viewMode === "code" ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
-                        >
-                            Source
-                        </button>
-                    </div>
+            <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-zinc-800">
+                <div className="flex items-center space-x-2">
+                    {viewMode === "code" && (
+                        <div className={`flex items-center space-x-1 text-xs px-2 py-1 rounded border ${lspStatus === 'connected' ? 'border-green-800 bg-green-900/20 text-green-400' :
+                            lspStatus === 'connecting' ? 'border-yellow-800 bg-yellow-900/20 text-yellow-400' :
+                                'border-zinc-700 bg-zinc-800 text-zinc-500'
+                            }`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${lspStatus === 'connected' ? 'bg-green-500' :
+                                lspStatus === 'connecting' ? 'bg-yellow-500' : 'bg-zinc-500'
+                                }`} />
+                            <span>{lspStatus === 'connected' ? 'LSP Ready' : lspStatus === 'connecting' ? 'LSP Connecting' : 'LSP Inactive'}</span>
+                        </div>
+                    )}
                 </div>
-            )}
+                <div className="flex space-x-2 bg-zinc-800 rounded p-1">
+                    <button
+                        onClick={() => setViewMode("markdown")}
+                        className={`px-3 py-1 text-xs rounded ${viewMode === "markdown" ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+                    >
+                        Preview
+                    </button>
+                    <button
+                        onClick={() => setViewMode("code")}
+                        className={`px-3 py-1 text-xs rounded ${viewMode === "code" ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+                    >
+                        Source
+                    </button>
+                </div>
+            </div>
 
             <div className="flex-1 overflow-auto">
                 {viewMode === "code" ? (

@@ -1,4 +1,4 @@
-Your job is to complete a **single** work item (docs/phases/phase-2/)
+Your job is to complete a **single** work item (docs/phases/02_enhanced_workflow.md)
 
 Make sure to study (docs/architecture, docs/goals, docs/ux-design)
 

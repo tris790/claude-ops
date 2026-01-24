@@ -17,27 +17,58 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
   - [x] WebSocket communication channel.
 - [x] **Frontend Integration**:
   - [x] Connect CodeMirror to LSP events.
-  - [x] Implement Hover (Go to Definition, Type info).
+  - [x] **Rich Tooltips**:
+    - [x] **Markdown Rendering**: Use `react-markdown` to render `Documentation` field from LSP. Ensure safe rendering and modern styling.
+    - [x] **Syntax Highlighting**: Integrate `shiki` or `prismjs` for code blocks within the rendered markdown documentation.
+    - [x] **Interactive Tooltips**: Tooltips must remain visible when the mouse moves into them to allow interaction with links.
+    - [x] **Enriched Content**: Display full type signatures, JSDoc descriptions, and available parameter info.
+  - [/] **LSP Navigation**:
+    - [ ] **Go to Definition**: Implement `F12` and `Cmd/Ctrl+Click` handlers mapping to `textDocument/definition`.
+    - [ ] **Location Mapping**: Transform LSP `Location` responses into internal app navigation paths (`/repo/:name/blob/:branch/*`).
+    - [ ] **Breadcrumbs**: Show clickable file/symbol paths in tooltips for easy navigation to referenced types.
   - [x] Implement Diagnostics (Squiggles/Errors).
+  - [ ] **LSP in Diff View**:
+    - [ ] **Position Mapping**: Translate diff-view coordinates (lines/cols) to actual document offsets for both `Original` and `Modified` buffers.
+    - [ ] **View Integration**: Ensure the `LSPProvider` attaches correctly to both panes in `Side-by-Side` mode and handles the `Unified` view context.
 
 ## 3. Interactive Code Review
 - [ ] **Rich Commenting**:
-  - [ ] Multi-line selection comments.
+  - [ ] **Multi-line selection**: Implement range selection in CodeMirror using `EditorView.lineBlockAt`. Show a floating "Comment" button on selection end.
+  - [ ] **Azure DevOps Integration**: Map selection ranges to the `iterationContext` and `threadContext` in the PR Thread API.
   - [x] Markdown support in comments.
   - [x] Threaded replies.
 - [ ] **Review Submission**:
-  - [ ] Draft comments status.
-  - [ ] Submit Review (Approve/Reject/Wait).
+  - [ ] **Local Drafts**: Store unsaved comment content in `localStorage` per PR/file to prevent data loss.
+  - [ ] **Status Control**: Add a "Review" menu in the PR header with one-click actions: `Approve`, `Approve with suggestions`, `Wait for author`, `Reject`.
+  - [ ] **Merge Integration**: Ensure "Complete PR" trigger is only enabled after successful review/policy checks.
+- [ ] **Review Progress & Iterations**:
+  - [ ] **Iteration Management**:
+    - [ ] **Iteration Selector**: Component to switch between specific code pushes.
+    - [ ] **Inter-iteration Diff**: Compare changes between arbitrary iterations (e.g., Iteration 2 vs Iteration 5).
+  - [ ] **Review State**:
+    - [ ] **File Completion**: Implement "Mark as reviewed" checkboxes in the file tree.
+    - [ ] **Cumulative Diff**: Show only "Changes since my last review" based on tracked iteration history.
 
 ## 4. Real-Time Interactions
 - [ ] **Live Updates**:
-  - [ ] Polling mechanism for Lists and Work Items.
-  - [ ] Optimistic UI updates for user actions.
+  - [ ] **Smart Polling**: Implement a `usePolling` hook via `Page Visibility API`. 
+    - Active view: 5s interval.
+    - Background/Hidden: Pause or 30s interval.
+  - [ ] **Optimistic UI**: Implement React Query `onMutate` handlers for:
+    - Adding/editing comments.
+    - Changing PR status.
+    - Marking files as reviewed.
 - [ ] **Pipeline Streaming**:
-  - [ ] Robust log streaming integration.
+  - [ ] **Log Fetcher**: Implement incremental log fetching using the `offset` parameter if available in Azure DevOps logs API.
+  - [ ] **Virtual Log View**: Use `@tanstack/react-virtual` for the log console to handle tens of thousands of log lines without performance degradation.
 
 ## 5. Advanced Search & Command Palette
 - [ ] **Deep Search**:
-  - [ ] Regex support.
-  - [ ] Integration with local `ripgrep` for cloned repos.
-- [ ] **Advanced Filters**: specialized filters in Command Palette (`author:me`, `state:active`).
+  - [ ] **Regex Engine**: Add a toggle in Command Palette. Backend uses `ripgrep` (`rg`) for cloned repos.
+  - [ ] **Contextual Results**: Show 2 lines of context around search matches in the results list.
+- [ ] **Advanced Filters**: 
+  - [ ] **Operator Support**: Parse `author:`, `state:`, `project:`, `repo:`, `ext:`, `file:` in the command palette search string.
+  - [ ] **Ranking Algorithm**: 
+    - Boost items in the current project.
+    - Boost recently/frequently accessed items.
+    - Fuzzy match baseline.

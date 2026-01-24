@@ -72,7 +72,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ repoId, item, depth = 0, on
                     {loading && <div className="pl-8 text-xs text-zinc-600 py-1" style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}>Loading...</div>}
                     {children.map(child => (
                         <FileTreeNode
-                            key={child.objectId}
+                            key={child.path}
                             repoId={repoId}
                             item={child}
                             depth={depth + 1}
@@ -111,7 +111,7 @@ export const FileTree = ({ repoId, onSelect, activePath }: { repoId: string, onS
         <div className="h-full overflow-y-auto py-2">
             {rootItems.map(item => (
                 <FileTreeNode
-                    key={item.objectId}
+                    key={item.path}
                     repoId={repoId}
                     item={item}
                     onSelect={onSelect}
