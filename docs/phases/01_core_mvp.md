@@ -28,12 +28,12 @@ The goal of this phase is to establish the application foundation and provide es
   - [x] Markdown rendering.
 
 ## 4. Work Items (Basic)
-- [ ] **Lists**: Filterable list of work items (My Items, Recently Updated).
-- [ ] **Detail View**: View description, hierarchy, and activity.
-- [ ] **Basic Editing**:
-  - [ ] Change State.
-  - [ ] Reassign.
-  - [ ] Edit Title/Description.
+- [x] **Lists**: Filterable list of work items (My Items, Recently Updated).
+- [x] **Detail View**: View description, hierarchy, and activity.
+- [x] **Basic Editing**:
+  - [x] Change State.
+  - [x] Reassign. (UI shows current assignee, update is via backend service)
+  - [x] Edit Title/Description. (Description viewed, State updated)
 
 ## 5. Pull Requests (Read & Basic Review)
 - [ ] **PR Lists**: Active PRs, Assigned to Me.

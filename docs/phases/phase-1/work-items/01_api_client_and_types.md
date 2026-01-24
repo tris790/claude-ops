@@ -9,36 +9,32 @@ Establish the communication layer with Azure DevOps for fetching and updating Wo
 
 ## Requirements
 
-### 1. TypeScript Interfaces
+### 1. TypeScript Interfaces [x]
 Define the data structures matching the Azure DevOps API (v7.0).
-- **`WorkItem`**:
-  - `id`: number
-  - `rev`: number
-  - `fields`: Key-value map (e.g., `System.Title`, `System.State`, `System.AssignedTo`).
-  - `url`: string
-- **`WorkItemRelation`**:
-  - `rel`: string (e.g., "System.LinkTypes.Hierarchy-Forward")
-  - `url`: string
-  - `attributes`: map
-- **`WorkItemUpdate`**: Structure for JSON Patch operations.
+- **`WorkItem`** [x]
+- **`WorkItemRelation`** [x]
+- **`WorkItemUpdate`** [x]
 
-### 2. Service Implementation
-Implement `WorkItemService` (likely in `src/backend/` or a shared `src/api/` folder depending on architecture).
-- **`getIdsByQuery(wiql: string)`**:
-  - Endpoint: `POST /_apis/wit/wiql`
-  - Input: WIQL string.
-  - Output: Array of `{ id, url }`.
-- **`getDetails(ids: number[])`**:
-  - Endpoint: `GET /_apis/wit/workitems?ids=...&expand=relations`
-  - Input: Array of IDs.
-  - Output: Array of `WorkItem` objects with all fields and relations.
-- **`getTypes()`** (Optional for this specific task, but good if easy):
-  - Endpoint: `GET /_apis/wit/workitemtypes`
-  - Output: Metadata about states and icons.
+### 2. Service Implementation [x]
+Implement `WorkItemService`.
+- **`getIdsByQuery(wiql: string)`** [x]
+- **`getDetails(ids: number[])`** [x]
+- **`getTypes()`** (Skipped for now as it was optional)
 
-### 3. Integration
-- Ensure the service uses the existing `AzureDevOpsClient` (or equivalent proxy) to inject the PAT and handle auth.
-- Verify error handling (401, 404).
+### 3. Integration [x]
+- Ensure the service uses the existing `AzureDevOpsClient`. [x]
+- Verify error handling (401, 404). [x]
+
+## Completion Status
+- **Branch**: `feat/work-items-api`
+- **Status**: Completed
+- **Changes**:
+  - Created `src/backend/types/work-items.ts`
+  - Updated `src/backend/services/azure.ts` with WIQL and Work Item detail methods
+  - Created `src/backend/services/work-items.ts`
+  - Created `src/backend/routes/work-items.ts`
+  - Updated `src/backend/index.ts` to register new routes
+  - Created `src/frontend/api/work-items.ts`
 
 ## Technical Details
 - **API Version**: 7.0

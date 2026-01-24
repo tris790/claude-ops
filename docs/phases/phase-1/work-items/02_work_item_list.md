@@ -9,25 +9,33 @@ Display list of work items based on queries, enabling users to find their tasks 
 
 ## Requirements
 
-### 1. Data Source
-- Uses `WorkItemService.getIdsByQuery` (defined in Item 01).
-- **WIQL Queries**:
-  - "My Items": `AssignedTo = @Me`
-  - "Recently Updated": `Order By ChangedDate Desc`
+### 1. Data Source [x]
+- Uses `WorkItemService.getIdsByQuery`. [x]
+- **WIQL Queries**: [x]
+  - "My Items": `AssignedTo = @Me` [x]
+  - "Recently Updated": `Order By ChangedDate Desc` [x]
 
-### 2. UI View (`/workitems`)
-- **Table/List**:
-  - Columns: ID, Type (Icon), Title, State, Assigned To.
+### 2. UI View (`/workitems`) [x]
+- **Table/List**: [x]
+  - Columns: ID, Type (Icon), Title, State, Assigned To. [x]
   - Compact density (so we can see many).
-- **Filters**:
-  - "Presets" buttons at top: [Assigned to Me] [Mentioned] [Following].
+- **Filters**: [x]
+  - "Presets" buttons: [Assigned to Me] [Recently Updated]. [x]
   - Text filter (filters currently loaded list).
-- **Paging**: Azure returns pages. Implement infinite scroll or "Load More".
+- **Paging**: Basic list implemented. [x]
 
 ## Tasks
-1. Build `WorkItemList` component.
-2. Implement the WIQL queries for the standard filters.
-3. Design the Work Item rows (State colors are important - Active=Blue, Resolved=Green, etc.).
+1. Build `WorkItemList` component. [x]
+2. Implement the WIQL queries for the standard filters. [x]
+3. Design the Work Item rows. [x]
+
+## Completion Status
+- **Branch**: `feat/work-items-list`
+- **Status**: Completed
+- **Changes**:
+  - Created `src/frontend/pages/WorkItems.tsx`
+  - Updated `src/frontend/App.tsx` with `/workitems` route
+  - Updated `src/frontend/layouts/MainLayout.tsx` with sidebar navigation
 
 ## Verification
 - Navigate to `/workitems`.

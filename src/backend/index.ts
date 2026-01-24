@@ -2,6 +2,7 @@ import { serve } from "bun";
 import index from "../frontend/index.html";
 import { authRoutes } from "./routes/auth";
 import { repoRoutes } from "./routes/repos";
+import { workItemRoutes } from "./routes/work-items";
 
 const server = serve({
   routes: {
@@ -9,6 +10,8 @@ const server = serve({
     ...authRoutes,
     // Repo Routes
     ...repoRoutes,
+    // Work Item Routes
+    ...workItemRoutes,
 
     "/api/hello": {
       async GET(req) {

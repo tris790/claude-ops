@@ -7,8 +7,10 @@ import {
     ChevronLeft,
     ChevronRight,
     Command,
-    Search
+    Search,
+    ListTodo
 } from "lucide-react";
+import { NavLink } from "react-router-dom";
 import { CommandPalette } from "../components/CommandPalette";
 
 interface MainLayoutProps {
@@ -53,10 +55,10 @@ export function MainLayout({ children }: MainLayoutProps) {
 
                 {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
-                    <NavItem icon={<LayoutGrid />} label="Dashboard" collapsed={isSidebarCollapsed} active />
-                    <NavItem icon={<GitBranch />} label="Repositories" collapsed={isSidebarCollapsed} />
-                    <NavItem icon={<Search />} label="Search" collapsed={isSidebarCollapsed} />
-                    <NavItem icon={<Settings />} label="Settings" collapsed={isSidebarCollapsed} />
+                    <NavItem to="/repos" icon={<LayoutGrid />} label="Repositories" collapsed={isSidebarCollapsed} />
+                    <NavItem to="/workitems" icon={<ListTodo />} label="Work Items" collapsed={isSidebarCollapsed} />
+                    <NavItem to="/search" icon={<Search />} label="Search" collapsed={isSidebarCollapsed} />
+                    <NavItem to="/settings" icon={<Settings />} label="Settings" collapsed={isSidebarCollapsed} />
                 </nav>
 
                 {/* Bottom Toggle (if collapsed) */}
@@ -105,22 +107,27 @@ export function MainLayout({ children }: MainLayoutProps) {
     );
 }
 
-function NavItem({ icon, label, collapsed, active }: { icon: React.ReactNode, label: string, collapsed: boolean, active?: boolean }) {
+function NavItem({ to, icon, label, collapsed }: { to: string, icon: React.ReactNode, label: string, collapsed: boolean }) {
     return (
-        <button
-            className={cn(
+        <NavLink
+            to={to}
+            className={({ isActive }) => cn(
                 "w-full flex items-center gap-3 px-2 py-2 rounded-md transition-all text-sm font-medium group relative",
-                active
+                isActive
                     ? "bg-sapphire-500/10 text-sapphire-400"
                     : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100",
                 collapsed && "justify-center px-0"
             )}
             title={collapsed ? label : undefined}
         >
-            {React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<any>, {
-                className: cn("h-5 w-5 flex-shrink-0", active ? "text-sapphire-500" : "group-hover:text-zinc-100")
-            })}
-            {!collapsed && <span className="truncate">{label}</span>}
-        </button>
+            {({ isActive }) => (
+                <>
+                    {React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<any>, {
+                        className: cn("h-5 w-5 flex-shrink-0", isActive ? "text-sapphire-500" : "group-hover:text-zinc-100")
+                    })}
+                    {!collapsed && <span className="truncate">{label}</span>}
+                </>
+            )}
+        </NavLink>
     )
 }

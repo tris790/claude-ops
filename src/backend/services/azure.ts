@@ -96,7 +96,7 @@ export class AzureDevOpsClient {
         return data.value || [];
     }
 
-    async getFileContent(repoId: string, path: string) {
+    async getFileContent(repoId: string, path: string, version?: string, versionType: string = "branch") {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
         }
@@ -104,6 +104,10 @@ export class AzureDevOpsClient {
         const url = new URL(`${this.baseUrl}/_apis/git/repositories/${repoId}/items`);
         url.searchParams.append("path", path);
         url.searchParams.append("includeContent", "true");
+        if (version) {
+            url.searchParams.append("versionDescriptor.version", version);
+            url.searchParams.append("versionDescriptor.versionType", versionType);
+        }
         url.searchParams.append("api-version", "7.0");
 
         const res = await fetch(url.toString(), { headers: this.headers });
@@ -114,6 +118,71 @@ export class AzureDevOpsClient {
 
         const data = await res.json();
         return data.content;
+    }
+
+    async getWorkItems(ids: number[]) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        if (ids.length === 0) return [];
+
+        const url = new URL(`${this.baseUrl}/_apis/wit/workitems`);
+        url.searchParams.append("ids", ids.join(","));
+        url.searchParams.append("$expand", "relations");
+        url.searchParams.append("api-version", "7.0");
+
+        const res = await fetch(url.toString(), { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch work items details: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.value || [];
+    }
+
+    async updateWorkItem(id: number, updates: any[]) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/wit/workitems/${id}?api-version=7.0`;
+        const res = await fetch(url, {
+            method: "PATCH",
+            headers: {
+                ...this.headers,
+                "Content-Type": "application/json-patch+json"
+            },
+            body: JSON.stringify(updates)
+        });
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.message || `Failed to update work item: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async addWorkItemComment(id: number, text: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/wit/workitems/${id}/comments?api-version=7.0`;
+        const res = await fetch(url, {
+            method: "POST",
+            headers: this.headers,
+            body: JSON.stringify({ text })
+        });
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.message || `Failed to add comment: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
     }
 }
 
