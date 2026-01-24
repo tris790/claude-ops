@@ -124,7 +124,26 @@ export class AzureDevOpsClient {
         return value;
     }
 
-    async getRepoItems(repoId: string, path: string = "/") {
+    async getBranches(repoId: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/git/repositories/${repoId}/refs?filter=heads/&api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch branches: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return (data.value || []).map((ref: any) => ({
+            name: ref.name.replace("refs/heads/", ""),
+            objectId: ref.objectId
+        }));
+    }
+
+    async getRepoItems(repoId: string, path: string = "/", version?: string, versionType: string = "branch") {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
         }
@@ -134,6 +153,10 @@ export class AzureDevOpsClient {
         const url = new URL(`${this.baseUrl}/_apis/git/repositories/${repoId}/items`);
         url.searchParams.append("scopePath", scopePath);
         url.searchParams.append("recursionLevel", "OneLevel");
+        if (version) {
+            url.searchParams.append("versionDescriptor.version", version);
+            url.searchParams.append("versionDescriptor.versionType", versionType);
+        }
         url.searchParams.append("api-version", "7.0");
 
         const res = await fetch(url.toString(), { headers: this.headers });

@@ -55,7 +55,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
     useEffect(() => {
         setLoading(true);
         setError(null);
-        getFileContent(repoId, file.path)
+        getFileContent(repoId, file.path, branch)
             .then(data => {
                 setContent(data);
                 setLoading(false);
@@ -65,7 +65,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                 setError("Failed to load file content");
                 setLoading(false);
             });
-    }, [repoId, file.path]);
+    }, [repoId, file.path, branch]);
 
     // LSP Connection Effect
     useEffect(() => {

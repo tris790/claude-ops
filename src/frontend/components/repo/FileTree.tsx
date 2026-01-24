@@ -8,9 +8,10 @@ interface FileTreeNodeProps {
     depth?: number;
     onSelect: (item: GitItem) => void;
     activePath?: string;
+    branch?: string;
 }
 
-const FileTreeNode: React.FC<FileTreeNodeProps> = ({ repoId, item, depth = 0, onSelect, activePath }) => {
+const FileTreeNode: React.FC<FileTreeNodeProps> = ({ repoId, item, depth = 0, onSelect, activePath, branch }) => {
     const [expanded, setExpanded] = useState(false);
     const [children, setChildren] = useState<GitItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -28,7 +29,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ repoId, item, depth = 0, on
                 if (children.length === 0) {
                     setLoading(true);
                     try {
-                        const items = await getRepoItems(repoId, item.path);
+                        const items = await getRepoItems(repoId, item.path, branch);
                         const filteredItems = items.filter(child => child.path !== item.path);
                         setChildren(filteredItems.sort((a, b) => {
                             const aIsFolder = a.gitObjectType === "tree";
@@ -78,6 +79,7 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ repoId, item, depth = 0, on
                             depth={depth + 1}
                             onSelect={onSelect}
                             activePath={activePath}
+                            branch={branch}
                         />
                     ))}
                 </div>
@@ -86,12 +88,12 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ repoId, item, depth = 0, on
     );
 };
 
-export const FileTree = ({ repoId, onSelect, activePath }: { repoId: string, onSelect: (item: GitItem) => void, activePath?: string }) => {
+export const FileTree = ({ repoId, onSelect, activePath, branch }: { repoId: string, onSelect: (item: GitItem) => void, activePath?: string, branch?: string }) => {
     const [rootItems, setRootItems] = useState<GitItem[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getRepoItems(repoId, "/")
+        getRepoItems(repoId, "/", branch)
             .then(items => {
                 const filteredItems = items.filter(item => item.path !== "/");
                 setRootItems(filteredItems.sort((a, b) => {
@@ -116,6 +118,7 @@ export const FileTree = ({ repoId, onSelect, activePath }: { repoId: string, onS
                     item={item}
                     onSelect={onSelect}
                     activePath={activePath}
+                    branch={branch}
                 />
             ))}
         </div>

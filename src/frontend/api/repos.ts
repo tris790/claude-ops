@@ -28,12 +28,19 @@ export async function getRepositories(): Promise<GitRepository[]> {
     return res.json();
 }
 
-export async function getRepoItems(repoId: string, path: string = "/"): Promise<GitItem[]> {
+export async function getRepoItems(repoId: string, path: string = "/", version?: string): Promise<GitItem[]> {
     const params = new URLSearchParams({ repoId, path });
+    if (version) params.append("version", version);
     const res = await fetch(`/api/repo-items?${params}`);
     if (!res.ok) {
         throw new Error(`Failed to fetch repo items: ${res.statusText}`);
     }
+    return res.json();
+}
+
+export async function getBranches(repoId: string): Promise<{ name: string; objectId: string }[]> {
+    const res = await fetch(`/api/repos/branches?repoId=${repoId}`);
+    if (!res.ok) throw new Error("Failed to fetch branches");
     return res.json();
 }
 

@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { FileTree } from "../components/repo/FileTree";
 import { Breadcrumbs } from "../components/repo/Breadcrumbs";
 import { FileViewer } from "../components/repo/FileViewer";
-import { getRepositories, type GitItem, type GitRepository } from "../api/repos";
+import { getRepositories, getBranches, type GitItem, type GitRepository } from "../api/repos";
 
 export function RepoBrowser() {
-    const { project, repo, branch, "*": path } = useParams<{ project: string; repo: string; branch?: string; "*": string }>();
+    const { project, repo, "*": splat } = useParams<{ project: string; repo: string; "*": string }>();
     const navigate = useNavigate();
     const location = useLocation();
 
     const [selectedFile, setSelectedFile] = useState<GitItem | null>(null);
     const [gitRepo, setGitRepo] = useState<GitRepository | null>(null);
+    const [branches, setBranches] = useState<{ name: string; objectId: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -23,36 +24,59 @@ export function RepoBrowser() {
                 const found = repos.find(r => r.project.name === project && r.name === repo);
                 if (found) {
                     setGitRepo(found);
+                    return getBranches(found.id);
                 } else {
-                    setError("Repository not found");
+                    throw new Error("Repository not found");
                 }
+            })
+            .then(b => {
+                setBranches(b);
             })
             .catch(err => {
                 console.error(err);
-                setError("Failed to load repository details");
+                setError(err.message || "Failed to load repository details");
             })
             .finally(() => setLoading(false));
     }, [project, repo]);
 
+    const { currentBranch, filePath } = useMemo(() => {
+        if (!splat || !gitRepo) return { currentBranch: (gitRepo?.defaultBranch || "main").replace("refs/heads/", ""), filePath: "" };
+
+        // Try to find the longest branch name that matches the start of splat
+        // e.g. splat = "feat/ui/src/App.tsx", branches = ["feat/ui"]
+        const sortedBranches = [...branches].sort((a, b) => b.name.length - a.name.length);
+        for (const b of sortedBranches) {
+            if (splat === b.name) return { currentBranch: b.name, filePath: "" };
+            if (splat.startsWith(b.name + "/")) {
+                return { currentBranch: b.name, filePath: splat.slice(b.name.length + 1) };
+            }
+        }
+
+        // Fallback: first segment is branch
+        const parts = splat.split("/");
+        return { currentBranch: parts[0], filePath: parts.slice(1).join("/") };
+    }, [splat, branches, gitRepo]);
+
     // Sync state from URL
     useEffect(() => {
-        if (gitRepo && path) {
+        if (gitRepo && filePath) {
             // If path is provided in URL but no selectedFile or path mismatch
-            if (!selectedFile || selectedFile.path !== path) {
+            if (!selectedFile || selectedFile.path !== filePath) {
                 setSelectedFile({
-                    path: path,
-                    gitObjectType: "blob", // Assume blob for now, we can refine later
+                    path: filePath,
+                    gitObjectType: "blob",
                     objectId: "",
                     commitId: "",
                     url: ""
                 });
             }
+        } else if (gitRepo && !filePath) {
+            setSelectedFile(null);
         }
-    }, [gitRepo, path]);
+    }, [gitRepo, filePath]);
 
     const handleFileSelect = (item: GitItem) => {
         setSelectedFile(item);
-        const currentBranch = branch || gitRepo?.defaultBranch || "main";
         navigate(`/repos/${project}/${repo}/blob/${currentBranch}/${item.path}`);
     };
 
@@ -69,6 +93,7 @@ export function RepoBrowser() {
                         repoId={gitRepo.id}
                         onSelect={handleFileSelect}
                         activePath={selectedFile?.path}
+                        branch={currentBranch}
                     />
                 </div>
                 <div className="flex-1 bg-zinc-950/50 flex flex-col overflow-hidden">
@@ -80,7 +105,7 @@ export function RepoBrowser() {
                                 projectName={gitRepo.project.name}
                                 repoName={gitRepo.name}
                                 isCloned={!!gitRepo.isCloned}
-                                branch={branch || gitRepo.defaultBranch || "main"}
+                                branch={currentBranch}
                             />
                         </div>
                     ) : (
@@ -88,7 +113,7 @@ export function RepoBrowser() {
                             <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mb-4">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-700"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>
                             </div>
-                            <p>Select a file to view its contents</p>
+                            <p>Select a file to view its contents in {currentBranch}</p>
                         </div>
                     )}
                 </div>

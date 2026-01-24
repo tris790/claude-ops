@@ -76,19 +76,35 @@ export const repoRoutes = {
             const url = new URL(req.url);
             const repoId = url.searchParams.get("repoId");
             const path = url.searchParams.get("path") || "/";
+            const version = url.searchParams.get("version");
+            const versionType = url.searchParams.get("versionType") || "branch";
 
             if (!repoId) {
                 return Response.json({ error: "Missing repoId" }, { status: 400 });
             }
 
             try {
-                const items = await azureClient.getRepoItems(repoId, path);
+                const items = await azureClient.getRepoItems(repoId, path, version || undefined, versionType);
                 return Response.json(items);
             } catch (error: any) {
                 console.error("Error fetching repo items:", error);
                 return Response.json({ error: error.message }, { status: 500 });
             }
         },
+    },
+    "/api/repos/branches": {
+        async GET(req: Request) {
+            const url = new URL(req.url);
+            const repoId = url.searchParams.get("repoId");
+            if (!repoId) return Response.json({ error: "Missing repoId" }, { status: 400 });
+
+            try {
+                const branches = await azureClient.getBranches(repoId);
+                return Response.json(branches);
+            } catch (error: any) {
+                return Response.json({ error: error.message }, { status: 500 });
+            }
+        }
     },
     "/api/repo-content": {
         async GET(req: Request) {
