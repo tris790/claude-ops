@@ -1,4 +1,6 @@
 import { azureClient } from "../services/azure";
+import { gitService } from "../services/git";
+
 
 function getPrId(req: Request, params: any): string {
     // Bun.serve passes (req, server) as arguments. 'params' here might be the Server object, not route params.
@@ -51,7 +53,20 @@ export const prRoutes = {
                 // azureClient.getPullRequests now handles iterating all projects if 'project' is missing
                 const prs = await azureClient.getPullRequests(criteria);
                 console.log(`[API] Found ${prs.length} PRs`);
-                return Response.json(prs);
+
+                // Add isCloned status to repositories
+                const clonedRepos = await gitService.listClonedRepos();
+                const clonedSet = new Set(clonedRepos.map(r => `${r.project}/${r.repo}`));
+
+                const prsWithClonedStatus = prs.map((pr: any) => ({
+                    ...pr,
+                    repository: {
+                        ...pr.repository,
+                        isCloned: clonedSet.has(`${pr.repository.project.name}/${pr.repository.name}`)
+                    }
+                }));
+
+                return Response.json(prsWithClonedStatus);
             } catch (error: any) {
                 console.error("[API] Error fetching PRs:", error);
                 return Response.json({
@@ -80,6 +95,12 @@ export const prRoutes = {
             try {
                 // Now supports project context and auto-search fallback in service
                 const pr = await azureClient.getPullRequest(id, repoId || undefined, project || undefined);
+
+                // Add isCloned status
+                if (pr.repository) {
+                    pr.repository.isCloned = await gitService.isCloned(pr.repository.project.name, pr.repository.name);
+                }
+
                 return Response.json(pr);
             } catch (error: any) {
                 console.error(`[API] Error fetching PR ${id}:`, error.message);

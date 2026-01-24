@@ -80,7 +80,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
             client.sendNotification('textDocument/didOpen', {
                 textDocument: {
-                    uri: `file://original${normalizedPath}`,
+                    uri: `file:///original${normalizedPath}`,
                     languageId: language,
                     version: 1,
                     text: contents.original
@@ -89,7 +89,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
             client.sendNotification('textDocument/didOpen', {
                 textDocument: {
-                    uri: `file://modified${normalizedPath}`,
+                    uri: `file:///modified${normalizedPath}`,
                     languageId: language,
                     version: 1,
                     text: contents.modified
@@ -345,11 +345,11 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         viewRef.current = new MergeView({
             a: {
                 doc: contents.original,
-                extensions: [...baseExtensions, ...createLSPExtensions(`file://original${normalizedPath}`)]
+                extensions: [...baseExtensions, ...createLSPExtensions(`file:///original${normalizedPath}`)]
             },
             b: {
                 doc: contents.modified,
-                extensions: [...baseExtensions, ...createLSPExtensions(`file://modified${normalizedPath}`)]
+                extensions: [...baseExtensions, ...createLSPExtensions(`file:///modified${normalizedPath}`)]
             },
             parent: containerRef.current,
         });
@@ -379,8 +379,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             });
         };
 
-        const unbindA = setupDiagnostics("a", `file://original${normalizedPath}`);
-        const unbindB = setupDiagnostics("b", `file://modified${normalizedPath}`);
+        const unbindA = setupDiagnostics("a", `file:///original${normalizedPath}`);
+        const unbindB = setupDiagnostics("b", `file:///modified${normalizedPath}`);
 
         return () => {
             unbindA?.();
@@ -397,14 +397,16 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0">
                 <div className="flex items-center space-x-3 text-xs">
                     <span className="text-zinc-500 font-mono truncate max-w-[300px]">{filePath}</span>
-                    <div className={`flex items-center space-x-1 px-1.5 py-0.5 rounded border ${lspStatus === 'connected' ? 'border-green-800 bg-green-900/20 text-green-400' :
+                    <div className={`flex items-center space-x-1 text-[10px] px-2 py-0.5 rounded border ${lspStatus === 'connected' ? 'border-green-800 bg-green-900/20 text-green-400' :
                         lspStatus === 'connecting' ? 'border-yellow-800 bg-yellow-900/20 text-yellow-400' :
                             'border-zinc-700 bg-zinc-800 text-zinc-500'
                         }`}>
                         <div className={`w-1 h-1 rounded-full ${lspStatus === 'connected' ? 'bg-green-500' :
                             lspStatus === 'connecting' ? 'bg-yellow-500' : 'bg-zinc-500'
                             }`} />
-                        <span>LSP</span>
+                        <span className="font-medium uppercase tracking-wider">
+                            {lspStatus === 'connected' ? 'LSP Ready' : lspStatus === 'connecting' ? 'LSP Connecting' : 'LSP Inactive'}
+                        </span>
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
