@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { getEditorTheme } from "../../styles/code-themes";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, drawSelection } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
@@ -66,7 +67,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file }) => {
                 history(),
                 drawSelection(),
                 bracketMatching(),
-                syntaxHighlighting(defaultHighlightStyle),
+                ...getEditorTheme(true),
                 keymap.of([...defaultKeymap, ...historyKeymap]),
                 EditorState.readOnly.of(true)
             ];

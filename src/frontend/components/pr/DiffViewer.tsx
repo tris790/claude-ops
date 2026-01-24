@@ -7,7 +7,7 @@ import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
 import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
-import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+import { getEditorTheme } from "../../styles/code-themes";
 import { getFileContent } from "../../api/repos";
 import { Loader2 } from "lucide-react";
 
@@ -60,7 +60,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ repoId, filePath, origin
 
                     const extensions = [
                         lineNumbers(),
-                        syntaxHighlighting(defaultHighlightStyle),
+                        ...getEditorTheme(true),
                         getLang(),
                         EditorState.readOnly.of(true),
                     ];
