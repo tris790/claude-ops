@@ -22,10 +22,10 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [x] **Syntax Highlighting**: Integrate `shiki` or `prismjs` for code blocks within the rendered markdown documentation.
     - [x] **Interactive Tooltips**: Tooltips must remain visible when the mouse moves into them to allow interaction with links.
     - [x] **Enriched Content**: Display full type signatures, JSDoc descriptions, and available parameter info.
-  - [/] **LSP Navigation**:
-    - [ ] **Go to Definition**: Implement `F12` and `Cmd/Ctrl+Click` handlers mapping to `textDocument/definition`.
-    - [ ] **Location Mapping**: Transform LSP `Location` responses into internal app navigation paths (`/repo/:name/blob/:branch/*`).
-    - [ ] **Breadcrumbs**: Show clickable file/symbol paths in tooltips for easy navigation to referenced types.
+  - [x] **LSP Navigation**:
+    - [x] **Go to Definition**: Implement `F12` and `Cmd/Ctrl+Click` handlers mapping to `textDocument/definition`.
+    - [x] **Location Mapping**: Transform LSP `Location` responses into internal app navigation paths (`/repos/:project/:repo/blob/:branch/*`).
+    - [x] **Breadcrumbs**: Show clickable file/symbol paths in tooltips for easy navigation to referenced types.
   - [x] Implement Diagnostics (Squiggles/Errors).
   - [ ] **LSP in Diff View**:
     - [ ] **Position Mapping**: Translate diff-view coordinates (lines/cols) to actual document offsets for both `Original` and `Modified` buffers.
