@@ -4,6 +4,7 @@ import { MainLayout } from "./layouts/MainLayout";
 import { SetupPage } from "./pages/SetupPage";
 
 import { RepoList } from "./pages/RepoList";
+import { RepoBrowser } from "./pages/RepoBrowser";
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -19,6 +20,7 @@ function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout><Outlet /></MainLayout>}>
           <Route path="/repos" element={<RepoList />} />
+          <Route path="/repos/:project/:repo" element={<RepoBrowser />} />
           <Route path="/" element={<Navigate to="/repos" replace />} />
         </Route>
       </Route>

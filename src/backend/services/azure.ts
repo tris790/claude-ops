@@ -73,6 +73,48 @@ export class AzureDevOpsClient {
 
         return value;
     }
+
+    async getRepoItems(repoId: string, path: string = "/") {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const scopePath = path;
+
+        const url = new URL(`${this.baseUrl}/_apis/git/repositories/${repoId}/items`);
+        url.searchParams.append("scopePath", scopePath);
+        url.searchParams.append("recursionLevel", "OneLevel");
+        url.searchParams.append("api-version", "7.0");
+
+        const res = await fetch(url.toString(), { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch items: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.value || [];
+    }
+
+    async getFileContent(repoId: string, path: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = new URL(`${this.baseUrl}/_apis/git/repositories/${repoId}/items`);
+        url.searchParams.append("path", path);
+        url.searchParams.append("includeContent", "true");
+        url.searchParams.append("api-version", "7.0");
+
+        const res = await fetch(url.toString(), { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch file content: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.content;
+    }
 }
 
 export const azureClient = new AzureDevOpsClient();

@@ -20,12 +20,12 @@ The goal of this phase is to establish the application foundation and provide es
   - [x] Context-aware filtering.
 
 ## 3. Remote Repository Browser
-- [ ] **Repo List**: Grouped by project, searchable.
-- [ ] **File Explorer**: Tree view navigation of remote repositories.
-- [ ] **File Viewer**:
-  - [ ] CodeMirror 6 integration for read-only viewing.
-  - [ ] Syntax highlighting.
-  - [ ] Markdown rendering.
+- [x] **Repo List**: Grouped by project, searchable.
+- [x] **File Explorer**: Tree view navigation of remote repositories (PR: #101).
+- [x] **File Viewer** (PR: #102):
+  - [x] CodeMirror 6 integration for read-only viewing.
+  - [x] Syntax highlighting.
+  - [x] Markdown rendering.
 
 ## 4. Work Items (Basic)
 - [ ] **Lists**: Filterable list of work items (My Items, Recently Updated).
