@@ -1,10 +1,11 @@
 import { serve } from "bun";
 import index from "../frontend/index.html";
+import { authRoutes } from "./routes/auth";
 
 const server = serve({
   routes: {
-    // Serve index.html for all unmatched routes.
-    "/*": index,
+    // Auth Routes
+    ...authRoutes,
 
     "/api/hello": {
       async GET(req) {
@@ -13,20 +14,10 @@ const server = serve({
           method: "GET",
         });
       },
-      async PUT(req) {
-        return Response.json({
-          message: "Hello, world!",
-          method: "PUT",
-        });
-      },
     },
 
-    "/api/hello/:name": async req => {
-      const name = req.params.name;
-      return Response.json({
-        message: `Hello, ${name}!`,
-      });
-    },
+    // Serve index.html for all unmatched routes (SPA Fallback)
+    "/*": index,
   },
 
   development: process.env.NODE_ENV !== "production" && {
