@@ -1,11 +1,14 @@
 import { serve } from "bun";
 import index from "../frontend/index.html";
 import { authRoutes } from "./routes/auth";
+import { repoRoutes } from "./routes/repos";
 
 const server = serve({
   routes: {
     // Auth Routes
     ...authRoutes,
+    // Repo Routes
+    ...repoRoutes,
 
     "/api/hello": {
       async GET(req) {

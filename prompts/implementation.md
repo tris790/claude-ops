@@ -2,4 +2,4 @@ Your job is to orchestrate sub agents to complete phase1 of the project (docs/ph
 
 Make sure that agents have the relevant context (docs/architecture, docs/goals, docs/ux-design, their work item, gemini.md)
 
-Work items should be sequential and work should be done on separate branches. We can do stacked prs. Their work item must be updated once their work is done and pull request created.
+Work items should be sequential and work should be done on separate branches. We can do stacked prs. Their work item must be updated once their work is done and pull request created inside the phase-1 document.

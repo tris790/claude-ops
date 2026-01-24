@@ -44,6 +44,35 @@ export class AzureDevOpsClient {
             throw new Error(error.message || "Failed to connect to Azure DevOps");
         }
     }
+    private repoCache: { data: any[], timestamp: number } | null = null;
+    private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+    async getRepositories() {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        if (this.repoCache && (Date.now() - this.repoCache.timestamp < this.CACHE_TTL)) {
+            return this.repoCache.data;
+        }
+
+        const url = `${this.baseUrl}/_apis/git/repositories?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch repositories: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        const value = data.value || [];
+
+        this.repoCache = {
+            data: value,
+            timestamp: Date.now()
+        };
+
+        return value;
+    }
 }
 
 export const azureClient = new AzureDevOpsClient();

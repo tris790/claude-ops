@@ -9,6 +9,7 @@ import {
     Command,
     Search
 } from "lucide-react";
+import { CommandPalette } from "../components/CommandPalette";
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -19,6 +20,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
     return (
         <div className="flex h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
+            <CommandPalette />
             {/* Sidebar */}
             <aside
                 className={cn(
