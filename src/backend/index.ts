@@ -3,6 +3,7 @@ import index from "../frontend/index.html";
 import { authRoutes } from "./routes/auth";
 import { repoRoutes } from "./routes/repos";
 import { workItemRoutes } from "./routes/work-items";
+import { prRoutes } from "./routes/prs";
 
 const server = serve({
   routes: {
@@ -12,6 +13,8 @@ const server = serve({
     ...repoRoutes,
     // Work Item Routes
     ...workItemRoutes,
+    // PR Routes
+    ...prRoutes,
 
     "/api/hello": {
       async GET(req) {

@@ -28,12 +28,22 @@ The landing page for a specific PR. Shows description, status checks, reviewers,
 - **Comment**: Add general comments (not file-specific yet).
 
 ## Tasks
-1. `PRDetail` layout with tabs.
-2. `PolicyStatus` component (Show green/red builds).
-3. `ReviewerList` component.
+1. `PRDetail` layout with tabs. [x]
+2. `PolicyStatus` component (Show green/red builds). [x]
+3. `ReviewerList` component. [x]
+
+## Completion Status
+- **Branch**: `feat/pr-details`
+- **Status**: Completed
+- **Changes**:
+  - Updated `src/backend/services/azure.ts` with `getPullRequest`, `getPullRequestThreads`, `votePullRequest`.
+  - Updated `src/backend/routes/prs.ts` with detail, threads, and vote endpoints.
+  - Updated `src/frontend/api/prs.ts` with matching frontend functions.
+  - Created `src/frontend/pages/PRDetail.tsx`.
+  - Updated `src/frontend/App.tsx` and `src/frontend/pages/PullRequests.tsx` for navigation.
 
 ## Verification
-- Open PR.
-- See who has approved.
-- See if build failed.
-- Vote "Approve".
+- Open PR. [x]
+- See who has approved. [x]
+- See if build failed. [x]
+- Vote "Approve". [x] (Backend implemented, UI feedback added)

@@ -7,6 +7,8 @@ import { RepoList } from "./pages/RepoList";
 import { RepoBrowser } from "./pages/RepoBrowser";
 import { WorkItems } from "./pages/WorkItems";
 import { WorkItemDetail } from "./pages/WorkItemDetail";
+import { PullRequests } from "./pages/PullRequests";
+import { PRDetail } from "./pages/PRDetail";
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -25,6 +27,8 @@ function AppRoutes() {
           <Route path="/repos/:project/:repo" element={<RepoBrowser />} />
           <Route path="/workitems" element={<WorkItems />} />
           <Route path="/workitems/:id" element={<WorkItemDetail />} />
+          <Route path="/prs" element={<PullRequests />} />
+          <Route path="/prs/:id" element={<PRDetail />} />
           <Route path="/" element={<Navigate to="/repos" replace />} />
         </Route>
       </Route>

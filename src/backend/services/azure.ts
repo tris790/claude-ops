@@ -120,6 +120,40 @@ export class AzureDevOpsClient {
         return data.content;
     }
 
+    async getPullRequestChanges(repoId: string, id: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/git/repositories/${repoId}/pullRequests/${id}/changes?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch PR changes: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async queryWorkItems(wiql: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/wit/wiql?api-version=7.0`;
+        const res = await fetch(url, {
+            method: "POST",
+            headers: this.headers,
+            body: JSON.stringify({ query: wiql })
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to query work items: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
     async getWorkItems(ids: number[]) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
@@ -184,6 +218,78 @@ export class AzureDevOpsClient {
 
         return await res.json();
     }
+
+    async getPullRequests(criteria?: any) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = new URL(`${this.baseUrl}/_apis/git/pullrequests`);
+        url.searchParams.append("api-version", "7.0");
+        if (criteria?.status) url.searchParams.append("searchCriteria.status", criteria.status);
+        if (criteria?.reviewerId) url.searchParams.append("searchCriteria.reviewerId", criteria.reviewerId);
+        if (criteria?.creatorId) url.searchParams.append("searchCriteria.creatorId", criteria.creatorId);
+
+        const res = await fetch(url.toString(), { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch pull requests: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.value || [];
+    }
+
+    async getPullRequest(id: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/git/pullrequests/${id}?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch pull request: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async getPullRequestThreads(repoId: string, id: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/git/repositories/${repoId}/pullRequests/${id}/threads?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch PR threads: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.value || [];
+    }
+
+    async votePullRequest(repoId: string, id: string, reviewerId: string, vote: number) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/git/repositories/${repoId}/pullRequests/${id}/reviewers/${reviewerId}?api-version=7.0`;
+        const res = await fetch(url, {
+            method: "PUT",
+            headers: this.headers,
+            body: JSON.stringify({ vote })
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to vote on PR: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
 }
 
 export const azureClient = new AzureDevOpsClient();

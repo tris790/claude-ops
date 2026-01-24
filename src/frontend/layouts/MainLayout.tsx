@@ -57,6 +57,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
                     <NavItem to="/repos" icon={<LayoutGrid />} label="Repositories" collapsed={isSidebarCollapsed} />
                     <NavItem to="/workitems" icon={<ListTodo />} label="Work Items" collapsed={isSidebarCollapsed} />
+                    <NavItem to="/prs" icon={<GitBranch />} label="Pull Requests" collapsed={isSidebarCollapsed} />
                     <NavItem to="/search" icon={<Search />} label="Search" collapsed={isSidebarCollapsed} />
                     <NavItem to="/settings" icon={<Settings />} label="Settings" collapsed={isSidebarCollapsed} />
                 </nav>

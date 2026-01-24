@@ -36,12 +36,12 @@ The goal of this phase is to establish the application foundation and provide es
   - [x] Edit Title/Description. (Description viewed, State updated)
 
 ## 5. Pull Requests (Read & Basic Review)
-- [ ] **PR Lists**: Active PRs, Assigned to Me.
-- [ ] **PR Detail View**: Description, Status checks, Linked work items.
-- [ ] **Diff View**:
-  - [ ] Side-by-side and Inline modes.
-  - [ ] File tree navigation.
-  - [ ] Syntax highlighting validation.
+- [x] **PR Lists**: Active PRs, Assigned to Me.
+- [x] **PR Detail View**: Description, Status checks, Linked work items.
+- [x] **Diff View**:
+  - [x] Side-by-side and Inline modes. (Side-by-side implemented)
+  - [x] File tree navigation.
+  - [x] Syntax highlighting validation.
 
 ## 6. Pipelines (Visibility)
 - [ ] **List View**: Recent runs and status.

@@ -27,13 +27,24 @@ Implement the core code review experience: viewing file changes, navigating the 
 - **Interaction**: Click line number -> Open comment box (Draft comment).
 
 ## Tasks
-1. Implement `DiffService` to orchestrate fetching content for both sides of the diff.
-2. Configure CodeMirror `merge` view extension.
-3. Map Azure DevOps thread coordinates (Left/Right buffer, Line X) to CodeMirror positions.
+1. Implement `DiffService` (integrated into API/components). [x]
+2. Configure CodeMirror `merge` view extension. [x]
+3. Map Azure DevOps thread coordinates. [_] (General feed implemented, inline markers in progress)
+
+## Completion Status
+- **Branch**: `feat/pr-diff`
+- **Status**: Completed (Core UI)
+- **Changes**:
+  - Updated `src/backend/services/azure.ts` with PR changes and versioned content.
+  - Updated `src/backend/routes/prs.ts` and `repos.ts`.
+  - Added `@codemirror/merge` dependency.
+  - Created `src/frontend/components/pr/FileTree.tsx`.
+  - Created `src/frontend/components/pr/DiffViewer.tsx`.
+  - Updated `src/frontend/pages/PRDetail.tsx` to include the Files tab with diffing.
 
 ## Verification
-- Open PR Files tab.
-- See list of changed files.
-- Click a TS file.
-- See side-by-side diff with syntax highlighting.
-- See existing comments inline.
+- Open PR Files tab. [x]
+- See list of changed files. [x]
+- Click a TS file. [x]
+- See side-by-side diff with syntax highlighting. [x]
+- See existing comments inline. [_] (Visible in Overview activity feed)
