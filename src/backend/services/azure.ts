@@ -9,14 +9,35 @@ export class AzureDevOpsClient {
         };
     }
 
+    private normalizeUrl(url?: string) {
+        if (!url) return undefined;
+        try {
+            const u = new URL(url);
+            // Handle visualstudio.com -> strip path (e.g. /ProjectName)
+            if (u.hostname.endsWith(".visualstudio.com")) {
+                return u.origin;
+            }
+            // Handle dev.azure.com -> keep organization only (first path segment)
+            if (u.hostname === "dev.azure.com") {
+                const parts = u.pathname.split("/").filter(Boolean);
+                if (parts.length > 0) {
+                    return `${u.origin}/${parts[0]}`;
+                }
+            }
+        } catch {
+            // Invalid URL or other cases, fallback to simple trim
+        }
+        return url.replace(/\/$/, "");
+    }
+
     private get baseUrl() {
-        // e.g. https://dev.azure.com/myorg
-        return process.env.AZURE_DEVOPS_ORG_URL?.replace(/\/$/, "");
+        return this.normalizeUrl(process.env.AZURE_DEVOPS_ORG_URL);
     }
 
     async validateConnection(orgUrl?: string, pat?: string) {
         // Allow passing credentials explicitly for setup/validation
-        const targetUrl = (orgUrl || this.baseUrl)?.replace(/\/$/, "");
+        const rawUrl = orgUrl || process.env.AZURE_DEVOPS_ORG_URL;
+        const targetUrl = this.normalizeUrl(rawUrl);
         const targetPat = pat || process.env.AZURE_DEVOPS_PAT;
 
         if (!targetUrl || !targetPat) {
