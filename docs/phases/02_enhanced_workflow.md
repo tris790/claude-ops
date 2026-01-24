@@ -15,10 +15,10 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
 - [x] **Backend LSP Bridge**:
   - [x] Setup architecture to spawn/manage language servers (tsserver, gopls, etc.).
   - [x] WebSocket communication channel.
-- [ ] **Frontend Integration**:
-  - [ ] Connect CodeMirror to LSP events.
-  - [ ] Implement Hover (Go to Definition, Type info).
-  - [ ] Implement Diagnostics (Squiggles/Errors).
+- [x] **Frontend Integration**:
+  - [x] Connect CodeMirror to LSP events.
+  - [x] Implement Hover (Go to Definition, Type info).
+  - [x] Implement Diagnostics (Squiggles/Errors).
 
 ## 3. Interactive Code Review
 - [ ] **Rich Commenting**:
