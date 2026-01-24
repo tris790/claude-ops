@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { FileTree } from "../components/repo/FileTree";
 import { Breadcrumbs } from "../components/repo/Breadcrumbs";
 import { FileViewer } from "../components/repo/FileViewer";
 import { getRepositories, type GitItem, type GitRepository } from "../api/repos";
 
 export function RepoBrowser() {
-    const { project, repo } = useParams<{ project: string; repo: string }>();
+    const { project, repo, branch, "*": path } = useParams<{ project: string; repo: string; branch?: string; "*": string }>();
+    const navigate = useNavigate();
+    const location = useLocation();
+
     const [selectedFile, setSelectedFile] = useState<GitItem | null>(null);
     const [gitRepo, setGitRepo] = useState<GitRepository | null>(null);
     const [loading, setLoading] = useState(true);
@@ -31,6 +34,28 @@ export function RepoBrowser() {
             .finally(() => setLoading(false));
     }, [project, repo]);
 
+    // Sync state from URL
+    useEffect(() => {
+        if (gitRepo && path) {
+            // If path is provided in URL but no selectedFile or path mismatch
+            if (!selectedFile || selectedFile.path !== path) {
+                setSelectedFile({
+                    path: path,
+                    gitObjectType: "blob", // Assume blob for now, we can refine later
+                    objectId: "",
+                    commitId: "",
+                    url: ""
+                });
+            }
+        }
+    }, [gitRepo, path]);
+
+    const handleFileSelect = (item: GitItem) => {
+        setSelectedFile(item);
+        const currentBranch = branch || gitRepo?.defaultBranch || "main";
+        navigate(`/repos/${project}/${repo}/blob/${currentBranch}/${item.path}`);
+    };
+
     if (loading) return <div className="h-full flex items-center justify-center text-zinc-500">Loading...</div>;
     if (error) return <div className="h-full flex items-center justify-center text-red-500">{error}</div>;
     if (!gitRepo) return null;
@@ -42,7 +67,7 @@ export function RepoBrowser() {
                 <div className="w-[300px] border-r border-zinc-800 bg-zinc-900/30 flex flex-col shrink-0">
                     <FileTree
                         repoId={gitRepo.id}
-                        onSelect={setSelectedFile}
+                        onSelect={handleFileSelect}
                         activePath={selectedFile?.path}
                     />
                 </div>
@@ -55,6 +80,7 @@ export function RepoBrowser() {
                                 projectName={gitRepo.project.name}
                                 repoName={gitRepo.name}
                                 isCloned={!!gitRepo.isCloned}
+                                branch={branch || gitRepo.defaultBranch || "main"}
                             />
                         </div>
                     ) : (

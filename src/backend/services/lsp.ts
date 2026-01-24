@@ -44,17 +44,49 @@ export class LSPService {
             return;
         }
 
-        // Assuming message is the JSON payload from the client
-        // We need to wrap it with LSP headers
         const json = typeof message === 'string' ? message : message.toString();
+        let payload: any;
+        try {
+            payload = JSON.parse(json);
+            // Rewrite URIs from client to server (bridge rootPath)
+            this.rewriteURIs(payload, (uri) => {
+                if (uri.startsWith('file:///')) {
+                    const relativePath = uri.slice(8);
+                    return `file://${join(rootPath, relativePath)}`;
+                }
+                return uri;
+            });
+        } catch (e) {
+            // If not JSON, just forward as is (unlikely for LSP)
+            this.forwardToProcess(instance, json);
+            return;
+        }
+
+        this.forwardToProcess(instance, JSON.stringify(payload));
+    }
+
+    private forwardToProcess(instance: LSPInstance, json: string) {
         const length = Buffer.byteLength(json, 'utf-8');
         const packet = `Content-Length: ${length}\r\n\r\n${json}`;
 
-        // Write to stdin
         if (instance.process.stdin) {
             const stdin = instance.process.stdin as unknown as FileSink;
             stdin.write(packet);
             stdin.flush();
+        }
+    }
+
+    private rewriteURIs(obj: any, rewriter: (uri: string) => string) {
+        if (!obj || typeof obj !== 'object') return;
+
+        for (const key in obj) {
+            if (key === 'uri' && typeof obj[key] === 'string') {
+                obj[key] = rewriter(obj[key]);
+            } else if (key === 'targetUri' && typeof obj[key] === 'string') {
+                obj[key] = rewriter(obj[key]);
+            } else if (typeof obj[key] === 'object') {
+                this.rewriteURIs(obj[key], rewriter);
+            }
         }
     }
 
@@ -169,10 +201,26 @@ export class LSPService {
                         },
                         publishDiagnostics: {
                             relatedInformation: true
+                        },
+                        definition: {
+                            dynamicRegistration: true,
+                            linkSupport: true
+                        },
+                        typeDefinition: {
+                            dynamicRegistration: true,
+                            linkSupport: true
+                        },
+                        implementation: {
+                            dynamicRegistration: true,
+                            linkSupport: true
+                        },
+                        references: {
+                            dynamicRegistration: true
                         }
                     },
                     workspace: {
-                        workspaceFolders: true
+                        workspaceFolders: true,
+                        configuration: true
                     }
                 }
             }
@@ -245,9 +293,26 @@ export class LSPService {
                 // Remove processed part from buffer
                 instance.buffer = instance.buffer.slice(idx + headerSize + contentLength);
 
+                let payload: any;
+                try {
+                    payload = JSON.parse(message);
+                    this.rewriteURIs(payload, (uri) => {
+                        if (uri.startsWith(`file://${instance.rootPath}`)) {
+                            let rel = uri.slice(`file://${instance.rootPath}`.length);
+                            if (rel.startsWith('/')) rel = rel.slice(1);
+                            return `file:///${rel}`;
+                        }
+                        return uri;
+                    });
+                } catch (e) {
+                    // ignore parse error, send original (should not happen in valid LSP)
+                }
+
+                const finalMessage = payload ? JSON.stringify(payload) : message;
+
                 // Broadcast to clients
                 for (const client of instance.clients) {
-                    client.send(message);
+                    client.send(finalMessage);
                 }
             } else {
                 return; // Wait for more data

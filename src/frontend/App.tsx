@@ -27,6 +27,7 @@ function AppRoutes() {
         <Route element={<MainLayout><Outlet /></MainLayout>}>
           <Route path="/repos" element={<RepoList />} />
           <Route path="/repos/:project/:repo" element={<RepoBrowser />} />
+          <Route path="/repos/:project/:repo/blob/:branch/*" element={<RepoBrowser />} />
           <Route path="/workitems" element={<WorkItems />} />
           <Route path="/workitems/:id" element={<WorkItemDetail />} />
           <Route path="/prs" element={<PullRequests />} />

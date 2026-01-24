@@ -17,6 +17,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getFileContent, type GitItem } from "../../api/repos";
 import { LSPClient } from "../../utils/lsp-client";
+import { useNavigate } from "react-router-dom";
 import { getHighlighter } from "../../utils/shiki";
 
 interface FileViewerProps {
@@ -25,9 +26,11 @@ interface FileViewerProps {
     projectName?: string;
     repoName?: string;
     isCloned?: boolean;
+    branch?: string;
 }
 
-export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectName, repoName, isCloned }) => {
+export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectName, repoName, isCloned, branch = "main" }) => {
+    const navigate = useNavigate();
     const [content, setContent] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -178,13 +181,55 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
 
                         const TooltipContent = () => {
                             const [highlighter, setHighlighter] = useState<any>(null);
+                            const [definition, setDefinition] = useState<{ path: string, uri: string } | null>(null);
 
                             useEffect(() => {
                                 getHighlighter().then(setHighlighter);
+
+                                // Fetch definition for breadcrumbs
+                                if (lspRef.current) {
+                                    const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+                                    const line = view.state.doc.lineAt(pos);
+                                    const character = pos - line.from;
+
+                                    lspRef.current.sendRequest("textDocument/definition", {
+                                        textDocument: { uri: `file://${normalizedPath}` },
+                                        position: { line: line.number - 1, character }
+                                    }).then(result => {
+                                        if (!result) return;
+                                        const loc = Array.isArray(result) ? result[0] : result;
+                                        if (loc) {
+                                            const uri = 'uri' in loc ? loc.uri : (loc as any).targetUri;
+                                            if (uri.startsWith('file:///')) {
+                                                setDefinition({
+                                                    uri,
+                                                    path: uri.slice(8)
+                                                });
+                                            }
+                                        }
+                                    }).catch(console.error);
+                                }
                             }, []);
 
                             return (
                                 <div className="max-h-[400px] overflow-y-auto">
+                                    {definition && (
+                                        <div className="px-4 py-1.5 bg-zinc-800/80 border-b border-zinc-700/30 flex items-center space-x-1 text-[10px] text-zinc-400 font-mono">
+                                            <span className="opacity-50">@</span>
+                                            <button
+                                                onClick={() => {
+                                                    const targetURL = `/repos/${projectName}/${repoName}/blob/${branch}/${definition.path}`;
+                                                    navigate(targetURL);
+                                                }}
+                                                className="hover:text-blue-400 hover:underline transition-colors truncate max-w-[300px]"
+                                                title={definition.path}
+                                            >
+                                                {definition.path.split('/').pop()}
+                                            </button>
+                                            <span className="opacity-30 px-1">›</span>
+                                            <span className="text-zinc-500 truncate">{definition.path}</span>
+                                        </div>
+                                    )}
                                     {signatureMarkdown && (
                                         <div className="bg-zinc-800/50 px-4 py-2 border-b border-zinc-700/30">
                                             <ReactMarkdown
@@ -294,8 +339,12 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                         scrollIntoView: true
                     });
                     return true;
+                } else if (targetUri.startsWith("file:///")) {
+                    const targetPath = targetUri.slice(8);
+                    const targetURL = `/repos/${projectName}/${repoName}/blob/${branch}/${targetPath}`;
+                    navigate(targetURL);
+                    return true;
                 } else {
-                    // TODO: Navigation to other files
                     console.log("[LSP] Navigate to other file", targetUri, range);
                     return false;
                 }
@@ -318,12 +367,22 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                     ...historyKeymap,
                     { key: "F12", run: (view) => { handleGoToDefinition(view); return true; } }
                 ]),
+                EditorView.domEventHandlers({
+                    mousedown: (event, view) => {
+                        if ((event.ctrlKey || event.metaKey) && event.button === 0) {
+                            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+                            if (pos !== null) {
+                                view.dispatch({ selection: { anchor: pos } });
+                                handleGoToDefinition(view);
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+                }),
                 EditorState.readOnly.of(true),
                 hoverExtension,
                 linter(async (view) => {
-                    // This is a polling linter, but we want push-based usually.
-                    // However, we can use this to hold the diagnostics place.
-                    // Or we can rely on `setDiagnostics` dispatch.
                     return [];
                 })
             ];
