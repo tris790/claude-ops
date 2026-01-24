@@ -4,6 +4,7 @@ import { authRoutes } from "./routes/auth";
 import { repoRoutes } from "./routes/repos";
 import { workItemRoutes } from "./routes/work-items";
 import { prRoutes } from "./routes/prs";
+import { pipelineRoutes } from "./routes/pipelines";
 
 const server = serve({
   routes: {
@@ -15,6 +16,8 @@ const server = serve({
     ...workItemRoutes,
     // PR Routes
     ...prRoutes,
+    // Pipeline Routes
+    ...pipelineRoutes,
 
     "/api/hello": {
       async GET(req) {

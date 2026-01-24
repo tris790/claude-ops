@@ -8,7 +8,8 @@ import {
     ChevronRight,
     Command,
     Search,
-    ListTodo
+    ListTodo,
+    Activity
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { CommandPalette } from "../components/CommandPalette";
@@ -58,6 +59,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     <NavItem to="/repos" icon={<LayoutGrid />} label="Repositories" collapsed={isSidebarCollapsed} />
                     <NavItem to="/workitems" icon={<ListTodo />} label="Work Items" collapsed={isSidebarCollapsed} />
                     <NavItem to="/prs" icon={<GitBranch />} label="Pull Requests" collapsed={isSidebarCollapsed} />
+                    <NavItem to="/pipelines" icon={<Activity />} label="Pipelines" collapsed={isSidebarCollapsed} />
                     <NavItem to="/search" icon={<Search />} label="Search" collapsed={isSidebarCollapsed} />
                     <NavItem to="/settings" icon={<Settings />} label="Settings" collapsed={isSidebarCollapsed} />
                 </nav>

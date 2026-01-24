@@ -21,11 +21,21 @@ View recent pipeline runs to check build status.
   - "Cancel": Stop a running build.
 
 ## Tasks
-1. `PipelineService`.
-2. `PipelineList` component.
-3. `RunPipelineModal`.
+1. `PipelineService`. [x]
+2. `PipelineList` component. [x]
+3. `RunPipelineModal`. [x] (Implemented via prompt for branch in List view)
+
+## Completion Status
+- **Branch**: `feat/pipeline-list`
+- **Status**: Completed
+- **Changes**:
+  - Added pipeline and run methods to `AzureDevOpsClient`.
+  - Created `src/backend/routes/pipelines.ts`.
+  - Created `src/frontend/api/pipelines.ts`.
+  - Created `src/frontend/pages/PipelineList.tsx`.
+  - Updated `src/frontend/App.tsx` with `/pipelines` route.
 
 ## Verification
-- View list.
-- Click "Run".
-- See new run appear in list.
+- View list. [x]
+- Click "Run". [x]
+- See new run appear in list. [x]

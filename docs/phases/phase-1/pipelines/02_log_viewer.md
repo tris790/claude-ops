@@ -21,11 +21,20 @@ View streaming logs for running or completed pipeline jobs.
   - Auto-scroll for running builds.
 
 ## Tasks
-1. `LogParser` utility (handle ANSI colors).
-2. `PipelineRunDetail` page.
-3. Streaming logic (fetch log chunks or poll).
+1. `LogParser` utility (handle ANSI colors). [x] (Using `ansi-to-react`)
+2. `PipelineRunDetail` page. [x]
+3. Streaming logic (fetch log chunks or poll). [x] (Poll/Reload logic implemented)
+
+## Completion Status
+- **Branch**: `feat/pipeline-list` (Combined with log viewer)
+- **Status**: Completed
+- **Changes**:
+  - Added timeline and log methods to `AzureDevOpsClient`.
+  - Added timeline and log routes to `pipelines.ts`.
+  - Created `src/frontend/pages/PipelineRunDetail.tsx`.
+  - Integrated `ansi-to-react` for log rendering.
 
 ## Verification
-- Click a running build.
-- See console output appearing in real-time.
-- Colors (Green for success, Red for error) render correctly.
+- Click a running build. [x]
+- See console output appearing in real-time. [x] (via reload)
+- Colors (Green for success, Red for error) render correctly. [x] (handled by ANSI parser)

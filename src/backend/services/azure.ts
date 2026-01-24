@@ -290,6 +290,115 @@ export class AzureDevOpsClient {
         return await res.json();
     }
 
+    async getPipelines() {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/pipelines?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch pipelines: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.value || [];
+    }
+
+    async getRecentRuns() {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        // Using builds API for better run history
+        const url = `${this.baseUrl}/_apis/build/builds?api-version=7.0&maxBuildsPerDefinition=1`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch recent runs: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.value || [];
+    }
+
+    async runPipeline(pipelineId: number, branch: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/pipelines/${pipelineId}/runs?api-version=7.0`;
+        const res = await fetch(url, {
+            method: "POST",
+            headers: this.headers,
+            body: JSON.stringify({
+                resources: {
+                    repositories: {
+                        self: {
+                            refName: branch.startsWith("refs/") ? branch : `refs/heads/${branch}`
+                        }
+                    }
+                }
+            })
+        });
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.message || `Failed to run pipeline: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async cancelRun(buildId: number) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/build/builds/${buildId}?api-version=7.0`;
+        const res = await fetch(url, {
+            method: "PATCH",
+            headers: this.headers,
+            body: JSON.stringify({ status: "Cancelling" })
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to cancel run: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async getRunTimeline(buildId: number) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/build/builds/${buildId}/timeline?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch timeline: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async getLogContent(buildId: number, logId: number) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/build/builds/${buildId}/logs/${logId}?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch log: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.text();
+    }
 }
 
 export const azureClient = new AzureDevOpsClient();

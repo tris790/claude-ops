@@ -44,6 +44,6 @@ The goal of this phase is to establish the application foundation and provide es
   - [x] Syntax highlighting validation.
 
 ## 6. Pipelines (Visibility)
-- [ ] **List View**: Recent runs and status.
-- [ ] **Log Viewer**: View streaming logs for running/completed pipelines.
-- [ ] **Basic Actions**: Cancel run, Re-run.
+- [x] **List View**: Recent runs and status.
+- [x] **Log Viewer**: View streaming logs for running/completed pipelines.
+- [x] **Basic Actions**: Cancel run, Re-run.
