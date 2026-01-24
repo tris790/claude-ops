@@ -36,8 +36,12 @@ export async function getRepoItems(repoId: string, path: string = "/"): Promise<
     return res.json();
 }
 
-export async function getFileContent(repoId: string, path: string): Promise<string> {
+export async function getFileContent(repoId: string, path: string, version?: string, versionType: string = "branch"): Promise<string> {
     const params = new URLSearchParams({ repoId, path });
+    if (version) {
+        params.append("version", version);
+        params.append("versionType", versionType);
+    }
     const res = await fetch(`/api/repo-content?${params}`);
     if (!res.ok) {
         throw new Error(`Failed to fetch file content: ${res.statusText}`);

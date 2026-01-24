@@ -36,13 +36,15 @@ export const repoRoutes = {
             const url = new URL(req.url);
             const repoId = url.searchParams.get("repoId");
             const path = url.searchParams.get("path");
+            const version = url.searchParams.get("version");
+            const versionType = url.searchParams.get("versionType") || "branch";
 
             if (!repoId || !path) {
                 return Response.json({ error: "Missing repoId or path" }, { status: 400 });
             }
 
             try {
-                const content = await azureClient.getFileContent(repoId, path);
+                const content = await azureClient.getFileContent(repoId, path, version || undefined, versionType);
                 return Response.json({ content });
             } catch (error: any) {
                 console.error("Error fetching repo content:", error);

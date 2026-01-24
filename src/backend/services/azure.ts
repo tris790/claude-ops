@@ -103,21 +103,27 @@ export class AzureDevOpsClient {
 
         const url = new URL(`${this.baseUrl}/_apis/git/repositories/${repoId}/items`);
         url.searchParams.append("path", path);
-        url.searchParams.append("includeContent", "true");
+        url.searchParams.append("$format", "text"); // More reliable way to get raw content
         if (version) {
             url.searchParams.append("versionDescriptor.version", version);
             url.searchParams.append("versionDescriptor.versionType", versionType);
         }
         url.searchParams.append("api-version", "7.0");
 
-        const res = await fetch(url.toString(), { headers: this.headers });
+        const res = await fetch(url.toString(), {
+            headers: {
+                ...this.headers,
+                "Accept": "text/plain, */*"
+            }
+        });
 
         if (!res.ok) {
+            const errorText = await res.text().catch(() => "");
+            console.error(`Azure API Error (${res.status}): ${errorText}`);
             throw new Error(`Failed to fetch file content: ${res.status} ${res.statusText}`);
         }
 
-        const data = await res.json();
-        return data.content;
+        return await res.text();
     }
 
     async getPullRequestChanges(repoId: string, id: string) {
