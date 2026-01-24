@@ -42,3 +42,19 @@ const server = serve({
 });
 
 console.log(`🚀 Server running at ${server.url}`);
+
+// Background Fetch Loop (Every 5 minutes)
+import { gitService } from "./services/git";
+
+setInterval(async () => {
+  // Silent in production, maybe log in dev
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("[Background] Starting git fetch...");
+  }
+  try {
+    await gitService.fetchAll();
+  } catch (e) {
+    console.error("[Background] Git fetch failed", e);
+  }
+}, 5 * 60 * 1000); // 5 minutes
+

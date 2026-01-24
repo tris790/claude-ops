@@ -3,9 +3,9 @@
 This phase unlocks the "Power User" features, specifically bridging the gap between a web interface and a local IDE. The focus is on deep integration and responsiveness.
 
 ## 1. Local Clone Management
-- [ ] **Backend Git Manager**:
-  - [ ] Logic to manage `~/.claude-ops/repos/`.
-  - [ ] Background `git fetch` operations.
+- [x] **Backend Git Manager**:
+  - [x] Logic to manage `~/.claude-ops/repos/`.
+  - [x] Background `git fetch` operations.
 - [ ] **Clone UX**:
   - [ ] UI indicators for cloned vs. remote repos.
   - [ ] "Sync" buttons and status badges.
