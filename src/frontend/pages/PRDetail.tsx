@@ -106,207 +106,221 @@ export function PRDetail() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto space-y-6">
-            <button
-                onClick={() => navigate("/prs")}
-                className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
-            >
-                <ArrowLeft className="h-4 w-4" />
-                Back to list
-            </button>
+        <div className="flex flex-col h-full bg-zinc-950">
+            {/* Header Section - Contained */}
+            <div className="max-w-6xl mx-auto w-full px-6 pt-6 space-y-6">
+                <button
+                    onClick={() => navigate("/prs")}
+                    className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to list
+                </button>
 
-            <header className="space-y-4">
-                <div className="flex items-center gap-3">
-                    <GitPullRequest className={`h-5 w-5 ${statusColors[pr.status] || "text-zinc-400"}`} />
-                    <span className="text-zinc-500 font-mono">#{pr.pullRequestId}</span>
-                    <span className={`px-2 py-0.5 rounded bg-zinc-800 text-xs font-medium uppercase tracking-wider ${statusColors[pr.status] || "text-zinc-400"}`}>
-                        {pr.status}
-                    </span>
-                </div>
-                <h1 className="text-3xl font-bold text-zinc-100 leading-tight">
-                    {pr.title}
-                </h1>
+                <header className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <GitPullRequest className={`h-5 w-5 ${statusColors[pr.status] || "text-zinc-400"}`} />
+                        <span className="text-zinc-500 font-mono">#{pr.pullRequestId}</span>
+                        <span className={`px-2 py-0.5 rounded bg-zinc-800 text-xs font-medium uppercase tracking-wider ${statusColors[pr.status] || "text-zinc-400"}`}>
+                            {pr.status}
+                        </span>
+                    </div>
+                    <h1 className="text-3xl font-bold text-zinc-100 leading-tight">
+                        {pr.title}
+                    </h1>
 
-                <div className="flex items-center gap-2 text-sm text-zinc-400">
-                    <span className="font-medium text-zinc-300">{pr.sourceRefName.split('/').pop()}</span>
-                    <ArrowLeft className="h-3 w-3 rotate-180 text-zinc-600" />
-                    <span className="font-medium text-zinc-300">{pr.targetRefName.split('/').pop()}</span>
-                    <span className="mx-2 text-zinc-700">•</span>
-                    <span>Created by {pr.createdBy.displayName}</span>
-                    <span className="mx-2 text-zinc-700">•</span>
-                    <Clock className="h-3 w-3 inline mr-1" />
-                    <span>{new Date(pr.creationDate).toLocaleDateString()}</span>
-                </div>
-            </header>
-
-            <div className="flex border-b border-zinc-800 gap-6">
-                <TabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</TabButton>
-                <TabButton active={activeTab === "files"} onClick={() => setActiveTab("files")}>Files</TabButton>
-                <TabButton active={activeTab === "commits"} onClick={() => setActiveTab("commits")}>Commits</TabButton>
+                    <div className="flex items-center gap-2 text-sm text-zinc-400">
+                        <span className="font-medium text-zinc-300">{pr.sourceRefName.split('/').pop()}</span>
+                        <ArrowLeft className="h-3 w-3 rotate-180 text-zinc-600" />
+                        <span className="font-medium text-zinc-300">{pr.targetRefName.split('/').pop()}</span>
+                        <span className="mx-2 text-zinc-700">•</span>
+                        <span>Created by {pr.createdBy.displayName}</span>
+                        <span className="mx-2 text-zinc-700">•</span>
+                        <Clock className="h-3 w-3 inline mr-1" />
+                        <span>{new Date(pr.creationDate).toLocaleDateString()}</span>
+                    </div>
+                </header>
             </div>
 
-            {activeTab === "overview" && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-8">
-                        <section className="bg-zinc-900/20 rounded-xl border border-zinc-800 overflow-hidden">
-                            <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/40">
-                                <h3 className="text-sm font-semibold text-zinc-200">Description</h3>
-                            </div>
-                            <div className="p-6 text-zinc-300 prose prose-invert max-w-none">
-                                {pr.description ? (
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                        {pr.description}
-                                    </ReactMarkdown>
-                                ) : (
-                                    <p className="italic text-zinc-600">No description provided.</p>
-                                )}
-                            </div>
-                        </section>
+            {/* Navigation Tabs - Full width border, contained Content */}
+            <div className="w-full border-b border-zinc-800 mt-6 bg-zinc-950 sticky top-0 z-10">
+                <div className="max-w-6xl mx-auto px-6 flex gap-6">
+                    <TabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</TabButton>
+                    <TabButton active={activeTab === "files"} onClick={() => setActiveTab("files")}>Files</TabButton>
+                    <TabButton active={activeTab === "commits"} onClick={() => setActiveTab("commits")}>Commits</TabButton>
+                </div>
+            </div>
 
-                        <section className="space-y-4">
-                            <div className="flex items-center gap-2 text-zinc-200 font-semibold px-2">
-                                <MessageSquare className="h-5 w-5 text-blue-500" />
-                                <h3>Activity</h3>
+            {/* Content Area */}
+            <div className="flex-1">
+                {activeTab === "overview" && (
+                    <div className="max-w-6xl mx-auto w-full px-6 py-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div className="lg:col-span-2 space-y-8">
+                                <section className="bg-zinc-900/20 rounded-xl border border-zinc-800 overflow-hidden">
+                                    <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/40">
+                                        <h3 className="text-sm font-semibold text-zinc-200">Description</h3>
+                                    </div>
+                                    <div className="p-6 text-zinc-300 prose prose-invert max-w-none">
+                                        {pr.description ? (
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                {pr.description}
+                                            </ReactMarkdown>
+                                        ) : (
+                                            <p className="italic text-zinc-600">No description provided.</p>
+                                        )}
+                                    </div>
+                                </section>
+
+                                <section className="space-y-4">
+                                    <div className="flex items-center gap-2 text-zinc-200 font-semibold px-2">
+                                        <MessageSquare className="h-5 w-5 text-blue-500" />
+                                        <h3>Activity</h3>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        {threads.filter(t => !t.isDraft && t.comments.some((c: any) => c.content)).map((thread: any) => (
+                                            <div key={thread.id} className="bg-zinc-900/30 rounded-xl border border-zinc-800 overflow-hidden">
+                                                <div className="space-y-4 p-4">
+                                                    {thread.comments.map((comment: any) => (
+                                                        <div key={comment.id} className="flex gap-4">
+                                                            <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-400 shrink-0">
+                                                                {comment.author.displayName[0]}
+                                                            </div>
+                                                            <div className="space-y-1 min-w-0">
+                                                                <div className="flex items-baseline gap-2">
+                                                                    <span className="font-medium text-sm text-zinc-200">{comment.author.displayName}</span>
+                                                                    <span className="text-[10px] text-zinc-500">{new Date(comment.publishedDate).toLocaleString()}</span>
+                                                                </div>
+                                                                <div className="text-sm text-zinc-400 break-words">
+                                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
                             </div>
 
-                            <div className="space-y-4">
-                                {threads.filter(t => !t.isDraft && t.comments.some((c: any) => c.content)).map((thread: any) => (
-                                    <div key={thread.id} className="bg-zinc-900/30 rounded-xl border border-zinc-800 overflow-hidden">
-                                        <div className="space-y-4 p-4">
-                                            {thread.comments.map((comment: any) => (
-                                                <div key={comment.id} className="flex gap-4">
-                                                    <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-400 shrink-0">
-                                                        {comment.author.displayName[0]}
-                                                    </div>
-                                                    <div className="space-y-1 min-w-0">
-                                                        <div className="flex items-baseline gap-2">
-                                                            <span className="font-medium text-sm text-zinc-200">{comment.author.displayName}</span>
-                                                            <span className="text-[10px] text-zinc-500">{new Date(comment.publishedDate).toLocaleString()}</span>
+                            <div className="space-y-6">
+                                <div className="p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 space-y-6">
+                                    <section className="space-y-4">
+                                        <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Reviewers</h4>
+                                        <div className="space-y-3">
+                                            {pr.reviewers.map((reviewer: any) => (
+                                                <div key={reviewer.id} className="flex items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <div className="h-6 w-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 shrink-0">
+                                                            {reviewer.displayName[0]}
                                                         </div>
-                                                        <div className="text-sm text-zinc-400 break-words">
-                                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
-                                                        </div>
+                                                        <span className="text-sm text-zinc-300 truncate">{reviewer.displayName}</span>
                                                     </div>
+                                                    <VoteBadge vote={reviewer.vote} />
                                                 </div>
                                             ))}
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                    </div>
+                                    </section>
 
-                    <div className="space-y-6">
-                        <div className="p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 space-y-6">
-                            <section className="space-y-4">
-                                <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Reviewers</h4>
-                                <div className="space-y-3">
-                                    {pr.reviewers.map((reviewer: any) => (
-                                        <div key={reviewer.id} className="flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <div className="h-6 w-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 shrink-0">
-                                                    {reviewer.displayName[0]}
-                                                </div>
-                                                <span className="text-sm text-zinc-300 truncate">{reviewer.displayName}</span>
+                                    <section className="space-y-4 pt-4 border-t border-zinc-800">
+                                        <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Policies</h4>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 text-sm text-zinc-400">
+                                                {pr.mergeStatus === "succeeded" ? (
+                                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                                ) : (
+                                                    <XCircle className="h-4 w-4 text-red-500" />
+                                                )}
+                                                <span>No merge conflicts</span>
                                             </div>
-                                            <VoteBadge vote={reviewer.vote} />
+                                            <div className="flex items-center gap-2 text-sm text-zinc-400">
+                                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                                <span>Build succeeded</span>
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
-                            </section>
+                                    </section>
 
-                            <section className="space-y-4 pt-4 border-t border-zinc-800">
-                                <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Policies</h4>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2 text-sm text-zinc-400">
-                                        {pr.mergeStatus === "succeeded" ? (
-                                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                        ) : (
-                                            <XCircle className="h-4 w-4 text-red-500" />
-                                        )}
-                                        <span>No merge conflicts</span>
-                                    </div>
-                                    {/* In a real app, we'd fetch status checks/builds */}
-                                    <div className="flex items-center gap-2 text-sm text-zinc-400">
-                                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                        <span>Build succeeded</span>
-                                    </div>
+                                    <section className="pt-4 border-t border-zinc-800 flex flex-col gap-2">
+                                        <button
+                                            onClick={() => handleVote(10)}
+                                            className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-all shadow-lg"
+                                        >
+                                            Approve
+                                        </button>
+                                        <button
+                                            onClick={() => handleVote(5)}
+                                            className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-medium transition-all border border-zinc-700"
+                                        >
+                                            Approve with suggestions
+                                        </button>
+                                    </section>
                                 </div>
-                            </section>
-
-                            <section className="pt-4 border-t border-zinc-800 flex flex-col gap-2">
-                                <button
-                                    onClick={() => handleVote(10)}
-                                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-all shadow-lg"
-                                >
-                                    Approve
-                                </button>
-                                <button
-                                    onClick={() => handleVote(5)}
-                                    className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-medium transition-all border border-zinc-700"
-                                >
-                                    Approve with suggestions
-                                </button>
-                            </section>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {activeTab === "files" && (
-                <div className="flex h-[calc(100vh-280px)] bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden">
-                    <div className="w-64 flex-shrink-0">
-                        <FileTree
-                            changes={changes?.changes || []}
-                            selectedPath={selectedFilePath}
-                            onSelect={setSelectedFilePath}
-                        />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        {selectedFilePath ? (
-                            <DiffViewer
-                                repoId={pr.repository.id}
-                                filePath={selectedFilePath}
-                                originalVersion={pr.lastMergeTargetCommitId}
-                                modifiedVersion={pr.lastMergeSourceCommitId}
-                            />
-                        ) : (
-                            <div className="flex items-center justify-center h-full text-zinc-500">
-                                Select a file to view changes
+                {activeTab === "files" && (
+                    <div className="flex flex-col h-full bg-zinc-950">
+                        <div className="flex h-[calc(100vh-275px)] border-zinc-800 overflow-hidden">
+                            <div className="w-64 flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30">
+                                <FileTree
+                                    changes={changes?.changes || []}
+                                    selectedPath={selectedFilePath}
+                                    onSelect={setSelectedFilePath}
+                                />
                             </div>
-                        )}
+                            <div className="flex-1 min-w-0 bg-zinc-950">
+                                {selectedFilePath ? (
+                                    <DiffViewer
+                                        repoId={pr.repository.id}
+                                        filePath={selectedFilePath}
+                                        originalVersion={pr.lastMergeTargetCommitId}
+                                        modifiedVersion={pr.lastMergeSourceCommitId}
+                                    />
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-zinc-500">
+                                        Select a file to view changes
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {activeTab === "commits" && (
-                <div className="bg-zinc-900/20 rounded-xl border border-zinc-800 overflow-hidden">
-                    <div className="flex flex-col">
-                        {commits.map((commit: any) => (
-                            <div key={commit.commitId} className="flex gap-4 p-4 border-b border-zinc-800 last:border-0 hover:bg-white/5 transition-colors">
-                                <div className="mt-1">
-                                    <GitCommit className="h-5 w-5 text-blue-500" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <h4 className="text-zinc-200 font-medium truncate">{commit.comment}</h4>
-                                        <span className="text-xs font-mono text-zinc-500 shrink-0">{commit.commitId.substring(0, 8)}</span>
+                {activeTab === "commits" && (
+                    <div className="max-w-6xl mx-auto w-full px-6 py-6">
+                        <div className="bg-zinc-900/20 rounded-xl border border-zinc-800 overflow-hidden">
+                            <div className="flex flex-col">
+                                {commits.map((commit: any) => (
+                                    <div key={commit.commitId} className="flex gap-4 p-4 border-b border-zinc-800 last:border-0 hover:bg-white/5 transition-colors">
+                                        <div className="mt-1">
+                                            <GitCommit className="h-5 w-5 text-blue-500" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <h4 className="text-zinc-200 font-medium truncate">{commit.comment}</h4>
+                                                <span className="text-xs font-mono text-zinc-500 shrink-0">{commit.commitId.substring(0, 8)}</span>
+                                            </div>
+                                            <div className="mt-1 flex items-center gap-2 text-xs text-zinc-400">
+                                                <span className="font-medium text-zinc-300">{commit.author.name}</span>
+                                                <span>committed on {new Date(commit.author.date).toLocaleString()}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="mt-1 flex items-center gap-2 text-xs text-zinc-400">
-                                        <span className="font-medium text-zinc-300">{commit.author.name}</span>
-                                        <span>committed on {new Date(commit.author.date).toLocaleString()}</span>
+                                ))}
+                                {commits.length === 0 && (
+                                    <div className="p-8 text-center text-zinc-500">
+                                        No commits found for this pull request.
                                     </div>
-                                </div>
+                                )}
                             </div>
-                        ))}
-                        {commits.length === 0 && (
-                            <div className="p-8 text-center text-zinc-500">
-                                No commits found for this pull request.
-                            </div>
-                        )}
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }

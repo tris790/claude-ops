@@ -81,7 +81,7 @@ export function PipelineRunDetail() {
     const jobs = records.filter((r: any) => r.type === "Job");
 
     return (
-        <div className="flex flex-col h-full space-y-4 max-w-7xl mx-auto px-4">
+        <div className="flex flex-col h-full space-y-4 w-full px-4">
             <header className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <button

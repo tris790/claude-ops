@@ -69,7 +69,7 @@ export function WorkItemDetail() {
     if (!item) return <div className="text-zinc-500">Work item not found.</div>;
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-5xl mx-auto p-6 space-y-6">
             <button
                 onClick={() => navigate("/workitems")}
                 className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors text-sm"

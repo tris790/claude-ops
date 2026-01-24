@@ -81,8 +81,8 @@ export function MainLayout({ children }: MainLayoutProps) {
             {/* Main Content Area */}
             <div className="flex flex-col flex-1 min-w-0">
                 {/* Main Stage */}
-                <main className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-                    <div className="mx-auto max-w-7xl h-full animate-fade-in">
+                <main className="flex-1 overflow-y-auto scrollbar-thin">
+                    <div className="h-full w-full animate-fade-in">
                         {children}
                     </div>
                 </main>
