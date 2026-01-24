@@ -27,9 +27,9 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [x] **Location Mapping**: Transform LSP `Location` responses into internal app navigation paths (`/repos/:project/:repo/blob/:branch/*`).
     - [x] **Breadcrumbs**: Show clickable file/symbol paths in tooltips for easy navigation to referenced types.
   - [x] Implement Diagnostics (Squiggles/Errors).
-  - [ ] **LSP in Diff View**:
-    - [ ] **Position Mapping**: Translate diff-view coordinates (lines/cols) to actual document offsets for both `Original` and `Modified` buffers.
-    - [ ] **View Integration**: Ensure the `LSPProvider` attaches correctly to both panes in `Side-by-Side` mode and handles the `Unified` view context.
+  - [x] **LSP in Diff View**:
+    - [x] **Position Mapping**: Translate diff-view coordinates (lines/cols) to actual document offsets for both `Original` and `Modified` buffers.
+    - [x] **View Integration**: Ensure the `LSPProvider` attaches correctly to both panes in `Side-by-Side` mode and handles the `Unified` view context.
 
 ## 3. Interactive Code Review
 - [ ] **Rich Commenting**:

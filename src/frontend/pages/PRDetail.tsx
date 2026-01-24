@@ -319,6 +319,9 @@ export function PRDetail() {
                                         filePath={selectedFilePath}
                                         originalVersion={pr.lastMergeTargetCommitId}
                                         modifiedVersion={pr.lastMergeSourceCommitId}
+                                        projectName={pr.repository.project.name}
+                                        repoName={pr.repository.name}
+                                        isCloned={pr.repository.isCloned}
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center h-full text-zinc-500">
