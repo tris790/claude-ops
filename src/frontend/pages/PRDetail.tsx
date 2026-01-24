@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges } from "../api/prs";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits } from "../api/prs";
 import {
     ArrowLeft,
     GitPullRequest,
@@ -13,7 +13,8 @@ import {
     Loader2,
     Check,
     Minus,
-    FileCode
+    FileCode,
+    GitCommit
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -22,13 +23,17 @@ import { DiffViewer } from "../components/pr/DiffViewer";
 
 export function PRDetail() {
     const { id } = useParams();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [pr, setPr] = useState<any>(null);
     const [threads, setThreads] = useState<any[]>([]);
     const [changes, setChanges] = useState<any>(null);
+    const [commits, setCommits] = useState<any[]>([]);
     const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"overview" | "files" | "commits">("overview");
+
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (id) loadData();
@@ -36,20 +41,24 @@ export function PRDetail() {
 
     async function loadData() {
         setLoading(true);
+        setError(null);
         try {
-            const data = await getPullRequest(id!);
+            const data = await getPullRequest(id!, searchParams.get("repoId") || undefined);
             setPr(data);
-            const [threadData, changeData] = await Promise.all([
+            const [threadData, changeData, commitData] = await Promise.all([
                 getPullRequestThreads(id!, data.repository.id),
-                getPullRequestChanges(id!, data.repository.id)
+                getPullRequestChanges(id!, data.repository.id),
+                getPullRequestCommits(id!, data.repository.id)
             ]);
             setThreads(threadData);
             setChanges(changeData);
+            setCommits(commitData);
             if (changeData.changes.length > 0) {
                 setSelectedFilePath(changeData.changes[0].item.path);
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            setError(err.message || "An error occurred");
         } finally {
             setLoading(false);
         }
@@ -73,6 +82,18 @@ export function PRDetail() {
     if (loading) return (
         <div className="flex items-center justify-center h-full min-h-[400px]">
             <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+        </div>
+    );
+
+    if (error) return (
+        <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
+            <div className="text-red-500 font-medium">Error: {error}</div>
+            <button
+                onClick={loadData}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm transition-colors"
+            >
+                Retry
+            </button>
         </div>
     );
 
@@ -259,8 +280,31 @@ export function PRDetail() {
             )}
 
             {activeTab === "commits" && (
-                <div className="bg-zinc-900/20 rounded-xl border border-zinc-800 p-12 text-center text-zinc-500">
-                    <p>Commit list coming soon.</p>
+                <div className="bg-zinc-900/20 rounded-xl border border-zinc-800 overflow-hidden">
+                    <div className="flex flex-col">
+                        {commits.map((commit: any) => (
+                            <div key={commit.commitId} className="flex gap-4 p-4 border-b border-zinc-800 last:border-0 hover:bg-white/5 transition-colors">
+                                <div className="mt-1">
+                                    <GitCommit className="h-5 w-5 text-blue-500" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <h4 className="text-zinc-200 font-medium truncate">{commit.comment}</h4>
+                                        <span className="text-xs font-mono text-zinc-500 shrink-0">{commit.commitId.substring(0, 8)}</span>
+                                    </div>
+                                    <div className="mt-1 flex items-center gap-2 text-xs text-zinc-400">
+                                        <span className="font-medium text-zinc-300">{commit.author.name}</span>
+                                        <span>committed on {new Date(commit.author.date).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {commits.length === 0 && (
+                            <div className="p-8 text-center text-zinc-500">
+                                No commits found for this pull request.
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

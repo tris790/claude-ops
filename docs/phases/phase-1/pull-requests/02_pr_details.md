@@ -31,6 +31,7 @@ The landing page for a specific PR. Shows description, status checks, reviewers,
 1. `PRDetail` layout with tabs. [x]
 2. `PolicyStatus` component (Show green/red builds). [x]
 3. `ReviewerList` component. [x]
+4. `CommitsList` implementation. [x]
 
 ## Completion Status
 - **Branch**: `feat/pr-details`

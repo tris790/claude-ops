@@ -79,7 +79,7 @@ export function PullRequests() {
                         prs.map((pr) => (
                             <div
                                 key={pr.pullRequestId}
-                                onClick={() => navigate(`/prs/${pr.pullRequestId}`)}
+                                onClick={() => navigate(`/prs/${pr.pullRequestId}?repoId=${pr.repository.id}`)}
                                 className="group p-4 hover:bg-white/5 transition-all flex items-center justify-between cursor-pointer"
                             >
                                 <div className="flex items-center gap-4 min-w-0">

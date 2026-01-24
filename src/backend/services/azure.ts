@@ -44,6 +44,35 @@ export class AzureDevOpsClient {
             throw new Error(error.message || "Failed to connect to Azure DevOps");
         }
     }
+
+    private projectCache: { data: any[], timestamp: number } | null = null;
+
+    async getProjects() {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        if (this.projectCache && (Date.now() - this.projectCache.timestamp < this.CACHE_TTL)) {
+            return this.projectCache.data;
+        }
+
+        const url = `${this.baseUrl}/_apis/projects?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch projects: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        const projects = data.value || [];
+
+        this.projectCache = {
+            data: projects,
+            timestamp: Date.now()
+        };
+
+        return projects;
+    }
     private repoCache: { data: any[], timestamp: number } | null = null;
     private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -131,14 +160,70 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/git/repositories/${repoId}/pullRequests/${id}/changes?api-version=7.0`;
+        // 1. Resolve PR context safely
+        const pr = await this.getPullRequest(id, repoId);
+        // pr.url is the safe base for this PR (e.g. includes Project GUID)
+        // e.g. .../pullRequests/1
+
+        // 2. Try fetching changes through iterations (most reliable for diffs)
+        try {
+            const iterationsUrl = `${pr.url}/iterations?api-version=7.0`;
+            const iterationsRes = await fetch(iterationsUrl, { headers: this.headers });
+            if (iterationsRes.ok) {
+                const iterationsData = await iterationsRes.json();
+                const iterations = iterationsData.value || [];
+                if (iterations.length > 0) {
+                    const lastIteration = iterations[iterations.length - 1];
+                    const changesUrl = lastIteration.url
+                        ? `${lastIteration.url}/changes?api-version=7.0`
+                        : `${pr.url}/iterations/${lastIteration.id}/changes?api-version=7.0`;
+
+                    const changesRes = await fetch(changesUrl, { headers: this.headers });
+                    if (changesRes.ok) {
+                        const data = await changesRes.json();
+                        // Normalize changeEntries to changes if needed (iteration changes endpoint uses changeEntries)
+                        if (data.changeEntries && !data.changes) {
+                            data.changes = data.changeEntries;
+                        }
+                        return data;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to fetch changes via iterations, falling back to direct...", e);
+        }
+
+        // Fallback: Try direct changes endpoint relative to the PR's valid internal URL
+        // pr.url is .../_apis/git/repositories/{guid}/pullRequests/{id}
+        const url = `${pr.url}/changes?api-version=7.0`;
         const res = await fetch(url, { headers: this.headers });
 
         if (!res.ok) {
+            // If even that fails, try legacy construction but use the safe project from PR if available
             throw new Error(`Failed to fetch PR changes: ${res.status} ${res.statusText}`);
         }
 
         return await res.json();
+    }
+
+    async getPullRequestCommits(repoId: string, id: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        // 1. Resolve PR context safely
+        const pr = await this.getPullRequest(id, repoId);
+
+        // 2. Use safe URL
+        const url = `${pr.url}/commits?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch PR commits: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.value || [];
     }
 
     async queryWorkItems(wiql: string) {
@@ -230,32 +315,121 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const url = new URL(`${this.baseUrl}/_apis/git/pullrequests`);
-        url.searchParams.append("api-version", "7.0");
-        if (criteria?.status) url.searchParams.append("searchCriteria.status", criteria.status);
-        if (criteria?.reviewerId) url.searchParams.append("searchCriteria.reviewerId", criteria.reviewerId);
-        if (criteria?.creatorId) url.searchParams.append("searchCriteria.creatorId", criteria.creatorId);
+        // Helper to fetch PRs for a specific project
+        const fetchForProject = async (projectName: string) => {
+            const url = new URL(`${this.baseUrl}/${projectName}/_apis/git/pullrequests`);
+            url.searchParams.append("api-version", "7.0");
 
-        const res = await fetch(url.toString(), { headers: this.headers });
+            if (criteria?.status) url.searchParams.append("searchCriteria.status", criteria.status);
+            if (criteria?.reviewerId) url.searchParams.append("searchCriteria.reviewerId", criteria.reviewerId);
+            if (criteria?.creatorId) url.searchParams.append("searchCriteria.creatorId", criteria.creatorId);
+            if (criteria?.repositoryId) url.searchParams.append("searchCriteria.repositoryId", criteria.repositoryId);
 
-        if (!res.ok) {
-            throw new Error(`Failed to fetch pull requests: ${res.status} ${res.statusText}`);
+            const res = await fetch(url.toString(), { headers: this.headers });
+            if (!res.ok) {
+                console.warn(`Failed to fetch PRs for project ${projectName}: ${res.status}`);
+                return [];
+            }
+            const data = await res.json();
+            return data.value || [];
+        };
+
+        // If project is specified, simple fetch
+        if (criteria?.project) {
+            return await fetchForProject(criteria.project);
         }
 
-        const data = await res.json();
-        return data.value || [];
+        // Otherwise, we must fetch for ALL projects (Organization view)
+        // Otherwise, we must fetch for ALL projects (Organization view)
+        let projects = [];
+        try {
+            // 1. Get all projects
+            projects = await this.getProjects();
+        } catch (error: any) {
+            console.warn(`[Azure] Failed to list projects (${error.message}). Attempting direct fetch from Base URL...`);
+
+            // Fallback: Try fetching for the current context (implied project)
+            const url = new URL(`${this.baseUrl}/_apis/git/pullrequests`);
+            url.searchParams.append("api-version", "7.0");
+
+            if (criteria?.status) url.searchParams.append("searchCriteria.status", criteria.status);
+            if (criteria?.reviewerId) url.searchParams.append("searchCriteria.reviewerId", criteria.reviewerId);
+            if (criteria?.creatorId) url.searchParams.append("searchCriteria.creatorId", criteria.creatorId);
+            if (criteria?.repositoryId) url.searchParams.append("searchCriteria.repositoryId", criteria.repositoryId);
+
+            const res = await fetch(url.toString(), { headers: this.headers });
+            if (!res.ok) {
+                throw error; // Rethrow original error if fallback fails
+            }
+            const data = await res.json();
+            return data.value || [];
+        }
+
+        // 2. Fetch PRs for each project in parallel
+        const results = await Promise.all(
+            projects.map((p: any) => fetchForProject(p.name))
+        );
+
+        // 3. Flatten results
+        return results.flat().sort((a: any, b: any) =>
+            new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime()
+        );
     }
 
-    async getPullRequest(id: string) {
+    async getPullRequest(id: string, repoId?: string, project?: string) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/git/pullrequests/${id}?api-version=7.0`;
+        let url: string;
+
+        // Best case: We have repoId (and implicitly project context from repo)
+        if (repoId && project) {
+            url = `${this.baseUrl}/${project}/_apis/git/repositories/${repoId}/pullRequests/${id}?api-version=7.0`;
+        }
+        // fallback: We have project, can use project-scoped search
+        else if (project) {
+            url = `${this.baseUrl}/${project}/_apis/git/pullrequests/${id}?api-version=7.0`;
+        }
+        // fallback 2: We have repoId but no project (rare, implies inferred project probably won't work perfectly without project in path)
+        else if (repoId) {
+            // Try to infer standard structure or user legacy collection support
+            url = `${this.baseUrl}/_apis/git/repositories/${repoId}/pullRequests/${id}?api-version=7.0`;
+        }
+        // Worst case: Just ID. We need to find the project.
+        else {
+            // We can't fetch a PR by ID globally without a project. 
+            // We will try to iterate active projects to find it. This is expensive.
+            console.log(`[Azure] Searching for PR ${id} across all projects (missing context)...`);
+            try {
+                const projects = await this.getProjects();
+                for (const p of projects) {
+                    try {
+                        const tryUrl = `${this.baseUrl}/${p.name}/_apis/git/pullrequests/${id}?api-version=7.0`;
+                        const res = await fetch(tryUrl, { headers: this.headers });
+                        if (res.ok) {
+                            return await res.json();
+                        }
+                    } catch { /* continue */ }
+                }
+            } catch (error: any) {
+                console.warn(`[Azure] Failed to list projects (${error.message}). Attempting direct fetch from Base URL...`);
+                // Fallback: Try fetching assuming Base URL is project-scoped
+                const url = `${this.baseUrl}/_apis/git/pullrequests/${id}?api-version=7.0`;
+                const res = await fetch(url, { headers: this.headers });
+                if (res.ok) {
+                    return await res.json();
+                }
+            }
+            throw new Error(`Pull Request ${id} not found in any project`);
+        }
+
         const res = await fetch(url, { headers: this.headers });
 
         if (!res.ok) {
-            throw new Error(`Failed to fetch pull request: ${res.status} ${res.statusText}`);
+            // Special handling: If 404/400 and we guessed, throw specific error
+            const text = await res.text();
+            throw new Error(`Failed to fetch pull request: ${res.status} ${text}`);
         }
 
         return await res.json();
@@ -266,7 +440,9 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/git/repositories/${repoId}/pullRequests/${id}/threads?api-version=7.0`;
+        const pr = await this.getPullRequest(id, repoId);
+
+        const url = `${pr.url}/threads?api-version=7.0`;
         const res = await fetch(url, { headers: this.headers });
 
         if (!res.ok) {

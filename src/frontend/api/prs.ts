@@ -7,8 +7,9 @@ export async function getPullRequests(status: string = "active") {
     return res.json();
 }
 
-export async function getPullRequest(id: string) {
-    const res = await fetch(`/api/prs/${id}`);
+export async function getPullRequest(id: string, repoId?: string) {
+    const url = repoId ? `/api/prs/${id}?repoId=${repoId}` : `/api/prs/${id}`;
+    const res = await fetch(url);
     if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to fetch pull request");
@@ -43,6 +44,15 @@ export async function getPullRequestChanges(id: string, repoId: string) {
     if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to fetch PR changes");
+    }
+    return res.json();
+}
+
+export async function getPullRequestCommits(id: string, repoId: string) {
+    const res = await fetch(`/api/prs/${id}/commits?repoId=${repoId}`);
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to fetch PR commits");
     }
     return res.json();
 }
