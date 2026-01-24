@@ -33,7 +33,21 @@ export const repoRoutes = {
                     return Response.json({ error: "Missing required fields" }, { status: 400 });
                 }
 
-                await gitService.clone(projectName, repoName, remoteUrl);
+                let cloneUrl = remoteUrl;
+                const pat = process.env.AZURE_DEVOPS_PAT;
+
+                if (pat) {
+                    try {
+                        const urlObj = new URL(remoteUrl);
+                        urlObj.username = "user"; // Azure DevOps accepts any username with PAT
+                        urlObj.password = pat;
+                        cloneUrl = urlObj.toString();
+                    } catch (e) {
+                        console.warn("Failed to inject PAT into clone URL, using original URL", e);
+                    }
+                }
+
+                await gitService.clone(projectName, repoName, cloneUrl);
                 return Response.json({ success: true });
             } catch (error: any) {
                 console.error("Error cloning repo:", error);
