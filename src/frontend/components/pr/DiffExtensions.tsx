@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { StateField, StateEffect } from "@codemirror/state";
-import { EditorView, Decoration, WidgetType, showTooltip, type Tooltip } from "@codemirror/view";
+import { EditorView, Decoration, WidgetType, showTooltip, type Tooltip, type DecorationSet } from "@codemirror/view";
 import { MessageSquarePlus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -167,53 +167,51 @@ export const createCommentSystem = (props: CommentSystemProps) => {
                 }
             }
             return drafts;
-        },
-        provide: f => EditorView.decorations.from(f, (drafts) => {
-            const decorations: Decoration[] = [];
+        }
+    });
 
-            // 1. Existing Threads
-            const threads = props.threads || [];
-            for (const thread of threads) {
-                if (thread.isDraft || !thread.threadContext) continue;
-                const context = thread.threadContext;
+    const commentDecorations = EditorView.decorations.compute([draftStateField], (state) => {
+        const drafts = state.field(draftStateField);
+        const decorations = [];
 
-                // Azure uses 1-based line numbers. Ensure path matches.
-                // Azure paths often have leading slash, normalize.
-                const threadPath = context.filePath?.startsWith('/') ? context.filePath : `/${context.filePath}`;
-                const propsPath = props.filePath?.startsWith('/') ? props.filePath : `/${props.filePath}`;
+        // 1. Existing Threads
+        const threads = props.threads || [];
+        for (const thread of threads) {
+            if (thread.isDraft || !thread.threadContext) continue;
+            const context = thread.threadContext;
 
-                if (threadPath !== propsPath) continue;
+            const threadPath = context.filePath?.startsWith('/') ? context.filePath : `/${context.filePath}`;
+            const propsPath = props.filePath?.startsWith('/') ? props.filePath : `/${props.filePath}`;
 
-                const posInfo = props.side === "original" ? context.leftFileStart : context.rightFileStart;
-                if (!posInfo) continue;
+            if (threadPath !== propsPath) continue;
 
-                try {
-                    // Check if line exists in current doc
-                    const state = f.get(f);
-                    if (posInfo.line > state.doc.lines) continue;
-                    const line = state.doc.line(posInfo.line);
-                    decorations.push(Decoration.widget({
-                        widget: new CommentThreadWidget(thread, props),
-                        side: 1,
-                        block: true
-                    }).range(line.to));
-                } catch (e) {
-                    console.warn("Failed to place comment thread at line", posInfo.line);
-                }
-            }
+            const posInfo = props.side === "original" ? context.leftFileStart : context.rightFileStart;
+            if (!posInfo) continue;
 
-            // 2. Drafts
-            for (const draft of drafts) {
+            try {
+                if (posInfo.line > state.doc.lines) continue;
+                const line = state.doc.line(posInfo.line);
                 decorations.push(Decoration.widget({
-                    widget: new CommentDraftWidget(draft, props),
+                    widget: new CommentThreadWidget(thread, props),
                     side: 1,
                     block: true
-                }).range(draft.to));
+                }).range(line.to));
+            } catch (e) {
+                console.warn("Failed to place comment thread at line", posInfo.line);
             }
+        }
 
-            decorations.sort((a, b) => a.from - b.from);
-            return Decoration.set(decorations);
-        })
+        // 2. Drafts
+        for (const draft of drafts) {
+            decorations.push(Decoration.widget({
+                widget: new CommentDraftWidget(draft, props),
+                side: 1,
+                block: true
+            }).range(draft.to));
+        }
+
+        decorations.sort((a, b) => a.from - b.from);
+        return Decoration.set(decorations);
     });
 
 
@@ -243,7 +241,6 @@ export const createCommentSystem = (props: CommentSystemProps) => {
                                 const to = selection.to;
 
                                 const startLine = view.state.doc.lineAt(from);
-                                const endLine = view.state.doc.lineAt(to);
 
                                 // Standardize offsets
                                 const startOffset = from - startLine.from + 1;
@@ -277,6 +274,7 @@ export const createCommentSystem = (props: CommentSystemProps) => {
 
     return [
         draftStateField,
+        commentDecorations,
         selectionTooltipField
     ];
 };

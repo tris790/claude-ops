@@ -49,7 +49,7 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
   - [ ] **Review State**:
     - [x] **File Completion**: Implement "Mark as reviewed" checkboxes in the file tree.
     - [x] **Cumulative Diff**: Show only "Changes since my last review" based on tracked iteration history.
-    - [ ] **Show comments in context**: Show comments in context of the code. Both in the diff view and overview list
+    - [x] **Show comments in context**: Show comments in context of the code. Both in the diff view and overview list
     - [ ] **CRUD operations on comments**: Implement CRUD operations on comments.
     - [ ] **Diff view improvements**: 
         - [ ] **Resizable diff panels**
