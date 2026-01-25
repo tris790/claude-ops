@@ -57,6 +57,7 @@ export function PRDetail() {
     const selectedBaseIteration = searchParams.get("baseIteration") ? parseInt(searchParams.get("baseIteration")!, 10) : null;
     const selectedFilePath = searchParams.get("path");
     const activeTab = (searchParams.get("tab") as any) || "overview";
+    const commentStatusFilter = searchParams.get("commentStatus") || "all";
 
     const updateQueryParams = (params: Record<string, string | null>, replace = false) => {
         const nextParams = new URLSearchParams(searchParams);
@@ -162,6 +163,14 @@ export function PRDetail() {
     }
 
     const scrollToLine = searchParams.get("line") ? parseInt(searchParams.get("line")!, 10) : null;
+
+    const filteredThreads = threads.filter(t => {
+        if (t.isDraft) return false;
+        if (!t.comments.some((c: any) => c.content)) return false;
+        if (commentStatusFilter === "active") return t.status === 1 || t.status === 0;
+        if (commentStatusFilter === "resolved") return t.status === 2 || t.status === 4;
+        return true;
+    });
 
     const jumpToContext = (thread: any) => {
         if (!thread.threadContext) return;
@@ -428,9 +437,22 @@ export function PRDetail() {
                                 </section>
 
                                 <section className="space-y-4">
-                                    <div className="flex items-center gap-2 text-zinc-200 font-semibold px-2">
-                                        <MessageSquare className="h-5 w-5 text-sapphire-500" />
-                                        <h3>Activity</h3>
+                                    <div className="flex items-center justify-between px-2">
+                                        <div className="flex items-center gap-2 text-zinc-200 font-semibold">
+                                            <MessageSquare className="h-5 w-5 text-sapphire-500" />
+                                            <h3>Activity</h3>
+                                        </div>
+                                        <div className="flex items-center gap-1 p-0.5 bg-zinc-900 rounded-md border border-zinc-800">
+                                            {["all", "active", "resolved"].map((status) => (
+                                                <button
+                                                    key={status}
+                                                    onClick={() => updateQueryParams({ commentStatus: status === "all" ? null : status })}
+                                                    className={`px-2 py-1 text-[10px] font-medium rounded transition-all capitalize ${commentStatusFilter === status ? "bg-zinc-800 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"}`}
+                                                >
+                                                    {status}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
 
                                     <div className="space-y-4">
@@ -453,7 +475,7 @@ export function PRDetail() {
                                                 </button>
                                             </div>
                                         </div>
-                                        {threads.filter(t => !t.isDraft && t.comments.some((c: any) => c.content)).map((thread: any) => (
+                                        {filteredThreads.map((thread: any) => (
                                             <div key={thread.id} className="bg-zinc-900/30 rounded-xl border border-zinc-800 overflow-hidden">
                                                 {thread.threadContext && (
                                                     <button
@@ -626,7 +648,7 @@ export function PRDetail() {
                                         pullRequestId={pr.pullRequestId}
                                         isReviewed={selectedFilePath ? reviewedFiles.has(selectedFilePath) : false}
                                         onToggleReviewed={() => selectedFilePath && toggleFileReviewed(selectedFilePath)}
-                                        threads={threads}
+                                        threads={filteredThreads}
                                         onCommentPosted={() => {
                                             getPullRequestThreads(id!, pr.repository.id).then(setThreads);
                                         }}
