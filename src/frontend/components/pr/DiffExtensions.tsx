@@ -3,9 +3,10 @@ import { createRoot } from "react-dom/client";
 import { StateField, StateEffect } from "@codemirror/state";
 import { EditorView, Decoration, WidgetType, showTooltip, type Tooltip } from "@codemirror/view";
 import { MessageSquarePlus } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { CommentDialog } from "./CommentDialog";
 import { createPullRequestThread } from "../../api/prs";
-import { linter, type Diagnostic } from "@codemirror/lint";
 
 // --- Types ---
 
@@ -25,6 +26,8 @@ interface CommentSystemProps {
     repoId: string;
     filePath: string;
     side: "original" | "modified";
+    threads?: any[];
+    onCommentPosted?: () => void;
 }
 
 // --- Effects ---
@@ -32,7 +35,7 @@ interface CommentSystemProps {
 const addDraftEffect = StateEffect.define<CommentDraft>();
 const removeDraftEffect = StateEffect.define<string>(); // id
 
-// --- Widget ---
+// --- Widgets ---
 
 class CommentDraftWidget extends WidgetType {
     constructor(
@@ -45,11 +48,6 @@ class CommentDraftWidget extends WidgetType {
     toDOM(view: EditorView): HTMLElement {
         const dom = document.createElement("div");
         dom.className = "cm-comment-draft-widget z-50 absolute";
-        // Position it nicely? The widget will be inserted at the 'to' position.
-        // We might want to make it overlay or block. 
-        // For now, let's make it a block widget so it pushes content or sits in between?
-        // Actually, inline widget at the end of selection is easiest for now, or use an overlay.
-        // Let's use absolute positioning relative to the line.
 
         const root = createRoot(dom);
 
@@ -61,29 +59,33 @@ class CommentDraftWidget extends WidgetType {
                 return;
             }
 
-            console.log("Saving comment:", content, this.draft);
-
-            // Construct thread context
-            // Azure DevOps/Generic Context
+            // Construction thread context
             const threadContext = {
                 filePath: this.props.filePath,
-                rightFileStart: this.draft.side === 'modified' ? { line: this.draft.modifiedLine, offset: this.draft.originalOffset } : undefined,
-                rightFileEnd: this.draft.side === 'modified' ? { line: this.draft.modifiedLine, offset: this.draft.originalOffset /* should be range end */ } : undefined,
-                leftFileStart: this.draft.side === 'original' ? { line: this.draft.originalLine, offset: this.draft.originalOffset } : undefined,
-                leftFileEnd: this.draft.side === 'original' ? { line: this.draft.originalLine, offset: this.draft.originalOffset } : undefined,
+                rightFileStart: this.props.side === 'modified' ? { line: this.draft.modifiedLine, offset: this.draft.modifiedOffset } : undefined,
+                rightFileEnd: this.props.side === 'modified' ? { line: this.draft.modifiedLine, offset: this.draft.modifiedOffset } : undefined,
+                leftFileStart: this.props.side === 'original' ? { line: this.draft.originalLine, offset: this.draft.originalOffset } : undefined,
+                leftFileEnd: this.props.side === 'original' ? { line: this.draft.originalLine, offset: this.draft.originalOffset } : undefined,
             };
 
-            await createPullRequestThread(
-                this.props.pullRequestId!,
-                this.props.repoId,
-                content,
-                threadContext
-            );
+            try {
+                await createPullRequestThread(
+                    this.props.pullRequestId!,
+                    this.props.repoId,
+                    content,
+                    threadContext
+                );
 
-            // Access view to dispatch remove effect
-            view.dispatch({
-                effects: removeDraftEffect.of(this.draft.id)
-            });
+                // Access view to dispatch remove effect
+                view.dispatch({
+                    effects: removeDraftEffect.of(this.draft.id)
+                });
+
+                // Trigger refresh
+                this.props.onCommentPosted?.();
+            } catch (err: any) {
+                alert("Failed to save comment: " + err.message);
+            }
         };
 
         const handleCancel = () => {
@@ -110,11 +112,50 @@ class CommentDraftWidget extends WidgetType {
     }
 }
 
+class CommentThreadWidget extends WidgetType {
+    constructor(
+        private thread: any,
+        private props: CommentSystemProps
+    ) {
+        super();
+    }
+
+    toDOM(view: EditorView): HTMLElement {
+        const dom = document.createElement("div");
+        dom.className = "cm-comment-thread-widget border-l-2 border-blue-500 bg-zinc-900/40 my-2 rounded-r-md overflow-hidden animate-in slide-in-from-left-2 duration-200 shadow-lg";
+        const root = createRoot(dom);
+        root.render(
+            <div className="p-3 space-y-4">
+                {this.thread.comments.filter((c: any) => c.content).map((comment: any, idx: number) => (
+                    <div key={comment.id || idx} className="flex gap-3">
+                        <div className="h-6 w-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 shrink-0 uppercase font-bold border border-zinc-700 shadow-sm">
+                            {comment.author?.displayName?.[0] || "?"}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline gap-2 mb-0.5">
+                                <span className="text-xs font-semibold text-zinc-200">{comment.author?.displayName}</span>
+                                <span className="text-[9px] text-zinc-500 uppercase tracking-tight">{new Date(comment.publishedDate).toLocaleString()}</span>
+                            </div>
+                            <div className="text-[13px] text-zinc-300 prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+        return dom;
+    }
+
+    override ignoreEvent() {
+        return true;
+    }
+}
+
 // --- Extensions ---
 
 export const createCommentSystem = (props: CommentSystemProps) => {
 
-    // Revised Field: Manage Data separate from Decorations
     const draftStateField = StateField.define<CommentDraft[]>({
         create() { return []; },
         update(drafts, tr) {
@@ -127,19 +168,51 @@ export const createCommentSystem = (props: CommentSystemProps) => {
             }
             return drafts;
         },
-        provide: f => EditorView.decorations.from(f, drafts => {
-            const widgets = drafts.map(draft => {
-                return Decoration.widget({
+        provide: f => EditorView.decorations.from(f, (drafts) => {
+            const decorations: Decoration[] = [];
+
+            // 1. Existing Threads
+            const threads = props.threads || [];
+            for (const thread of threads) {
+                if (thread.isDraft || !thread.threadContext) continue;
+                const context = thread.threadContext;
+
+                // Azure uses 1-based line numbers. Ensure path matches.
+                // Azure paths often have leading slash, normalize.
+                const threadPath = context.filePath?.startsWith('/') ? context.filePath : `/${context.filePath}`;
+                const propsPath = props.filePath?.startsWith('/') ? props.filePath : `/${props.filePath}`;
+
+                if (threadPath !== propsPath) continue;
+
+                const posInfo = props.side === "original" ? context.leftFileStart : context.rightFileStart;
+                if (!posInfo) continue;
+
+                try {
+                    // Check if line exists in current doc
+                    const state = f.get(f);
+                    if (posInfo.line > state.doc.lines) continue;
+                    const line = state.doc.line(posInfo.line);
+                    decorations.push(Decoration.widget({
+                        widget: new CommentThreadWidget(thread, props),
+                        side: 1,
+                        block: true
+                    }).range(line.to));
+                } catch (e) {
+                    console.warn("Failed to place comment thread at line", posInfo.line);
+                }
+            }
+
+            // 2. Drafts
+            for (const draft of drafts) {
+                decorations.push(Decoration.widget({
                     widget: new CommentDraftWidget(draft, props),
                     side: 1,
                     block: true
-                }).range(draft.to);
-            });
-            // Decoration.set expects sorted ranges. If they are not sorted, this will crash or warn.
-            // .map produces an array.
-            // We should sort them.
-            widgets.sort((a, b) => a.from - b.from);
-            return Decoration.set(widgets);
+                }).range(draft.to));
+            }
+
+            decorations.sort((a, b) => a.from - b.from);
+            return Decoration.set(decorations);
         })
     });
 
@@ -170,6 +243,7 @@ export const createCommentSystem = (props: CommentSystemProps) => {
                                 const to = selection.to;
 
                                 const startLine = view.state.doc.lineAt(from);
+                                const endLine = view.state.doc.lineAt(to);
 
                                 // Standardize offsets
                                 const startOffset = from - startLine.from + 1;

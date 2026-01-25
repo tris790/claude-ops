@@ -172,13 +172,13 @@ export const prRoutes = {
 
             try {
                 const body = await req.json();
-                const { repoId, content } = body;
+                const { repoId, content, threadContext } = body;
 
                 if (!repoId || !content) {
                     return Response.json({ error: "Missing required fields (repoId, content)" }, { status: 400 });
                 }
 
-                const thread = await azureClient.createPullRequestThread(repoId, id, content);
+                const thread = await azureClient.createPullRequestThread(repoId, id, content, threadContext);
                 return Response.json(thread);
             } catch (error: any) {
                 console.error(`[API] Error creating thread for PR ${id}:`, error);

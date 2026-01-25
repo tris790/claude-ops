@@ -32,6 +32,8 @@ interface DiffViewerProps {
     pullRequestId?: string;
     isReviewed: boolean;
     onToggleReviewed: () => void;
+    threads?: any[];
+    onCommentPosted?: () => void;
 }
 
 type DiffMode = "side-by-side" | "unified" | "new-only";
@@ -46,7 +48,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     isCloned,
     pullRequestId,
     isReviewed,
-    onToggleReviewed
+    onToggleReviewed,
+    threads,
+    onCommentPosted
 }) => {
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -376,7 +380,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                             gutter: true,
                         }),
                         ...createLSPExtensions(`file:///modified${normalizedPath}`),
-                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId })
+                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted })
                     ]
                 }),
                 parent: containerRef.current
@@ -391,7 +395,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     extensions: [
                         ...baseExtensions,
                         ...createLSPExtensions(`file:///modified${normalizedPath}`),
-                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId })
+                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted })
                     ]
                 }),
                 parent: containerRef.current
@@ -406,7 +410,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 extensions: [
                     ...baseExtensions,
                     ...createLSPExtensions(`file:///original${normalizedPath}`),
-                    ...createCommentSystem({ repoId, filePath, side: "original", pullRequestId })
+                    ...createCommentSystem({ repoId, filePath, side: "original", pullRequestId, threads, onCommentPosted })
                 ]
             },
             b: {
@@ -414,7 +418,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 extensions: [
                     ...baseExtensions,
                     ...createLSPExtensions(`file:///modified${normalizedPath}`),
-                    ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId })
+                    ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted })
                 ]
             },
             parent: containerRef.current,

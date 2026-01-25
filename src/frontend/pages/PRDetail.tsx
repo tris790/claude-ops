@@ -580,6 +580,10 @@ export function PRDetail() {
                                         pullRequestId={pr.pullRequestId}
                                         isReviewed={selectedFilePath ? reviewedFiles.has(selectedFilePath) : false}
                                         onToggleReviewed={() => selectedFilePath && toggleFileReviewed(selectedFilePath)}
+                                        threads={threads}
+                                        onCommentPosted={() => {
+                                            getPullRequestThreads(id!, pr.repository.id).then(setThreads);
+                                        }}
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center h-full text-zinc-500">

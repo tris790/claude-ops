@@ -557,7 +557,7 @@ export class AzureDevOpsClient {
         return data.value || [];
     }
 
-    async createPullRequestThread(repoId: string, id: string, content: string) {
+    async createPullRequestThread(repoId: string, id: string, content: string, threadContext?: any) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
         }
@@ -565,19 +565,25 @@ export class AzureDevOpsClient {
         const pr = await this.getPullRequest(id, repoId);
 
         const url = `${pr.url}/threads?api-version=7.0`;
+        const body: any = {
+            comments: [
+                {
+                    parentCommentId: 0,
+                    content: content,
+                    commentType: 1 // Text
+                }
+            ],
+            status: 1 // Active
+        };
+
+        if (threadContext) {
+            body.threadContext = threadContext;
+        }
+
         const res = await fetch(url, {
             method: "POST",
             headers: this.headers,
-            body: JSON.stringify({
-                comments: [
-                    {
-                        parentCommentId: 0,
-                        content: content,
-                        commentType: 1 // Text
-                    }
-                ],
-                status: 1 // Active
-            })
+            body: JSON.stringify(body)
         });
 
         if (!res.ok) {
