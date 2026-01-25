@@ -221,7 +221,7 @@ export class AzureDevOpsClient {
         return await res.text();
     }
 
-    async getPullRequestChanges(repoId: string, id: string) {
+    async getPullRequestChanges(repoId: string, id: string, iterationId?: string, baseIterationId?: string) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
         }
@@ -230,6 +230,26 @@ export class AzureDevOpsClient {
         const pr = await this.getPullRequest(id, repoId);
         // pr.url is the safe base for this PR (e.g. includes Project GUID)
         // e.g. .../pullRequests/1
+
+        // If specific iteration requested
+        if (iterationId) {
+            let url = `${pr.url}/iterations/${iterationId}/changes?api-version=7.0`;
+            if (baseIterationId) {
+                url += `&$compareToIteration=${baseIterationId}`;
+            }
+
+            const res = await fetch(url, { headers: this.headers });
+            if (!res.ok) {
+                throw new Error(`Failed to fetch iteration changes: ${res.status} ${res.statusText}`);
+            }
+
+            const data = await res.json();
+            // Normalize changeEntries to changes
+            if (data.changeEntries && !data.changes) {
+                data.changes = data.changeEntries;
+            }
+            return data;
+        }
 
         // 2. Try fetching changes through iterations (most reliable for diffs)
         try {
@@ -270,6 +290,24 @@ export class AzureDevOpsClient {
         }
 
         return await res.json();
+    }
+
+    async getPullRequestIterations(repoId: string, id: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const pr = await this.getPullRequest(id, repoId);
+
+        const url = `${pr.url}/iterations?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch PR iterations: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.value || [];
     }
 
     async getPullRequestCommits(repoId: string, id: string) {

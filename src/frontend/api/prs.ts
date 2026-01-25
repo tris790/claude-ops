@@ -52,11 +52,24 @@ export async function votePullRequest(id: string, repoId: string, reviewerId: st
     return res.json();
 }
 
-export async function getPullRequestChanges(id: string, repoId: string) {
-    const res = await fetch(`/api/prs/${id}/changes?repoId=${repoId}`);
+export async function getPullRequestChanges(id: string, repoId: string, iterationId?: string, baseIterationId?: string) {
+    let url = `/api/prs/${id}/changes?repoId=${repoId}`;
+    if (iterationId) url += `&iterationId=${iterationId}`;
+    if (baseIterationId) url += `&baseIterationId=${baseIterationId}`;
+
+    const res = await fetch(url);
     if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to fetch PR changes");
+    }
+    return res.json();
+}
+
+export async function getPullRequestIterations(id: string, repoId: string) {
+    const res = await fetch(`/api/prs/${id}/iterations?repoId=${repoId}`);
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to fetch PR iterations");
     }
     return res.json();
 }

@@ -43,12 +43,20 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
   - [x] **Status Control**: Add a "Review" menu in the PR header with one-click actions: `Approve`, `Approve with suggestions`, `Wait for author`, `Reject`.
   - [x] **Merge Integration**: Ensure "Complete PR" trigger is only enabled after successful review/policy checks.
 - [ ] **Review Progress & Iterations**:
-  - [ ] **Iteration Management**:
-    - [ ] **Iteration Selector**: Component to switch between specific code pushes.
-    - [ ] **Inter-iteration Diff**: Compare changes between arbitrary iterations (e.g., Iteration 2 vs Iteration 5).
+  - [x] **Iteration Management**:
+    - [x] **Iteration Selector**: Component to switch between specific code pushes.
+    - [x] **Inter-iteration Diff**: Compare changes between arbitrary iterations (e.g., Iteration 2 vs Iteration 5).
   - [ ] **Review State**:
     - [ ] **File Completion**: Implement "Mark as reviewed" checkboxes in the file tree.
     - [ ] **Cumulative Diff**: Show only "Changes since my last review" based on tracked iteration history.
+    - [ ] **Show comments in context**: Show comments in context of the code. Both in the diff view and overview list
+    - [ ] **CRUD operations on comments**: Implement CRUD operations on comments.
+    - [ ] **Diff view improvements**: 
+        - [ ] **Resizable diff panels**
+        - [ ] **Diff view modes**: Unified, Side-by-Side, Inline
+        - [ ] **File tree/list**
+        - [ ] **Resizable/collapsible file tree**
+
 
 ## 4. Real-Time Interactions
 - [ ] **Live Updates**:

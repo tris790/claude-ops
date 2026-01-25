@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread } from "../api/prs";
+import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread, getPullRequestIterations } from "../api/prs";
 import { getCurrentUser } from "../api/auth";
 import {
     ArrowLeft,
@@ -24,6 +24,7 @@ import remarkGfm from "remark-gfm";
 import { FileTree } from "../components/pr/FileTree";
 import { DiffViewer } from "../components/pr/DiffViewer";
 import { CompleteDialog } from "../components/pr/CompleteDialog";
+import { IterationSelector } from "../components/pr/IterationSelector";
 
 export function PRDetail() {
     const { id } = useParams();
@@ -33,6 +34,9 @@ export function PRDetail() {
     const [threads, setThreads] = useState<any[]>([]);
     const [changes, setChanges] = useState<any>(null);
     const [commits, setCommits] = useState<any[]>([]);
+    const [iterations, setIterations] = useState<any[]>([]);
+    const [selectedIteration, setSelectedIteration] = useState<number | null>(null);
+    const [selectedBaseIteration, setSelectedBaseIteration] = useState<number | null>(null);
     const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"overview" | "files" | "commits">("overview");
@@ -54,15 +58,17 @@ export function PRDetail() {
         try {
             const data = await getPullRequest(id!, searchParams.get("repoId") || undefined);
             setPr(data);
-            const [threadData, changeData, commitData, userData] = await Promise.all([
+            const [threadData, changeData, commitData, iterData, userData] = await Promise.all([
                 getPullRequestThreads(id!, data.repository.id),
                 getPullRequestChanges(id!, data.repository.id),
                 getPullRequestCommits(id!, data.repository.id),
+                getPullRequestIterations(id!, data.repository.id),
                 getCurrentUser().catch(() => null)
             ]);
             setThreads(threadData);
             setChanges(changeData);
             setCommits(commitData);
+            setIterations(iterData);
             setCurrentUser(userData);
             if (changeData.changes.length > 0) {
                 setSelectedFilePath(changeData.changes[0].item.path);
@@ -126,6 +132,56 @@ export function PRDetail() {
             alert("Failed to post comment: " + err.message);
         } finally {
             setPostingComment(false);
+        }
+    }
+
+    async function handleIterationSelect(iterId: number | null, baseIterId: number | null) {
+        setSelectedIteration(iterId);
+        setSelectedBaseIteration(baseIterId);
+        setLoading(true);
+        try {
+            const data = await getPullRequestChanges(
+                id!,
+                pr.repository.id,
+                iterId?.toString(),
+                baseIterId?.toString()
+            );
+            setChanges(data);
+            if (data.changes.length > 0) {
+                // Try to keep selected file if it exists in new changes
+                const exists = data.changes.find((c: any) => c.item.path === selectedFilePath);
+                if (!exists) {
+                    setSelectedFilePath(data.changes[0].item.path);
+                }
+            } else {
+                setSelectedFilePath(null);
+            }
+        } catch (err: any) {
+            console.error("Failed to fetch changes for iteration", err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Determine commit IDs for DiffViewer
+    let originalVersion = pr?.lastMergeTargetCommitId;
+    let modifiedVersion = pr?.lastMergeSourceCommitId;
+
+    if (iterations.length > 0 && selectedIteration !== null) {
+        const iter = iterations.find(i => i.id === selectedIteration);
+        if (iter) {
+            modifiedVersion = iter.sourceRefCommit.commitId;
+
+            if (selectedBaseIteration !== null && selectedBaseIteration > 0) {
+                const baseIter = iterations.find(i => i.id === selectedBaseIteration);
+                if (baseIter) {
+                    originalVersion = baseIter.sourceRefCommit.commitId;
+                }
+            } else {
+                // Considering comparison against base
+                originalVersion = iter.commonRefCommit.commitId;
+            }
         }
     }
 
@@ -391,7 +447,15 @@ export function PRDetail() {
                 {activeTab === "files" && (
                     <div className="flex flex-col h-full bg-zinc-950">
                         <div className="flex h-[calc(100vh-275px)] border-zinc-800 overflow-hidden">
-                            <div className="w-64 flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30">
+                            <div className="w-64 flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30 flex flex-col">
+                                <div className="p-2 border-b border-zinc-800">
+                                    <IterationSelector
+                                        iterations={iterations}
+                                        selectedIteration={selectedIteration}
+                                        selectedBaseIteration={selectedBaseIteration}
+                                        onSelect={handleIterationSelect}
+                                    />
+                                </div>
                                 <FileTree
                                     changes={changes?.changes || []}
                                     selectedPath={selectedFilePath}
@@ -403,8 +467,8 @@ export function PRDetail() {
                                     <DiffViewer
                                         repoId={pr.repository.id}
                                         filePath={selectedFilePath}
-                                        originalVersion={pr.lastMergeTargetCommitId}
-                                        modifiedVersion={pr.lastMergeSourceCommitId}
+                                        originalVersion={originalVersion}
+                                        modifiedVersion={modifiedVersion}
                                         projectName={pr.repository.project.name}
                                         repoName={pr.repository.name}
                                         isCloned={pr.repository.isCloned}

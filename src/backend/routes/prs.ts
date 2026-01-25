@@ -222,14 +222,39 @@ export const prRoutes = {
 
             const url = new URL(req.url);
             const repoId = url.searchParams.get("repoId");
+            const iterationId = url.searchParams.get("iterationId"); // Optional
+            const baseIterationId = url.searchParams.get("baseIterationId"); // Optional
 
             if (!repoId) return Response.json({ error: "repoId is required for changes" }, { status: 400 });
 
             try {
-                const changes = await azureClient.getPullRequestChanges(repoId, id);
+                const changes = await azureClient.getPullRequestChanges(repoId, id, iterationId || undefined, baseIterationId || undefined);
                 return Response.json(changes);
             } catch (error: any) {
                 console.error(`[API] Error fetching changes for PR ${id}:`, error);
+                return Response.json({ error: error.message }, { status: 500 });
+            }
+        }
+    },
+
+    // -------------------------------------------------------------------------
+    // Get PR Iterations
+    // -------------------------------------------------------------------------
+    "/api/prs/:id/iterations": {
+        async GET(req: Request, params: any) {
+            const id = getPrId(req, params);
+            if (!id) return Response.json({ error: "Invalid PR ID" }, { status: 400 });
+
+            const url = new URL(req.url);
+            const repoId = url.searchParams.get("repoId");
+
+            if (!repoId) return Response.json({ error: "repoId is required for iterations" }, { status: 400 });
+
+            try {
+                const iterations = await azureClient.getPullRequestIterations(repoId, id);
+                return Response.json(iterations);
+            } catch (error: any) {
+                console.error(`[API] Error fetching iterations for PR ${id}:`, error);
                 return Response.json({ error: error.message }, { status: 500 });
             }
         }
