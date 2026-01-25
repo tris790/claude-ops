@@ -37,10 +37,11 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
   - [x] **Azure DevOps Integration**: Map selection ranges to the `iterationContext` and `threadContext` in the PR Thread API.
   - [x] Markdown support in comments.
   - [x] Threaded replies.
-- [ ] **Review Submission**:
+
+- [x] **Review Submission**:
   - [x] **Local Drafts**: Store unsaved comment content in `localStorage` per PR/file to prevent data loss.
   - [x] **Status Control**: Add a "Review" menu in the PR header with one-click actions: `Approve`, `Approve with suggestions`, `Wait for author`, `Reject`.
-  - [ ] **Merge Integration**: Ensure "Complete PR" trigger is only enabled after successful review/policy checks.
+  - [x] **Merge Integration**: Ensure "Complete PR" trigger is only enabled after successful review/policy checks.
 - [ ] **Review Progress & Iterations**:
   - [ ] **Iteration Management**:
     - [ ] **Iteration Selector**: Component to switch between specific code pushes.

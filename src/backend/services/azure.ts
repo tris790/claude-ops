@@ -71,11 +71,12 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/connectionData?api-version=7.0`;
+        const url = `${this.baseUrl}/_apis/connectionData?api-version=7.0-preview`;
         const res = await fetch(url, { headers: this.headers });
 
         if (!res.ok) {
-            throw new Error(`Failed to fetch user info: ${res.status} ${res.statusText}`);
+            const text = await res.text();
+            throw new Error(`Failed to fetch user info: ${res.status} ${res.statusText} - ${text}`);
         }
 
         const data = await res.json();
@@ -548,6 +549,7 @@ export class AzureDevOpsClient {
         return await res.json();
     }
 
+
     async votePullRequest(repoId: string, id: string, reviewerId: string, vote: number) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
@@ -562,6 +564,26 @@ export class AzureDevOpsClient {
 
         if (!res.ok) {
             throw new Error(`Failed to vote on PR: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async updatePullRequest(repoId: string, id: string, data: any) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/git/repositories/${repoId}/pullRequests/${id}?api-version=7.0`;
+        const res = await fetch(url, {
+            method: "PATCH",
+            headers: this.headers,
+            body: JSON.stringify(data)
+        });
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.message || `Failed to update PR: ${res.status} ${res.statusText}`);
         }
 
         return await res.json();

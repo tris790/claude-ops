@@ -10,7 +10,13 @@ export const authRoutes = {
     "/api/user": async () => {
         try {
             const user = await azureClient.getCurrentUser();
-            return Response.json(user);
+            const normalizedUser = {
+                id: user.id,
+                displayName: user.providerDisplayName || user.customDisplayName,
+                emailAddress: user.properties?.Account?.$value || user.emailAddress,
+                descriptor: user.descriptor
+            };
+            return Response.json(normalizedUser);
         } catch (error: any) {
             return Response.json({ error: error.message }, { status: 500 });
         }

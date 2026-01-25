@@ -445,6 +445,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                 if (!viewRef.current) return;
                 // params.uri matching logic could be added here
 
+                // Diagnostics disabled per user request
+                /*
                 const diagnostics: Diagnostic[] = params.diagnostics.map((d: any) => {
                     const fromLine = view.state.doc.line(d.range.start.line + 1);
                     const toLine = view.state.doc.line(d.range.end.line + 1);
@@ -461,6 +463,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                 });
 
                 view.dispatch(setDiagnostics(view.state, diagnostics));
+                */
             });
         }
 

@@ -26,11 +26,11 @@ export async function getPullRequestThreads(id: string, repoId: string) {
     return res.json();
 }
 
-export async function createPullRequestThread(id: string, repoId: string, content: string) {
+export async function createPullRequestThread(id: string, repoId: string, content: string, threadContext?: any) {
     const res = await fetch(`/api/prs/${id}/threads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repoId, content }),
+        body: JSON.stringify({ repoId, content, threadContext }),
     });
     if (!res.ok) {
         const error = await res.json();
@@ -66,6 +66,20 @@ export async function getPullRequestCommits(id: string, repoId: string) {
     if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to fetch PR commits");
+    }
+
+    return res.json();
+}
+
+export async function updatePullRequest(id: string, repoId: string, data: any) {
+    const res = await fetch(`/api/prs/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoId, ...data }),
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update PR");
     }
     return res.json();
 }

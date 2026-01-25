@@ -80,6 +80,7 @@ export const prRoutes = {
     // -------------------------------------------------------------------------
     // Get Single Pull Request
     // -------------------------------------------------------------------------
+
     "/api/prs/:id": {
         async GET(req: Request, params: any) {
             const id = getPrId(req, params);
@@ -108,6 +109,32 @@ export const prRoutes = {
                     error: `Failed to fetch PR ${id}`,
                     details: error.message
                 }, { status: 500 }); // Or 404 if not found
+            }
+        },
+        async PATCH(req: Request, params: any) {
+            const id = getPrId(req, params);
+            if (!id) return Response.json({ error: "Invalid PR ID" }, { status: 400 });
+
+            try {
+                const body = await req.json();
+                const { repoId, status, lastMergeSourceCommit, completionOptions } = body;
+
+                if (!repoId) return Response.json({ error: "repoId is required" }, { status: 400 });
+
+                // Construct update payload
+                const updateData: any = {};
+                if (status) updateData.status = status;
+                if (lastMergeSourceCommit) updateData.lastMergeSourceCommit = lastMergeSourceCommit;
+                if (completionOptions) updateData.completionOptions = completionOptions;
+
+                const pr = await azureClient.updatePullRequest(repoId, id, updateData);
+                return Response.json(pr);
+            } catch (error: any) {
+                console.error(`[API] Error updating PR ${id}:`, error.message);
+                return Response.json({
+                    error: `Failed to update PR ${id}`,
+                    details: error.message
+                }, { status: 500 });
             }
         }
     },

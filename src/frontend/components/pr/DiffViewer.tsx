@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { EditorState } from "@codemirror/state";
-import { EditorView, lineNumbers, hoverTooltip, drawSelection, keymap } from "@codemirror/view";
+import { EditorState, StateField } from "@codemirror/state";
+import { EditorView, lineNumbers, hoverTooltip, drawSelection, keymap, showTooltip, type Tooltip } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { MergeView } from "@codemirror/merge";
@@ -15,10 +15,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getEditorTheme } from "../../styles/code-themes";
 import { getFileContent } from "../../api/repos";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageSquarePlus } from "lucide-react";
 import { LSPClient } from "../../utils/lsp-client";
 import { getHighlighter } from "../../utils/shiki";
 import { useNavigate } from "react-router-dom";
+import { createCommentSystem } from "./DiffExtensions";
 
 interface DiffViewerProps {
     repoId: string;
@@ -28,6 +29,7 @@ interface DiffViewerProps {
     projectName?: string;
     repoName?: string;
     isCloned?: boolean;
+    pullRequestId?: string;
 }
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({
@@ -37,7 +39,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     modifiedVersion,
     projectName,
     repoName,
-    isCloned
+    isCloned,
+    pullRequestId
 }) => {
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -158,6 +161,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 default: return [];
             }
         };
+
+        // Legacy comment extension removed in favor of createCommentSystem
 
         const createLSPExtensions = (uri: string) => {
             const hoverExtension = hoverTooltip(async (view, pos, side) => {
@@ -345,11 +350,19 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         viewRef.current = new MergeView({
             a: {
                 doc: contents.original,
-                extensions: [...baseExtensions, ...createLSPExtensions(`file:///original${normalizedPath}`)]
+                extensions: [
+                    ...baseExtensions,
+                    ...createLSPExtensions(`file:///original${normalizedPath}`),
+                    ...createCommentSystem({ repoId, filePath, side: "original", pullRequestId })
+                ]
             },
             b: {
                 doc: contents.modified,
-                extensions: [...baseExtensions, ...createLSPExtensions(`file:///modified${normalizedPath}`)]
+                extensions: [
+                    ...baseExtensions,
+                    ...createLSPExtensions(`file:///modified${normalizedPath}`),
+                    ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId })
+                ]
             },
             parent: containerRef.current,
         });
@@ -362,6 +375,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
             return lspRef.current.on('textDocument/publishDiagnostics', (params: any) => {
                 if (params.uri !== uri) return;
+                // Diagnostics disabled per user request
+                /*
                 const diagnostics: Diagnostic[] = params.diagnostics.map((d: any) => {
                     const fromLine = view.state.doc.line(d.range.start.line + 1);
                     const toLine = view.state.doc.line(d.range.end.line + 1);
@@ -376,6 +391,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     };
                 });
                 view.dispatch(setDiagnostics(view.state, diagnostics));
+                */
             });
         };
 

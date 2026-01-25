@@ -20,8 +20,10 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+
 import { FileTree } from "../components/pr/FileTree";
 import { DiffViewer } from "../components/pr/DiffViewer";
+import { CompleteDialog } from "../components/pr/CompleteDialog";
 
 export function PRDetail() {
     const { id } = useParams();
@@ -38,6 +40,7 @@ export function PRDetail() {
     const [postingComment, setPostingComment] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [reviewMenuOpen, setReviewMenuOpen] = useState(false);
+    const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -152,8 +155,21 @@ export function PRDetail() {
         abandoned: "text-zinc-500",
     };
 
+    const hasRejections = pr.reviewers.some((r: any) => r.vote === -10);
+    const hasConflicts = pr.mergeStatus !== "succeeded";
+    const canComplete = !hasRejections && !hasConflicts && pr.status === 'active';
+
     return (
         <div className="flex flex-col h-full bg-zinc-950">
+            <CompleteDialog
+                isOpen={completeDialogOpen}
+                onClose={() => setCompleteDialogOpen(false)}
+                pr={pr}
+                onComplete={() => {
+                    loadData(); // Refresh all data
+                }}
+            />
+
             {/* Header Section - Contained */}
             <div className="max-w-6xl mx-auto w-full px-6 pt-6 space-y-6">
                 <button
@@ -175,47 +191,58 @@ export function PRDetail() {
                         </div>
 
                         {pr.status === 'active' && (
-                            <div className="relative">
+                            <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => setReviewMenuOpen(!reviewMenuOpen)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                    onClick={() => setCompleteDialogOpen(true)}
+                                    disabled={!canComplete}
+                                    title={!canComplete ? (hasRejections ? "Cannot complete: Reviews rejected" : "Cannot complete: Merge conflicts or status issues") : "Complete Pull Request"}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm ${canComplete ? "bg-zinc-100 hover:bg-white text-zinc-900" : "bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50"}`}
                                 >
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    Review
-                                    <ChevronDown className={`h-4 w-4 transition-transform ${reviewMenuOpen ? 'rotate-180' : ''}`} />
+                                    <Check className="h-4 w-4" />
+                                    Complete
                                 </button>
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setReviewMenuOpen(!reviewMenuOpen)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                    >
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Review
+                                        <ChevronDown className={`h-4 w-4 transition-transform ${reviewMenuOpen ? 'rotate-180' : ''}`} />
+                                    </button>
 
-                                {reviewMenuOpen && (
-                                    <>
-                                        <div
-                                            className="fixed inset-0 z-40"
-                                            onClick={() => setReviewMenuOpen(false)}
-                                        />
-                                        <div className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden py-1">
-                                            <button onClick={() => handleVote(10)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
-                                                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                                <span>Approve</span>
-                                            </button>
-                                            <button onClick={() => handleVote(5)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
-                                                <CheckCircle2 className="h-4 w-4 text-zinc-400" />
-                                                <span>Approve with suggestions</span>
-                                            </button>
-                                            <button onClick={() => handleVote(-5)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
-                                                <Clock className="h-4 w-4 text-amber-500" />
-                                                <span>Wait for author</span>
-                                            </button>
-                                            <button onClick={() => handleVote(-10)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2 text-red-400">
-                                                <XCircle className="h-4 w-4 text-red-500" />
-                                                <span>Reject</span>
-                                            </button>
-                                            <div className="h-px bg-zinc-800 my-1"></div>
-                                            <button onClick={() => handleVote(0)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-400 flex items-center gap-2">
-                                                <Minus className="h-4 w-4" />
-                                                <span>Reset feedback</span>
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                                    {reviewMenuOpen && (
+                                        <>
+                                            <div
+                                                className="fixed inset-0 z-40"
+                                                onClick={() => setReviewMenuOpen(false)}
+                                            />
+                                            <div className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                                                <button onClick={() => handleVote(10)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
+                                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                                    <span>Approve</span>
+                                                </button>
+                                                <button onClick={() => handleVote(5)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
+                                                    <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+                                                    <span>Approve with suggestions</span>
+                                                </button>
+                                                <button onClick={() => handleVote(-5)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
+                                                    <Clock className="h-4 w-4 text-amber-500" />
+                                                    <span>Wait for author</span>
+                                                </button>
+                                                <button onClick={() => handleVote(-10)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2 text-red-400">
+                                                    <XCircle className="h-4 w-4 text-red-500" />
+                                                    <span>Reject</span>
+                                                </button>
+                                                <div className="h-px bg-zinc-800 my-1"></div>
+                                                <button onClick={() => handleVote(0)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-400 flex items-center gap-2">
+                                                    <Minus className="h-4 w-4" />
+                                                    <span>Reset feedback</span>
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
