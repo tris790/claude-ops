@@ -61,7 +61,7 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [ ] **Add browser navigation history for review**: add the review tab in the url and more details as needed such as file or commit
     - [x] **Comment on comments**: Comment threads
     - [x] **filter comments based on status**: Same statuses of Azure DevOps
-    - [ ] **comment status**: Use the same statuses of Azure DevOps. the user can change the status of a comment
+    - [x] **comment status**: Use the same statuses of Azure DevOps. the user can change the status of a comment
 
 ## 4. Real-Time Interactions
 - [ ] **Live Updates**:
