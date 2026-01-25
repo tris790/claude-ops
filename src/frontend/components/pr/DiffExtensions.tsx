@@ -185,7 +185,17 @@ export const createCommentSystem = (props: CommentSystemProps) => {
 
             if (threadPath !== propsPath) continue;
 
-            const posInfo = props.side === "original" ? context.leftFileStart : context.rightFileStart;
+            // In side-by-side, we only show comments for the current side.
+            // In unified or new-only, we might want to show all, but for now we follow the 'side' prop.
+            // However, for unified, 'side' is 'modified'. If a comment is on a deleted line, its 'rightFileStart' is null.
+            let posInfo = props.side === "original" ? context.leftFileStart : context.rightFileStart;
+
+            // Simple heuristic: if we are on modified side but there's no right position, 
+            // and it's a deleted line (left position exists), show it if it's unified view.
+            // But wait, the line numbers in unified view document correspond to the 'modified' side.
+            // Deleted lines are virtual, so we can't easily place them using line numbering.
+            // For now, let's just make sure we don't skip line-based comments if they fit the current side.
+
             if (!posInfo) continue;
 
             try {

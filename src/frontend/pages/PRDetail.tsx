@@ -37,11 +37,7 @@ export function PRDetail() {
     const [changes, setChanges] = useState<any>(null);
     const [commits, setCommits] = useState<any[]>([]);
     const [iterations, setIterations] = useState<any[]>([]);
-    const [selectedIteration, setSelectedIteration] = useState<number | null>(null);
-    const [selectedBaseIteration, setSelectedBaseIteration] = useState<number | null>(null);
-    const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<"overview" | "files" | "commits">("overview");
     const [newComment, setNewComment] = useState("");
     const [postingComment, setPostingComment] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
@@ -53,9 +49,26 @@ export function PRDetail() {
         return saved ? parseInt(saved, 10) : 256;
     });
     const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
-
     const [lastReviewedIterationId, setLastReviewedIterationId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // Sync state with URL search params
+    const selectedIteration = searchParams.get("iteration") ? parseInt(searchParams.get("iteration")!, 10) : null;
+    const selectedBaseIteration = searchParams.get("baseIteration") ? parseInt(searchParams.get("baseIteration")!, 10) : null;
+    const selectedFilePath = searchParams.get("path");
+    const activeTab = (searchParams.get("tab") as any) || "overview";
+
+    const updateQueryParams = (params: Record<string, string | null>, replace = false) => {
+        const nextParams = new URLSearchParams(searchParams);
+        Object.entries(params).forEach(([key, value]) => {
+            if (value === null) nextParams.delete(key);
+            else nextParams.set(key, value);
+        });
+        navigate(`?${nextParams.toString()}`, { replace });
+    };
+
+    const setActiveTab = (tab: string) => updateQueryParams({ tab });
+    const setSelectedFilePath = (path: string | null, replace = false) => updateQueryParams({ path, line: null }, replace);
 
     useEffect(() => {
         if (id) {
@@ -95,8 +108,8 @@ export function PRDetail() {
             setCommits(commitData);
             setIterations(iterData);
             setCurrentUser(userData);
-            if (changeData.changes.length > 0) {
-                setSelectedFilePath(changeData.changes[0].item.path);
+            if (changeData.changes.length > 0 && !selectedFilePath) {
+                setSelectedFilePath(changeData.changes[0].item.path, true);
             }
         } catch (err: any) {
             console.error(err);
@@ -148,6 +161,18 @@ export function PRDetail() {
         }
     }
 
+    const scrollToLine = searchParams.get("line") ? parseInt(searchParams.get("line")!, 10) : null;
+
+    const jumpToContext = (thread: any) => {
+        if (!thread.threadContext) return;
+        const line = thread.threadContext.rightFileStart?.line || thread.threadContext.leftFileStart?.line;
+        updateQueryParams({
+            tab: "files",
+            path: thread.threadContext.filePath,
+            line: line?.toString() || null
+        }, false);
+    };
+
     async function handlePostComment() {
         if (!newComment.trim() || !pr || !id) return;
 
@@ -168,8 +193,6 @@ export function PRDetail() {
     }
 
     async function handleIterationSelect(iterId: number | null, baseIterId: number | null) {
-        setSelectedIteration(iterId);
-        setSelectedBaseIteration(baseIterId);
         setLoading(true);
         try {
             const data = await getPullRequestChanges(
@@ -179,15 +202,24 @@ export function PRDetail() {
                 baseIterId?.toString()
             );
             setChanges(data);
+
+            const nextParams: Record<string, string | null> = {
+                iteration: iterId?.toString() || null,
+                baseIteration: baseIterId?.toString() || null
+            };
+
             if (data.changes.length > 0) {
                 // Try to keep selected file if it exists in new changes
                 const exists = data.changes.find((c: any) => c.item.path === selectedFilePath);
                 if (!exists) {
-                    setSelectedFilePath(data.changes[0].item.path);
+                    nextParams.path = data.changes[0].item.path;
+                    nextParams.line = null;
                 }
             } else {
-                setSelectedFilePath(null);
+                nextParams.path = null;
+                nextParams.line = null;
             }
+            updateQueryParams(nextParams, false);
         } catch (err: any) {
             console.error("Failed to fetch changes for iteration", err);
             setError(err.message);
@@ -423,6 +455,20 @@ export function PRDetail() {
                                         </div>
                                         {threads.filter(t => !t.isDraft && t.comments.some((c: any) => c.content)).map((thread: any) => (
                                             <div key={thread.id} className="bg-zinc-900/30 rounded-xl border border-zinc-800 overflow-hidden">
+                                                {thread.threadContext && (
+                                                    <button
+                                                        onClick={() => jumpToContext(thread)}
+                                                        className="w-full px-4 py-2 bg-zinc-800/40 border-b border-zinc-800 flex items-center gap-2 hover:bg-zinc-800/60 transition-colors group"
+                                                    >
+                                                        <FileCode className="h-3.5 w-3.5 text-zinc-500 group-hover:text-sapphire-400 transition-colors" />
+                                                        <span className="text-xs font-mono text-zinc-400 group-hover:text-zinc-200 truncate flex-1 text-left">
+                                                            {thread.threadContext.filePath}
+                                                            <span className="text-zinc-600 ml-2 group-hover:text-zinc-500">
+                                                                L{thread.threadContext.rightFileStart?.line || thread.threadContext.leftFileStart?.line}
+                                                            </span>
+                                                        </span>
+                                                    </button>
+                                                )}
                                                 <div className="space-y-4 p-4">
                                                     {thread.comments.map((comment: any) => (
                                                         <div key={comment.id} className="flex gap-4">
@@ -584,6 +630,7 @@ export function PRDetail() {
                                         onCommentPosted={() => {
                                             getPullRequestThreads(id!, pr.repository.id).then(setThreads);
                                         }}
+                                        scrollToLine={scrollToLine}
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center h-full text-zinc-500">

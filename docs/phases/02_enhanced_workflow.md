@@ -52,12 +52,15 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [x] **Show comments in context**: Show comments in context of the code. Both in the diff view and overview list
     - [ ] **CRUD operations on comments**: Implement CRUD operations on comments.
     - [ ] **Diff view improvements**: 
+        - [ ] **Collapsible  comments**: 
         - [ ] **Resizable diff panels**
         - [x] **Diff view modes**: Unified, Side-by-Side, Inline
         - [x] **File tree/list**
         - [x] **Resizable/collapsible file tree**
       
     - [ ] **Add browser navigation history for review**: add the review tab in the url and more details as needed such as file or commit
+    - [ ] **Comment on comments**: Comment threads
+    - [ ] **filter comments based on status**: Same statuses of Azure DevOps
 
 
 ## 4. Real-Time Interactions

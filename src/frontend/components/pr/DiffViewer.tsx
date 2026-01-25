@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { EditorState, StateField } from "@codemirror/state";
-import { EditorView, lineNumbers, hoverTooltip, drawSelection, keymap, showTooltip, type Tooltip } from "@codemirror/view";
+import { EditorView, lineNumbers, hoverTooltip, drawSelection, keymap, showTooltip, type Tooltip, Decoration } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { MergeView, unifiedMergeView } from "@codemirror/merge";
@@ -34,6 +34,7 @@ interface DiffViewerProps {
     onToggleReviewed: () => void;
     threads?: any[];
     onCommentPosted?: () => void;
+    scrollToLine?: number | null;
 }
 
 type DiffMode = "side-by-side" | "unified" | "new-only";
@@ -50,11 +51,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     isReviewed,
     onToggleReviewed,
     threads,
-    onCommentPosted
+    onCommentPosted,
+    scrollToLine
 }) => {
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<MergeView | null>(null);
+    const editorRef = useRef<EditorView | null>(null);
     const lspRef = useRef<LSPClient | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -385,7 +388,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 }),
                 parent: containerRef.current
             });
-            return () => { editorView.destroy(); };
+            editorRef.current = editorView;
+            return () => { editorView.destroy(); editorRef.current = null; };
         }
 
         if (diffMode === "new-only") {
@@ -400,7 +404,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 }),
                 parent: containerRef.current
             });
-            return () => { editorView.destroy(); };
+            editorRef.current = editorView;
+            return () => { editorView.destroy(); editorRef.current = null; };
         }
 
         // Side-by-side (default)
@@ -435,7 +440,33 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 viewRef.current = null;
             }
         };
-    }, [loading, contents, filePath, lspStatus, diffMode]);
+    }, [loading, contents, filePath, lspStatus, diffMode, threads]);
+
+    // Handle Scrolling
+    useEffect(() => {
+        if (!scrollToLine || loading) return;
+
+        const view = diffMode === "side-by-side" ? viewRef.current?.b : editorRef.current;
+        if (!view) return;
+
+        try {
+            const line = view.state.doc.line(Math.min(scrollToLine, view.state.doc.lines));
+            view.dispatch({
+                selection: { anchor: line.from },
+                scrollIntoView: true,
+                effects: EditorView.scrollIntoView(line.from, { y: 'center' })
+            });
+
+            // Highlight the line briefly
+            const highlight = Decoration.line({ attributes: { class: "bg-blue-500/20 ring-1 ring-blue-500/50" } });
+            const deco = Decoration.set([highlight.range(line.from)]);
+            // Since we can't easily add ad-hoc decorations without a StateField, 
+            // we'll just rely on the selection/scroll for now.
+        } catch (e) {
+            console.warn("Failed to scroll to line", scrollToLine);
+        }
+    }, [scrollToLine, loading, diffMode]);
+
 
     return (
         <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
