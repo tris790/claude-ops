@@ -18,7 +18,8 @@ import {
     GitCommit,
     ChevronDown,
     PanelLeftClose,
-    PanelLeftOpen
+    PanelLeftOpen,
+    RotateCcw
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -27,7 +28,7 @@ import { FileTree } from "../components/pr/FileTree";
 import { DiffViewer } from "../components/pr/DiffViewer";
 import { CompleteDialog } from "../components/pr/CompleteDialog";
 import { IterationSelector } from "../components/pr/IterationSelector";
-import { ThreadStatusPicker } from "../components/pr/ThreadStatusPicker";
+import { ThreadStatusPicker, isThreadActive, isThreadResolved, isThreadClosed, isThreadPending } from "../components/pr/ThreadStatusPicker";
 
 export function PRDetail() {
     const { id } = useParams();
@@ -168,10 +169,11 @@ export function PRDetail() {
     const filteredThreads = threads.filter(t => {
         if (t.isDraft) return false;
         if (!t.comments.some((c: any) => c.content)) return false;
-        if (commentStatusFilter === "active") return t.status === 1 || t.status === 0;
-        if (commentStatusFilter === "resolved") return t.status === 2 || t.status === 4;
-        if (commentStatusFilter === "closed") return t.status === 4;
-        if (commentStatusFilter === "pending") return t.status === 6;
+
+        if (commentStatusFilter === "active") return isThreadActive(t.status);
+        if (commentStatusFilter === "resolved") return isThreadResolved(t.status);
+        if (commentStatusFilter === "closed") return isThreadClosed(t.status);
+        if (commentStatusFilter === "pending") return isThreadPending(t.status);
         return true;
     });
 
@@ -240,10 +242,10 @@ export function PRDetail() {
         }
     }
 
-    async function handleUpdateThreadStatus(threadId: number, status: number) {
+    async function handleUpdateThreadStatus(threadId: number, status: number | string) {
         if (!pr) return;
         try {
-            await updatePullRequestThread(id!, pr.repository.id, threadId, status);
+            await updatePullRequestThread(id!, pr.repository.id, threadId, status as any); // Cast as any because API might still expect number, will update API next
             // Refresh threads
             const threadData = await getPullRequestThreads(id!, pr.repository.id);
             setThreads(threadData);
@@ -494,23 +496,29 @@ export function PRDetail() {
                                         {filteredThreads.map((thread: any) => (
                                             <div key={thread.id} className="bg-zinc-900/30 rounded-xl border border-zinc-800 overflow-hidden">
                                                 {thread.threadContext && (
-                                                    <button
-                                                        onClick={() => jumpToContext(thread)}
-                                                        className="w-full px-4 py-2 bg-zinc-800/40 border-b border-zinc-800 flex items-center gap-2 hover:bg-zinc-800/60 transition-colors group"
+                                                    <div
+                                                        className="w-full bg-zinc-800/40 border-b border-zinc-800 flex items-center gap-2 hover:bg-zinc-800/60 transition-colors group"
                                                     >
-                                                        <FileCode className="h-3.5 w-3.5 text-zinc-500 group-hover:text-sapphire-400 transition-colors" />
-                                                        <span className="text-xs font-mono text-zinc-400 group-hover:text-zinc-200 truncate flex-1 text-left">
-                                                            {thread.threadContext.filePath}
-                                                            <span className="text-zinc-600 ml-2 group-hover:text-zinc-500">
-                                                                L{thread.threadContext.rightFileStart?.line || thread.threadContext.leftFileStart?.line}
+                                                        <button
+                                                            onClick={() => jumpToContext(thread)}
+                                                            className="flex-1 px-4 py-2 flex items-center gap-2 text-left"
+                                                        >
+                                                            <FileCode className="h-3.5 w-3.5 text-zinc-500 group-hover:text-sapphire-400 transition-colors" />
+                                                            <span className="text-xs font-mono text-zinc-400 group-hover:text-zinc-200 truncate flex-1">
+                                                                {thread.threadContext.filePath}
+                                                                <span className="text-zinc-600 ml-2 group-hover:text-zinc-500">
+                                                                    L{thread.threadContext.rightFileStart?.line || thread.threadContext.leftFileStart?.line}
+                                                                </span>
                                                             </span>
-                                                        </span>
-                                                        <ThreadStatusPicker
-                                                            status={thread.status}
-                                                            onStatusChange={(status) => handleUpdateThreadStatus(thread.id, status)}
-                                                            compact
-                                                        />
-                                                    </button>
+                                                        </button>
+                                                        <div className="pr-4">
+                                                            <ThreadStatusPicker
+                                                                status={thread.status}
+                                                                onStatusChange={(status) => handleUpdateThreadStatus(thread.id, status)}
+                                                                compact
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 )}
                                                 {!thread.threadContext && (
                                                     <div className="px-4 py-2 bg-zinc-800/20 border-b border-zinc-800 flex items-center justify-between">

@@ -62,6 +62,8 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [x] **Comment on comments**: Comment threads
     - [x] **filter comments based on status**: Same statuses of Azure DevOps
     - [x] **comment status**: Use the same statuses of Azure DevOps. the user can change the status of a comment
+    - [x] **comment status dropdown deduplication**: use the same comment inside the overview list and diff view.
+    - [x] **comment status dropdown**: bug fix where the dropdown is cut off by the comment border. the dropdown should be on top of everything and it is allowed to go below the comment border if needed.
 
 ## 4. Real-Time Interactions
 - [ ] **Live Updates**:

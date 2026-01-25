@@ -8,7 +8,7 @@ import remarkGfm from "remark-gfm";
 import { CommentDialog } from "./CommentDialog";
 import { createPullRequestThread, updatePullRequestComment, deletePullRequestComment, updatePullRequestThread, addPullRequestComment } from "../../api/prs";
 import { Edit2, Trash2, CheckCircle2, RotateCcw, Reply, MoreVertical, ChevronDown, ChevronRight } from "lucide-react";
-import { ThreadStatusPicker } from "./ThreadStatusPicker";
+import { ThreadStatusPicker, isThreadResolved, isThreadClosed } from "./ThreadStatusPicker";
 
 // --- Types ---
 
@@ -119,8 +119,8 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
     const user = props.currentUser;
     const [editingCommentId, setEditingCommentId] = React.useState<number | null>(null);
     const [isReplying, setIsReplying] = React.useState(false);
-    const isThreadResolved = thread.status === 2 || thread.status === 4;
-    const [isCollapsed, setIsCollapsed] = React.useState(isThreadResolved);
+    const isResolved = isThreadResolved(thread.status) || isThreadClosed(thread.status);
+    const [isCollapsed, setIsCollapsed] = React.useState(isResolved);
 
     const handleUpdateComment = async (commentId: number, content: string) => {
         try {
@@ -142,9 +142,9 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
         }
     };
 
-    const handleUpdateThreadStatus = async (status: number) => {
+    const handleUpdateThreadStatus = async (status: number | string) => {
         try {
-            await updatePullRequestThread(props.pullRequestId!, props.repoId, thread.id, status);
+            await updatePullRequestThread(props.pullRequestId!, props.repoId, thread.id, status as any);
             props.onCommentPosted?.();
         } catch (err: any) {
             alert("Failed to update thread status: " + err.message);
@@ -243,23 +243,25 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
                         );
                     })}
 
-                    {!isReplying ? (
-                        <button
-                            onClick={() => setIsReplying(true)}
-                            className="flex items-center space-x-1.5 text-[11px] font-medium text-zinc-500 hover:text-blue-400 transition-colors pl-9"
-                        >
-                            <Reply className="w-3 h-3" />
-                            <span>Reply...</span>
-                        </button>
-                    ) : (
-                        <div className="pl-9 mt-2">
-                            <CommentDialog
-                                draftKey={`reply_${thread.id}`}
-                                onSubmit={handleReply}
-                                onCancel={() => setIsReplying(false)}
-                            />
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2 pl-9">
+                        {!isReplying ? (
+                            <button
+                                onClick={() => setIsReplying(true)}
+                                className="flex items-center space-x-1.5 text-[11px] font-medium text-zinc-500 hover:text-blue-400 transition-colors"
+                            >
+                                <Reply className="w-3 h-3" />
+                                <span>Reply...</span>
+                            </button>
+                        ) : (
+                            <div className="flex-1 mt-2">
+                                <CommentDialog
+                                    draftKey={`reply_${thread.id}`}
+                                    onSubmit={handleReply}
+                                    onCancel={() => setIsReplying(false)}
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

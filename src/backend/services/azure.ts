@@ -573,7 +573,7 @@ export class AzureDevOpsClient {
                     commentType: 1 // Text
                 }
             ],
-            status: 1 // Active
+            status: "active"
         };
 
         if (threadContext) {
@@ -634,7 +634,7 @@ export class AzureDevOpsClient {
         return res.status === 204 ? { success: true } : await res.json();
     }
 
-    async updatePullRequestThread(repoId: string, pullRequestId: string, threadId: number, status: number) {
+    async updatePullRequestThread(repoId: string, pullRequestId: string, threadId: number, status: number | string) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
         }

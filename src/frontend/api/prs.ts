@@ -76,7 +76,7 @@ export async function deletePullRequestComment(id: string, repoId: string, threa
     return res.json();
 }
 
-export async function updatePullRequestThread(id: string, repoId: string, threadId: number, status: number) {
+export async function updatePullRequestThread(id: string, repoId: string, threadId: number, status: number | string) {
     const res = await fetch(`/api/prs/${id}/threads`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
