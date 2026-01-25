@@ -25,6 +25,48 @@ export const repoRoutes = {
             }
         },
     },
+    "/api/repos/search": {
+        async GET(req: Request) {
+            const url = new URL(req.url);
+            const repoId = url.searchParams.get("repoId");
+            const project = url.searchParams.get("project");
+            const repo = url.searchParams.get("repo");
+            const query = url.searchParams.get("query");
+
+            if (!query) {
+                return Response.json({ error: "Missing query" }, { status: 400 });
+            }
+
+            try {
+                let targetProject = "";
+                let targetRepo = "";
+
+                if (project && repo) {
+                    targetProject = project;
+                    targetRepo = repo;
+                } else if (repoId) {
+                    const repoInfo = await azureClient.getRepositoryById(repoId);
+                    if (repoInfo && repoInfo.project && repoInfo.name) {
+                        targetProject = repoInfo.project.name;
+                        targetRepo = repoInfo.name;
+                    }
+                } else {
+                    return Response.json({ error: "Missing repo context" }, { status: 400 });
+                }
+
+                if (targetProject && targetRepo) {
+                    if (await gitService.isCloned(targetProject, targetRepo)) {
+                        const results = await gitService.search(targetProject, targetRepo, query);
+                        return Response.json(results);
+                    }
+                }
+
+                return Response.json([]);
+            } catch (error: any) {
+                return Response.json({ error: error.message }, { status: 500 });
+            }
+        }
+    },
     "/api/repos/clone": {
         async POST(req: Request) {
             try {
@@ -84,6 +126,17 @@ export const repoRoutes = {
             }
 
             try {
+                // Try to resolve project info first to check local clone
+                const repoInfo = await azureClient.getRepositoryById(repoId);
+
+                if (repoInfo && repoInfo.project && repoInfo.name) {
+                    if (await gitService.isCloned(repoInfo.project.name, repoInfo.name)) {
+
+                        const items = await gitService.listFiles(repoInfo.project.name, repoInfo.name, path);
+                        return Response.json(items);
+                    }
+                }
+
                 const items = await azureClient.getRepoItems(repoId, path, version || undefined, versionType);
                 return Response.json(items);
             } catch (error: any) {
@@ -119,6 +172,16 @@ export const repoRoutes = {
             }
 
             try {
+                // Try to resolve project info first to check local clone
+                const repoInfo = await azureClient.getRepositoryById(repoId);
+
+                if (repoInfo && repoInfo.project && repoInfo.name) {
+                    if (await gitService.isCloned(repoInfo.project.name, repoInfo.name)) {
+                        const content = await gitService.getFileContent(repoInfo.project.name, repoInfo.name, path);
+                        return Response.json({ content });
+                    }
+                }
+
                 const content = await azureClient.getFileContent(repoId, path, version || undefined, versionType);
                 return Response.json({ content });
             } catch (error: any) {

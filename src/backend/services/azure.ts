@@ -124,6 +124,11 @@ export class AzureDevOpsClient {
         return value;
     }
 
+    async getRepositoryById(repoId: string) {
+        const repos = await this.getRepositories();
+        return repos.find((r: any) => r.id === repoId);
+    }
+
     async getBranches(repoId: string) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");

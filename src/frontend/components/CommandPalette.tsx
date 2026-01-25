@@ -22,6 +22,8 @@ export function CommandPalette() {
     const location = useLocation();
 
     const [commands, setCommands] = useState<CommandItem[]>([]);
+    const [searchResults, setSearchResults] = useState<CommandItem[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
 
     useEffect(() => {
         const baseCommands: CommandItem[] = [
@@ -44,9 +46,52 @@ export function CommandPalette() {
         setCommands(baseCommands);
     }, [location.pathname]);
 
-    const filteredCommands = commands.filter(cmd =>
-        cmd.label.toLowerCase().includes(query.toLowerCase())
-    );
+    // Search effect
+    useEffect(() => {
+        // Match /repos/:project/:repo
+        const match = location.pathname.match(/^\/repos\/([^\/]+)\/([^\/]+)/);
+        const project = match ? match[1] : null;
+        const repo = match ? match[2] : null;
+
+        if (!project || !repo || query.length < 3) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setIsSearching(true);
+            try {
+                const res = await fetch(`/api/repos/search?project=${project}&repo=${repo}&query=${encodeURIComponent(query)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setSearchResults(data.map((item: any, i: number) => ({
+                        id: `search-${i}`,
+                        label: item.file,
+                        icon: <FileCode className="w-4 h-4 text-blue-400" />,
+                        category: "Code Search",
+                        description: `${item.line}: ${item.content.trim()}`,
+                        action: () => {
+                            // Navigate to file view
+                            // Using HEAD as branch for search results (since git grep uses HEAD)
+                            navigate(`/repos/${project}/${repo}/blob/HEAD/${item.file}?line=${item.line}`);
+                        }
+                    })));
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [query, location.pathname, navigate]);
+
+    const filteredCommands = [
+        ...commands.filter(cmd => cmd.label.toLowerCase().includes(query.toLowerCase())),
+        ...searchResults
+    ];
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -69,6 +114,7 @@ export function CommandPalette() {
             setTimeout(() => inputRef.current?.focus(), 10);
             setQuery("");
             setSelectedIndex(0);
+            setSearchResults([]);
         }
     }, [isOpen]);
 
@@ -113,7 +159,7 @@ export function CommandPalette() {
                     <input
                         ref={inputRef}
                         className="flex-1 bg-transparent border-none outline-none text-zinc-100 placeholder-zinc-500 text-lg focus:ring-0"
-                        placeholder="Type a command or search..."
+                        placeholder="Type a command or search code..."
                         value={query}
                         onChange={(e) => {
                             setQuery(e.target.value);
@@ -122,6 +168,7 @@ export function CommandPalette() {
                         onKeyDown={handleKeyDown}
                     />
                     <div className="flex gap-1">
+                        {isSearching && <span className="text-zinc-500 text-xs animate-pulse">Searching...</span>}
                         <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 font-mono text-[10px] font-medium text-zinc-400">
                             <span className="text-xs">ESC</span>
                         </kbd>
@@ -153,7 +200,12 @@ export function CommandPalette() {
                                     )}>
                                         {cmd.icon}
                                     </div>
-                                    <span className="flex-1 font-medium">{cmd.label}</span>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-medium truncate">{cmd.label}</div>
+                                        {(cmd as any).description && (
+                                            <div className="text-xs text-zinc-500 truncate font-mono opacity-80">{(cmd as any).description}</div>
+                                        )}
+                                    </div>
                                     {cmd.shortcut && (
                                         <span className="text-xs text-zinc-500">{cmd.shortcut}</span>
                                     )}

@@ -169,6 +169,134 @@ export class GitService {
             throw new Error(`Git pull failed: ${stderr}`);
         }
     }
+
+    async listFiles(projectName: string, repoName: string, path: string = "/"): Promise<any[]> {
+        const repoPath = this.getRepoPath(projectName, repoName);
+        if (!(await this.isCloned(projectName, repoName))) {
+            throw new Error("Repository not cloned");
+        }
+
+        // Normalize path. removing leading slash
+        const relPath = path.replace(/^\//, "");
+        const gitObj = relPath ? `HEAD:${relPath}` : "HEAD";
+
+        try {
+            const proc = Bun.spawn(["git", "ls-tree", gitObj], {
+                cwd: repoPath,
+                stdout: "pipe",
+                stderr: "pipe",
+            });
+
+            const exitCode = await proc.exited;
+            if (exitCode !== 0) {
+                return [];
+            }
+
+            const output = await new Response(proc.stdout).text();
+
+            return output.trim().split("\n").filter(Boolean).map(line => {
+                const parts = line.split("\t");
+                if (parts.length < 2) return null;
+                const [meta, name] = parts;
+                const [mode, type, object] = meta.split(" ");
+
+                return {
+                    objectId: object,
+                    gitObjectType: type, // "blob" or "tree"
+                    commitId: "HEAD",
+                    path: relPath ? `/${relPath}/${name}` : `/${name}`,
+                    url: ""
+                };
+            }).filter(Boolean);
+
+        } catch (e) {
+            console.error("git listFiles error", e);
+            throw e;
+        }
+    }
+
+    async getFileContent(projectName: string, repoName: string, path: string): Promise<string> {
+        const repoPath = this.getRepoPath(projectName, repoName);
+        if (!(await this.isCloned(projectName, repoName))) {
+            throw new Error("Repository not cloned");
+        }
+
+        const relPath = path.replace(/^\//, "");
+
+        const proc = Bun.spawn(["git", "show", `HEAD:${relPath}`], {
+            cwd: repoPath,
+            stdout: "pipe",
+            stderr: "pipe"
+        });
+
+        const exitCode = await proc.exited;
+        if (exitCode !== 0) {
+            const stderr = await new Response(proc.stderr).text();
+            throw new Error(`Failed to get file content: ${stderr}`);
+        }
+
+        return await new Response(proc.stdout).text();
+    }
+
+    async search(projectName: string, repoName: string, query: string): Promise<any[]> {
+        const repoPath = this.getRepoPath(projectName, repoName);
+        if (!(await this.isCloned(projectName, repoName))) {
+            return [];
+        }
+
+        try {
+            // git grep -n -I <query> HEAD
+            const proc = Bun.spawn(["git", "grep", "-n", "-I", query, "HEAD"], {
+                cwd: repoPath,
+                stdout: "pipe",
+                stderr: "pipe"
+            });
+
+            const exitCode = await proc.exited;
+            if (exitCode !== 0) {
+                // Determine if it was "not found" (exit code 1) or error (exit code > 1)
+                // git grep returns 1 if not found.
+                return [];
+            }
+
+            const output = await new Response(proc.stdout).text();
+            // Output format: HEAD:path/to/file:lineNumber:content
+
+            return output.trim().split("\n").map(line => {
+                // Split by colon, limiting to 4 parts to keep content intact
+                // HEAD : path : line : content
+                // But path might have colons? unlikely in git paths but possible.
+                // git grep -n output is generally consistent.
+
+                // We can strip HEAD: prefix first
+                const cleanLine = line.replace(/^HEAD:/, "");
+
+                // Now path:line:content
+                // Find first colon
+                const firstColon = cleanLine.indexOf(":");
+                if (firstColon === -1) return null;
+
+                const path = cleanLine.substring(0, firstColon);
+                const rest = cleanLine.substring(firstColon + 1);
+
+                const secondColon = rest.indexOf(":");
+                if (secondColon === -1) return null;
+
+                const lineNumber = rest.substring(0, secondColon);
+                const content = rest.substring(secondColon + 1);
+
+                return {
+                    file: path,
+                    line: parseInt(lineNumber, 10),
+                    content: content
+                };
+            }).filter(Boolean);
+
+        } catch (e) {
+            console.error("Search error:", e);
+            return [];
+        }
+    }
 }
 
 export const gitService = new GitService();
