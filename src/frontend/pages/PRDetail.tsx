@@ -16,7 +16,9 @@ import {
     Minus,
     FileCode,
     GitCommit,
-    ChevronDown
+    ChevronDown,
+    PanelLeftClose,
+    PanelLeftOpen
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -50,6 +52,7 @@ export function PRDetail() {
         const saved = localStorage.getItem("pr-tree-width");
         return saved ? parseInt(saved, 10) : 256;
     });
+    const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -477,55 +480,80 @@ export function PRDetail() {
                 {activeTab === "files" && (
                     <div className="flex flex-col h-full bg-zinc-950">
                         <div className="flex h-[calc(100vh-120px)] border-zinc-800 overflow-hidden relative">
-                            <div
-                                className="flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30 flex flex-col"
-                                style={{ width: treeWidth }}
-                            >
-                                <div className="p-2 border-b border-zinc-800">
-                                    <IterationSelector
-                                        iterations={iterations}
-                                        selectedIteration={selectedIteration}
-                                        selectedBaseIteration={selectedBaseIteration}
-                                        onSelect={handleIterationSelect}
-                                    />
+                            {/* Sidebar Expand Button (visible only when collapsed) */}
+                            {isTreeCollapsed && (
+                                <div className="absolute left-0 top-0 bottom-0 w-10 flex flex-col items-center py-4 bg-zinc-900 border-r border-zinc-800 z-30 shadow-xl">
+                                    <button
+                                        onClick={() => setIsTreeCollapsed(false)}
+                                        className="p-1.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+                                        title="Expand Sidebar"
+                                    >
+                                        <PanelLeftOpen className="h-4 w-4" />
+                                    </button>
                                 </div>
-                                <div className="flex-1 overflow-hidden">
-                                    <FileTree
-                                        changes={changes?.changes || []}
-                                        selectedPath={selectedFilePath}
-                                        onSelect={setSelectedFilePath}
-                                        reviewedFiles={reviewedFiles}
-                                        onToggleReviewed={toggleFileReviewed}
-                                    />
+                            )}
+
+                            {!isTreeCollapsed && (
+                                <div
+                                    className="flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30 flex flex-col"
+                                    style={{ width: treeWidth }}
+                                >
+                                    <div className="p-2 border-b border-zinc-800 flex items-center justify-between gap-2 overflow-hidden">
+                                        <div className="flex-1 min-w-0">
+                                            <IterationSelector
+                                                iterations={iterations}
+                                                selectedIteration={selectedIteration}
+                                                selectedBaseIteration={selectedBaseIteration}
+                                                onSelect={handleIterationSelect}
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={() => setIsTreeCollapsed(true)}
+                                            className="p-1.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
+                                            title="Collapse Sidebar"
+                                        >
+                                            <PanelLeftClose className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    <div className="flex-1 overflow-hidden">
+                                        <FileTree
+                                            changes={changes?.changes || []}
+                                            selectedPath={selectedFilePath}
+                                            onSelect={setSelectedFilePath}
+                                            reviewedFiles={reviewedFiles}
+                                            onToggleReviewed={toggleFileReviewed}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Resize Handle */}
-                            <div
-                                className="w-1 cursor-col-resize hover:bg-sapphire-500/50 transition-colors active:bg-sapphire-500 z-10 shrink-0"
-                                onMouseDown={(e) => {
-                                    const startX = e.pageX;
-                                    const startWidth = treeWidth;
+                            {!isTreeCollapsed && (
+                                <div
+                                    className="w-1 cursor-col-resize hover:bg-sapphire-500/50 transition-colors active:bg-sapphire-500 z-10 shrink-0"
+                                    onMouseDown={(e) => {
+                                        const startX = e.pageX;
+                                        const startWidth = treeWidth;
 
-                                    function onMouseMove(e: MouseEvent) {
-                                        const delta = e.pageX - startX;
-                                        const newWidth = Math.max(150, Math.min(600, startWidth + delta));
-                                        setTreeWidth(newWidth);
-                                        localStorage.setItem("pr-tree-width", newWidth.toString());
-                                    }
+                                        function onMouseMove(e: MouseEvent) {
+                                            const delta = e.pageX - startX;
+                                            const newWidth = Math.max(150, Math.min(600, startWidth + delta));
+                                            setTreeWidth(newWidth);
+                                            localStorage.setItem("pr-tree-width", newWidth.toString());
+                                        }
 
-                                    function onMouseUp() {
-                                        window.removeEventListener("mousemove", onMouseMove);
-                                        window.removeEventListener("mouseup", onMouseUp);
-                                        document.body.style.cursor = "default";
-                                    }
+                                        function onMouseUp() {
+                                            window.removeEventListener("mousemove", onMouseMove);
+                                            window.removeEventListener("mouseup", onMouseUp);
+                                            document.body.style.cursor = "default";
+                                        }
 
-                                    window.addEventListener("mousemove", onMouseMove);
-                                    window.addEventListener("mouseup", onMouseUp);
-                                    document.body.style.cursor = "col-resize";
-                                }}
-                            />
-                            <div className="flex-1 min-w-0 bg-zinc-950">
+                                        window.addEventListener("mousemove", onMouseMove);
+                                        window.addEventListener("mouseup", onMouseUp);
+                                        document.body.style.cursor = "col-resize";
+                                    }}
+                                />
+                            )}
+                            <div className={`flex-1 min-w-0 bg-zinc-950 ${isTreeCollapsed ? 'ml-10' : ''}`}>
                                 {selectedFilePath ? (
                                     <DiffViewer
                                         repoId={pr.repository.id}
