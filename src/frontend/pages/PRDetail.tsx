@@ -187,7 +187,7 @@ export function PRDetail() {
 
     if (loading) return (
         <div className="flex items-center justify-center h-full min-h-[400px]">
-            <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            <Loader2 className="h-8 w-8 text-sapphire-500 animate-spin" />
         </div>
     );
 
@@ -206,7 +206,7 @@ export function PRDetail() {
     if (!pr) return <div className="text-zinc-500">Pull request not found.</div>;
 
     const statusColors: Record<string, string> = {
-        active: "text-blue-500",
+        active: "text-sapphire-500",
         completed: "text-green-500",
         abandoned: "text-zinc-500",
     };
@@ -226,45 +226,48 @@ export function PRDetail() {
                 }}
             />
 
-            {/* Header Section - Contained */}
-            <div className="max-w-6xl mx-auto w-full px-6 pt-6 space-y-6">
-                <button
-                    onClick={() => navigate("/prs")}
-                    className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to list
-                </button>
-
-                <header className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <GitPullRequest className={`h-5 w-5 ${statusColors[pr.status] || "text-zinc-400"}`} />
-                            <span className="text-zinc-500 font-mono">#{pr.pullRequestId}</span>
-                            <span className={`px-2 py-0.5 rounded bg-zinc-800 text-xs font-medium uppercase tracking-wider ${statusColors[pr.status] || "text-zinc-400"}`}>
-                                {pr.status}
-                            </span>
+            {/* Header Section - Compact */}
+            <header className="w-full border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-md sticky top-0 z-20">
+                <div className="max-w-7xl mx-auto px-4 py-2 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <button
+                                onClick={() => navigate("/prs")}
+                                className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+                                title="Back to list"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                            </button>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-zinc-500 font-mono text-xs shrink-0">#{pr.pullRequestId}</span>
+                                <h1 className="text-base font-bold text-zinc-100 truncate">
+                                    {pr.title}
+                                </h1>
+                                <span className={`px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] font-bold uppercase tracking-wider ${statusColors[pr.status] || "text-zinc-400"}`}>
+                                    {pr.status}
+                                </span>
+                            </div>
                         </div>
 
                         {pr.status === 'active' && (
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 shrink-0">
                                 <button
                                     onClick={() => setCompleteDialogOpen(true)}
                                     disabled={!canComplete}
                                     title={!canComplete ? (hasRejections ? "Cannot complete: Reviews rejected" : "Cannot complete: Merge conflicts or status issues") : "Complete Pull Request"}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm ${canComplete ? "bg-zinc-100 hover:bg-white text-zinc-900" : "bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50"}`}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors shadow-sm ${canComplete ? "bg-zinc-100 hover:bg-white text-zinc-900" : "bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50"}`}
                                 >
-                                    <Check className="h-4 w-4" />
+                                    <Check className="h-3.5 w-3.5" />
                                     Complete
                                 </button>
                                 <div className="relative">
                                     <button
                                         onClick={() => setReviewMenuOpen(!reviewMenuOpen)}
-                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-sapphire-600 hover:bg-sapphire-500 text-white rounded-md text-xs font-medium transition-colors shadow-sm"
                                     >
-                                        <CheckCircle2 className="h-4 w-4" />
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
                                         Review
-                                        <ChevronDown className={`h-4 w-4 transition-transform ${reviewMenuOpen ? 'rotate-180' : ''}`} />
+                                        <ChevronDown className={`h-3 w-3 transition-transform ${reviewMenuOpen ? 'rotate-180' : ''}`} />
                                     </button>
 
                                     {reviewMenuOpen && (
@@ -273,26 +276,26 @@ export function PRDetail() {
                                                 className="fixed inset-0 z-40"
                                                 onClick={() => setReviewMenuOpen(false)}
                                             />
-                                            <div className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden py-1">
-                                                <button onClick={() => handleVote(10)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
-                                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                            <div className="absolute right-0 mt-1 w-56 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                                                <button onClick={() => handleVote(10)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-200 flex items-center gap-2">
+                                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                                                     <span>Approve</span>
                                                 </button>
-                                                <button onClick={() => handleVote(5)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
-                                                    <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+                                                <button onClick={() => handleVote(5)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-200 flex items-center gap-2">
+                                                    <CheckCircle2 className="h-3.5 w-3.5 text-zinc-400" />
                                                     <span>Approve with suggestions</span>
                                                 </button>
-                                                <button onClick={() => handleVote(-5)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
-                                                    <Clock className="h-4 w-4 text-amber-500" />
+                                                <button onClick={() => handleVote(-5)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-200 flex items-center gap-2">
+                                                    <Clock className="h-3.5 w-3.5 text-amber-500" />
                                                     <span>Wait for author</span>
                                                 </button>
-                                                <button onClick={() => handleVote(-10)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2 text-red-400">
-                                                    <XCircle className="h-4 w-4 text-red-500" />
+                                                <button onClick={() => handleVote(-10)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-200 flex items-center gap-2 text-red-400">
+                                                    <XCircle className="h-3.5 w-3.5 text-red-500" />
                                                     <span>Reject</span>
                                                 </button>
                                                 <div className="h-px bg-zinc-800 my-1"></div>
-                                                <button onClick={() => handleVote(0)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-400 flex items-center gap-2">
-                                                    <Minus className="h-4 w-4" />
+                                                <button onClick={() => handleVote(0)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-400 flex items-center gap-2">
+                                                    <Minus className="h-3.5 w-3.5" />
                                                     <span>Reset feedback</span>
                                                 </button>
                                             </div>
@@ -302,31 +305,28 @@ export function PRDetail() {
                             </div>
                         )}
                     </div>
-                    <h1 className="text-3xl font-bold text-zinc-100 leading-tight">
-                        {pr.title}
-                    </h1>
 
-                    <div className="flex items-center gap-2 text-sm text-zinc-400">
-                        <span className="font-medium text-zinc-300">{pr.sourceRefName.split('/').pop()}</span>
-                        <ArrowLeft className="h-3 w-3 rotate-180 text-zinc-600" />
-                        <span className="font-medium text-zinc-300">{pr.targetRefName.split('/').pop()}</span>
-                        <span className="mx-2 text-zinc-700">•</span>
-                        <span>Created by {pr.createdBy.displayName}</span>
-                        <span className="mx-2 text-zinc-700">•</span>
-                        <Clock className="h-3 w-3 inline mr-1" />
-                        <span>{new Date(pr.creationDate).toLocaleDateString()}</span>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[11px] text-zinc-500">
+                            <div className="flex items-center gap-1 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-800">
+                                <span className="font-mono text-zinc-300">{pr.sourceRefName.split('/').pop()}</span>
+                                <ArrowLeft className="h-3 w-3 rotate-180 text-zinc-600" />
+                                <span className="font-mono text-zinc-300">{pr.targetRefName.split('/').pop()}</span>
+                            </div>
+                            <span className="text-zinc-700">•</span>
+                            <span>Created by <span className="text-zinc-300 font-medium">{pr.createdBy.displayName}</span></span>
+                            <span className="text-zinc-700">•</span>
+                            <span>{new Date(pr.creationDate).toLocaleDateString()}</span>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <TabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</TabButton>
+                            <TabButton active={activeTab === "files"} onClick={() => setActiveTab("files")}>Files</TabButton>
+                            <TabButton active={activeTab === "commits"} onClick={() => setActiveTab("commits")}>Commits</TabButton>
+                        </div>
                     </div>
-                </header>
-            </div>
-
-            {/* Navigation Tabs - Full width border, contained Content */}
-            <div className="w-full border-b border-zinc-800 mt-6 bg-zinc-950 sticky top-0 z-10">
-                <div className="max-w-6xl mx-auto px-6 flex gap-6">
-                    <TabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</TabButton>
-                    <TabButton active={activeTab === "files"} onClick={() => setActiveTab("files")}>Files</TabButton>
-                    <TabButton active={activeTab === "commits"} onClick={() => setActiveTab("commits")}>Commits</TabButton>
                 </div>
-            </div>
+            </header>
 
             {/* Content Area */}
             <div className="flex-1">
@@ -351,7 +351,7 @@ export function PRDetail() {
 
                                 <section className="space-y-4">
                                     <div className="flex items-center gap-2 text-zinc-200 font-semibold px-2">
-                                        <MessageSquare className="h-5 w-5 text-blue-500" />
+                                        <MessageSquare className="h-5 w-5 text-sapphire-500" />
                                         <h3>Activity</h3>
                                     </div>
 
@@ -362,13 +362,13 @@ export function PRDetail() {
                                                 value={newComment}
                                                 onChange={(e) => setNewComment(e.target.value)}
                                                 placeholder="Leave a comment..."
-                                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none min-h-[100px] resize-y placeholder-zinc-600"
+                                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-300 focus:border-sapphire-500 focus:ring-1 focus:ring-sapphire-500 outline-none min-h-[100px] resize-y placeholder-zinc-600"
                                             />
                                             <div className="flex justify-end">
                                                 <button
                                                     onClick={handlePostComment}
                                                     disabled={postingComment || !newComment.trim()}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all"
+                                                    className="flex items-center gap-2 px-4 py-2 bg-sapphire-600 hover:bg-sapphire-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-all"
                                                 >
                                                     {postingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                                                     Comment
@@ -446,7 +446,7 @@ export function PRDetail() {
 
                 {activeTab === "files" && (
                     <div className="flex flex-col h-full bg-zinc-950">
-                        <div className="flex h-[calc(100vh-275px)] border-zinc-800 overflow-hidden">
+                        <div className="flex h-[calc(100vh-120px)] border-zinc-800 overflow-hidden">
                             <div className="w-64 flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30 flex flex-col">
                                 <div className="p-2 border-b border-zinc-800">
                                     <IterationSelector
@@ -491,7 +491,7 @@ export function PRDetail() {
                                 {commits.map((commit: any) => (
                                     <div key={commit.commitId} className="flex gap-4 p-4 border-b border-zinc-800 last:border-0 hover:bg-white/5 transition-colors">
                                         <div className="mt-1">
-                                            <GitCommit className="h-5 w-5 text-blue-500" />
+                                            <GitCommit className="h-5 w-5 text-sapphire-500" />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between gap-4">
@@ -523,7 +523,7 @@ function TabButton({ children, active, onClick }: { children: React.ReactNode, a
     return (
         <button
             onClick={onClick}
-            className={`py-4 px-2 text-sm font-medium border-b-2 transition-all ${active ? "border-blue-500 text-blue-500" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}
+            className={`py-2 px-1 text-xs font-medium border-b-2 transition-all ${active ? "border-sapphire-500 text-sapphire-500" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}
         >
             {children}
         </button>
