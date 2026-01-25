@@ -54,6 +54,7 @@ export function PRDetail() {
     });
     const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
 
+    const [lastReviewedIterationId, setLastReviewedIterationId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -67,6 +68,11 @@ export function PRDetail() {
                 } catch (e) {
                     console.error("Failed to parse reviewed files", e);
                 }
+            }
+            // Load last reviewed iteration
+            const savedIter = localStorage.getItem(`pr-${id}-last-reviewed-iteration`);
+            if (savedIter) {
+                setLastReviewedIterationId(parseInt(savedIter, 10));
             }
         }
     }, [id]);
@@ -124,6 +130,13 @@ export function PRDetail() {
 
         try {
             await votePullRequest(id, pr.repository.id, reviewerId, vote);
+
+            // Update last reviewed iteration
+            const latestId = iterations.reduce((max, it) => Math.max(max, it.id), 0);
+            if (latestId > 0) {
+                setLastReviewedIterationId(latestId);
+                localStorage.setItem(`pr-${id}-last-reviewed-iteration`, latestId.toString());
+            }
 
             // Optimistic update or reload
             const updatedPr = await getPullRequest(id, pr.repository.id);
@@ -504,6 +517,7 @@ export function PRDetail() {
                                                 iterations={iterations}
                                                 selectedIteration={selectedIteration}
                                                 selectedBaseIteration={selectedBaseIteration}
+                                                lastReviewedIterationId={lastReviewedIterationId}
                                                 onSelect={handleIterationSelect}
                                             />
                                         </div>

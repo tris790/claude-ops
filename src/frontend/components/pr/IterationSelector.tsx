@@ -23,10 +23,11 @@ interface IterationSelectorProps {
     iterations: Iteration[];
     selectedIteration: number | null; // null means latest/current
     selectedBaseIteration: number | null; // null means base of the PR
+    lastReviewedIterationId?: number | null;
     onSelect: (iterationId: number | null, baseIterationId: number | null) => void;
 }
 
-export function IterationSelector({ iterations, selectedIteration, selectedBaseIteration, onSelect }: IterationSelectorProps) {
+export function IterationSelector({ iterations, selectedIteration, selectedBaseIteration, lastReviewedIterationId, onSelect }: IterationSelectorProps) {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -108,6 +109,24 @@ export function IterationSelector({ iterations, selectedIteration, selectedBaseI
                         </button>
 
                         <div className="h-px bg-zinc-800 my-1 mx-4" />
+
+                        {lastReviewedIterationId && lastReviewedIterationId < latestId && (
+                            <>
+                                <button
+                                    onClick={() => handleSelect(latestId, lastReviewedIterationId)}
+                                    className={`w-full text-left px-4 py-2 hover:bg-zinc-800 flex items-center justify-between group ${currentId === latestId && currentBaseId === lastReviewedIterationId ? "bg-zinc-800/50" : ""}`}
+                                >
+                                    <div className="flex flex-col">
+                                        <span className={`text-sm ${currentId === latestId && currentBaseId === lastReviewedIterationId ? "text-blue-400 font-medium" : "text-zinc-200"}`}>
+                                            Since My Last Review
+                                        </span>
+                                        <span className="text-xs text-zinc-500">Iter {lastReviewedIterationId} &rarr; Iteration {latestId} (Latest)</span>
+                                    </div>
+                                    {(currentId === latestId && currentBaseId === lastReviewedIterationId) && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+                                </button>
+                                <div className="h-px bg-zinc-800 my-1 mx-4" />
+                            </>
+                        )}
 
                         {sortedIterations.map((iter, index) => {
                             // Logic for "Changes in this iteration" (Compare Iter N with Iter N-1)
