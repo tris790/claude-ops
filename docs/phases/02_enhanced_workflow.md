@@ -53,7 +53,7 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [ ] **CRUD operations on comments**: Implement CRUD operations on comments.
     - [ ] **Diff view improvements**: 
         - [ ] **Resizable diff panels**
-        - [ ] **Diff view modes**: Unified, Side-by-Side, Inline
+        - [x] **Diff view modes**: Unified, Side-by-Side, Inline
         - [ ] **File tree/list**
         - [ ] **Resizable/collapsible file tree**
     - [ ] **Add browser navigation history for review**: add the review tab in the url and more details as needed such as file or commit

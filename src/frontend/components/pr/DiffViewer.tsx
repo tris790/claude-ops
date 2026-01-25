@@ -4,7 +4,7 @@ import { EditorState, StateField } from "@codemirror/state";
 import { EditorView, lineNumbers, hoverTooltip, drawSelection, keymap, showTooltip, type Tooltip } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
-import { MergeView } from "@codemirror/merge";
+import { MergeView, unifiedMergeView } from "@codemirror/merge";
 import { javascript } from "@codemirror/lang-javascript";
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
@@ -34,6 +34,8 @@ interface DiffViewerProps {
     onToggleReviewed: () => void;
 }
 
+type DiffMode = "side-by-side" | "unified" | "new-only";
+
 export const DiffViewer: React.FC<DiffViewerProps> = ({
     repoId,
     filePath,
@@ -53,7 +55,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [lspStatus, setLspStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-    const [isUnified, setIsUnified] = useState(false);
+    const [diffMode, setDiffMode] = useState<DiffMode>("side-by-side");
 
     const [contents, setContents] = useState<{ original: string; modified: string } | null>(null);
 
@@ -351,6 +353,53 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             EditorState.readOnly.of(true),
         ];
 
+        // Setup Diagnostics for both panes
+        const setupDiagnostics = (target: "a" | "b", uri: string) => {
+            if (!lspRef.current || !viewRef.current || diffMode !== "side-by-side") return;
+            const view = target === "a" ? viewRef.current.a : viewRef.current.b;
+            if (!view) return;
+
+            return lspRef.current.on('textDocument/publishDiagnostics', (params: any) => {
+                if (params.uri !== uri) return;
+            });
+        };
+
+        if (diffMode === "unified") {
+            const editorView = new EditorView({
+                state: EditorState.create({
+                    doc: contents.modified,
+                    extensions: [
+                        ...baseExtensions,
+                        unifiedMergeView({
+                            original: contents.original,
+                            highlightChanges: true,
+                            gutter: true,
+                        }),
+                        ...createLSPExtensions(`file:///modified${normalizedPath}`),
+                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId })
+                    ]
+                }),
+                parent: containerRef.current
+            });
+            return () => { editorView.destroy(); };
+        }
+
+        if (diffMode === "new-only") {
+            const editorView = new EditorView({
+                state: EditorState.create({
+                    doc: contents.modified,
+                    extensions: [
+                        ...baseExtensions,
+                        ...createLSPExtensions(`file:///modified${normalizedPath}`),
+                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId })
+                    ]
+                }),
+                parent: containerRef.current
+            });
+            return () => { editorView.destroy(); };
+        }
+
+        // Side-by-side (default)
         viewRef.current = new MergeView({
             a: {
                 doc: contents.original,
@@ -371,34 +420,6 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             parent: containerRef.current,
         });
 
-        // Setup Diagnostics for both panes
-        const setupDiagnostics = (target: "a" | "b", uri: string) => {
-            if (!lspRef.current || !viewRef.current || isUnified) return; // Diagnostics in unified view are complex
-            const view = target === "a" ? viewRef.current.a : viewRef.current.b;
-            if (!view) return;
-
-            return lspRef.current.on('textDocument/publishDiagnostics', (params: any) => {
-                if (params.uri !== uri) return;
-                // Diagnostics disabled per user request
-                /*
-                const diagnostics: Diagnostic[] = params.diagnostics.map((d: any) => {
-                    const fromLine = view.state.doc.line(d.range.start.line + 1);
-                    const toLine = view.state.doc.line(d.range.end.line + 1);
-                    const from = Math.min(fromLine.from + d.range.start.character, fromLine.to);
-                    const to = Math.min(toLine.from + d.range.end.character, toLine.to);
-                    return {
-                        from,
-                        to,
-                        severity: d.severity === 1 ? "error" : d.severity === 2 ? "warning" : "info",
-                        message: d.message,
-                        source: d.source
-                    };
-                });
-                view.dispatch(setDiagnostics(view.state, diagnostics));
-                */
-            });
-        };
-
         const unbindA = setupDiagnostics("a", `file:///original${normalizedPath}`);
         const unbindB = setupDiagnostics("b", `file:///modified${normalizedPath}`);
 
@@ -410,7 +431,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 viewRef.current = null;
             }
         };
-    }, [loading, contents, filePath, lspStatus]);
+    }, [loading, contents, filePath, lspStatus, diffMode]);
 
     return (
         <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
@@ -429,13 +450,25 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                         </span>
                     </div>
                 </div>
-                <div className="flex items-center space-x-2">
-
-                    <div className="flex items-center space-x-4 text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mr-4">
-                        <span>Original</span>
-                        <span className="text-zinc-700">|</span>
-                        <span>Modified</span>
-                    </div>
+                <div className="flex items-center space-x-1 p-0.5 bg-zinc-950 rounded-md border border-zinc-800">
+                    <button
+                        onClick={() => setDiffMode("side-by-side")}
+                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "side-by-side" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}
+                    >
+                        Side-by-Side
+                    </button>
+                    <button
+                        onClick={() => setDiffMode("unified")}
+                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "unified" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}
+                    >
+                        Unified
+                    </button>
+                    <button
+                        onClick={() => setDiffMode("new-only")}
+                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "new-only" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}
+                    >
+                        New Code
+                    </button>
                 </div>
             </div>
             {loading && (
