@@ -4,6 +4,7 @@ import { Spinner } from "../components/ui/Spinner";
 interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
+    user: any;
     login: (orgUrl: string, pat: string) => Promise<void>;
 }
 
@@ -11,6 +12,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [user, setUser] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -23,6 +25,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (res.ok) {
                 const data = await res.json();
                 setIsAuthenticated(data.isAuthenticated);
+
+                if (data.isAuthenticated) {
+                    const userRes = await fetch("/api/user");
+                    if (userRes.ok) {
+                        const userData = await userRes.json();
+                        setUser(userData);
+                    }
+                }
             }
         } catch (e) {
             console.error("Auth check failed", e);
@@ -42,6 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) throw new Error(data.error || "Setup failed");
 
         setIsAuthenticated(true);
+        const userRes = await fetch("/api/user");
+        if (userRes.ok) {
+            const userData = await userRes.json();
+            setUser(userData);
+        }
     }
 
     if (isLoading) {
@@ -49,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <AuthContext.Provider value={{ isAuthenticated, isLoading, login }}>
+        <AuthContext.Provider value={{ isAuthenticated, isLoading, user, login }}>
             {children}
         </AuthContext.Provider>
     );

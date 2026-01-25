@@ -184,6 +184,87 @@ export const prRoutes = {
                 console.error(`[API] Error creating thread for PR ${id}:`, error);
                 return Response.json({ error: error.message }, { status: 500 });
             }
+        },
+        async PATCH(req: Request, params: any) {
+            const id = getPrId(req, params);
+            if (!id) return Response.json({ error: "Invalid PR ID" }, { status: 400 });
+
+            try {
+                const body = await req.json();
+                const { repoId, threadId, status } = body;
+
+                if (!repoId || threadId === undefined || status === undefined) {
+                    return Response.json({ error: "Missing required fields (repoId, threadId, status)" }, { status: 400 });
+                }
+
+                const thread = await azureClient.updatePullRequestThread(repoId, id, threadId, status);
+                return Response.json(thread);
+            } catch (error: any) {
+                console.error(`[API] Error updating thread for PR ${id}:`, error);
+                return Response.json({ error: error.message }, { status: 500 });
+            }
+        }
+    },
+
+    "/api/prs/:id/comments": {
+        async POST(req: Request, params: any) {
+            const id = getPrId(req, params);
+            if (!id) return Response.json({ error: "Invalid PR ID" }, { status: 400 });
+
+            try {
+                const body = await req.json();
+                const { repoId, threadId, content } = body;
+
+                if (!repoId || threadId === undefined || !content) {
+                    return Response.json({ error: "Missing required fields" }, { status: 400 });
+                }
+
+                const result = await azureClient.addPullRequestComment(repoId, id, threadId, content);
+                return Response.json(result);
+            } catch (error: any) {
+                console.error(`[API] Error adding comment for PR ${id}:`, error);
+                return Response.json({ error: error.message }, { status: 500 });
+            }
+        },
+        async PATCH(req: Request, params: any) {
+            const id = getPrId(req, params);
+            if (!id) return Response.json({ error: "Invalid PR ID" }, { status: 400 });
+
+            try {
+                const body = await req.json();
+                const { repoId, threadId, commentId, content } = body;
+
+                if (!repoId || threadId === undefined || commentId === undefined || content === undefined) {
+                    return Response.json({ error: "Missing required fields" }, { status: 400 });
+                }
+
+                const result = await azureClient.updatePullRequestComment(repoId, id, threadId, commentId, content);
+                return Response.json(result);
+            } catch (error: any) {
+                console.error(`[API] Error updating comment for PR ${id}:`, error);
+                return Response.json({ error: error.message }, { status: 500 });
+            }
+        },
+        async DELETE(req: Request, params: any) {
+            const id = getPrId(req, params);
+            if (!id) return Response.json({ error: "Invalid PR ID" }, { status: 400 });
+
+            try {
+                const url = new URL(req.url);
+                const repoId = url.searchParams.get("repoId");
+                const threadId = parseInt(url.searchParams.get("threadId") || "");
+                const commentId = parseInt(url.searchParams.get("commentId") || "");
+
+                if (!repoId || isNaN(threadId) || isNaN(commentId)) {
+                    return Response.json({ error: "Missing required query parameters" }, { status: 400 });
+                }
+
+                const result = await azureClient.deletePullRequestComment(repoId, id, threadId, commentId);
+                return Response.json(result);
+            } catch (error: any) {
+                console.error(`[API] Error deleting comment for PR ${id}:`, error);
+                return Response.json({ error: error.message }, { status: 500 });
+            }
         }
     },
 

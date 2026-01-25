@@ -593,6 +593,93 @@ export class AzureDevOpsClient {
         return await res.json();
     }
 
+    async updatePullRequestComment(repoId: string, pullRequestId: string, threadId: number, commentId: number, content: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const pr = await this.getPullRequest(pullRequestId, repoId);
+        const url = `${pr.url}/threads/${threadId}/comments/${commentId}?api-version=7.0`;
+
+        const res = await fetch(url, {
+            method: "PATCH",
+            headers: this.headers,
+            body: JSON.stringify({ content })
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to update comment: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async deletePullRequestComment(repoId: string, pullRequestId: string, threadId: number, commentId: number) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const pr = await this.getPullRequest(pullRequestId, repoId);
+        const url = `${pr.url}/threads/${threadId}/comments/${commentId}?api-version=7.0`;
+
+        const res = await fetch(url, {
+            method: "DELETE",
+            headers: this.headers
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to delete comment: ${res.status} ${res.statusText}`);
+        }
+
+        return res.status === 204 ? { success: true } : await res.json();
+    }
+
+    async updatePullRequestThread(repoId: string, pullRequestId: string, threadId: number, status: number) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const pr = await this.getPullRequest(pullRequestId, repoId);
+        const url = `${pr.url}/threads/${threadId}?api-version=7.0`;
+
+        const res = await fetch(url, {
+            method: "PATCH",
+            headers: this.headers,
+            body: JSON.stringify({ status })
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to update thread: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
+    async addPullRequestComment(repoId: string, pullRequestId: string, threadId: number, content: string) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const pr = await this.getPullRequest(pullRequestId, repoId);
+        const url = `${pr.url}/threads/${threadId}/comments?api-version=7.0`;
+
+        const res = await fetch(url, {
+            method: "POST",
+            headers: this.headers,
+            body: JSON.stringify({
+                content,
+                parentCommentId: 0,
+                commentType: 1 // Text
+            })
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to add comment to thread: ${res.status} ${res.statusText}`);
+        }
+
+        return await res.json();
+    }
+
 
     async votePullRequest(repoId: string, id: string, reviewerId: string, vote: number) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {

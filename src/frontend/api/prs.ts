@@ -39,6 +39,56 @@ export async function createPullRequestThread(id: string, repoId: string, conten
     return res.json();
 }
 
+export async function addPullRequestComment(id: string, repoId: string, threadId: number, content: string) {
+    const res = await fetch(`/api/prs/${id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoId, threadId, content }),
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to add comment");
+    }
+    return res.json();
+}
+
+export async function updatePullRequestComment(id: string, repoId: string, threadId: number, commentId: number, content: string) {
+    const res = await fetch(`/api/prs/${id}/comments`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoId, threadId, commentId, content }),
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update comment");
+    }
+    return res.json();
+}
+
+export async function deletePullRequestComment(id: string, repoId: string, threadId: number, commentId: number) {
+    const res = await fetch(`/api/prs/${id}/comments?repoId=${repoId}&threadId=${threadId}&commentId=${commentId}`, {
+        method: "DELETE",
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to delete comment");
+    }
+    return res.json();
+}
+
+export async function updatePullRequestThread(id: string, repoId: string, threadId: number, status: number) {
+    const res = await fetch(`/api/prs/${id}/threads`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoId, threadId, status }),
+    });
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update thread");
+    }
+    return res.json();
+}
+
 export async function votePullRequest(id: string, repoId: string, reviewerId: string, vote: number) {
     const res = await fetch(`/api/prs/${id}/vote`, {
         method: "POST",

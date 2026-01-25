@@ -5,6 +5,7 @@ import { Loader2, Send, X } from "lucide-react";
 
 interface CommentDialogProps {
     draftKey: string;
+    initialValue?: string;
     onSubmit: (content: string) => Promise<void>;
     onCancel: () => void;
     position?: { x: number; y: number } | null;
@@ -12,11 +13,12 @@ interface CommentDialogProps {
 
 export const CommentDialog: React.FC<CommentDialogProps> = ({
     draftKey,
+    initialValue = "",
     onSubmit,
     onCancel,
     position
 }) => {
-    const [content, setContent] = useState("");
+    const [content, setContent] = useState(initialValue);
     const [isPreview, setIsPreview] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
