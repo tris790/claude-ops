@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CommentDialog } from "./CommentDialog";
 import { createPullRequestThread, updatePullRequestComment, deletePullRequestComment, updatePullRequestThread, addPullRequestComment } from "../../api/prs";
-import { Edit2, Trash2, CheckCircle2, RotateCcw, Reply, MoreVertical } from "lucide-react";
+import { Edit2, Trash2, CheckCircle2, RotateCcw, Reply, MoreVertical, ChevronDown, ChevronRight } from "lucide-react";
 
 // --- Types ---
 
@@ -118,6 +118,8 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
     const user = props.currentUser;
     const [editingCommentId, setEditingCommentId] = React.useState<number | null>(null);
     const [isReplying, setIsReplying] = React.useState(false);
+    const isThreadResolved = thread.status === 2 || thread.status === 4;
+    const [isCollapsed, setIsCollapsed] = React.useState(isThreadResolved);
 
     const handleUpdateComment = async (commentId: number, content: string) => {
         try {
@@ -158,12 +160,16 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
         }
     };
 
-    const isThreadResolved = thread.status === 2 || thread.status === 4;
-
     return (
-        <div className="p-3 space-y-4">
-            <div className="flex items-center justify-between mb-2">
+        <div className="p-2 space-y-2">
+            <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
+                    <button
+                        onClick={() => setIsCollapsed(!isCollapsed)}
+                        className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200"
+                    >
+                        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${isThreadResolved ? "bg-green-500/20 text-green-400" : "bg-blue-500/20 text-blue-400"
                         }`}>
                         {thread.status === 1 ? "Active" :
@@ -172,19 +178,28 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
                                     thread.status === 4 ? "Closed" :
                                         thread.status === 5 ? "By Design" : "Pending"}
                     </span>
+                    {isCollapsed && (
+                        <span className="text-[11px] text-zinc-500 truncate max-w-[300px]">
+                            {thread.comments[0]?.author?.displayName}: {thread.comments[0]?.content.substring(0, 60)}
+                            {thread.comments[0]?.content.length > 60 ? "..." : ""}
+                            {thread.comments.length > 1 ? ` (+${thread.comments.length - 1} replies)` : ""}
+                        </span>
+                    )}
                 </div>
                 <div className="flex items-center space-x-1">
                     {isThreadResolved ? (
                         <button
                             onClick={() => handleUpdateThreadStatus(1)}
-                            className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200 title='Reactivate'"
+                            className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200"
+                            title="Reactivate"
                         >
                             <RotateCcw className="w-3.5 h-3.5" />
                         </button>
                     ) : (
                         <button
                             onClick={() => handleUpdateThreadStatus(2)}
-                            className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200 title='Resolve'"
+                            className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200"
+                            title="Resolve"
                         >
                             <CheckCircle2 className="w-3.5 h-3.5" />
                         </button>
@@ -192,78 +207,83 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
                 </div>
             </div>
 
-            {thread.comments.filter((c: any) => c.content).map((comment: any, idx: number) => {
-                const isAuthor = user && comment.author && user.id === comment.author.id;
-                const isEditing = editingCommentId === comment.id;
+            {!isCollapsed && (
+                <div className="space-y-4 pt-2">
+                    {thread.comments.filter((c: any) => c.content).map((comment: any, idx: number) => {
+                        const isAuthor = user && comment.author && user.id === comment.author.id;
+                        const isEditing = editingCommentId === comment.id;
 
-                if (isEditing) {
-                    return (
-                        <div key={comment.id || idx} className="mt-2">
+                        if (isEditing) {
+                            return (
+                                <div key={comment.id || idx} className="mt-2">
+                                    <CommentDialog
+                                        draftKey={`edit_${comment.id}`}
+                                        initialValue={comment.content}
+                                        onSubmit={(content) => handleUpdateComment(comment.id, content)}
+                                        onCancel={() => setEditingCommentId(null)}
+                                    />
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <div key={comment.id || idx} className="flex gap-3 group">
+                                <div className="h-6 w-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 shrink-0 uppercase font-bold border border-zinc-700 shadow-sm">
+                                    {comment.author?.displayName?.[0] || "?"}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-baseline justify-between mb-0.5">
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-xs font-semibold text-zinc-200">{comment.author?.displayName}</span>
+                                            <span className="text-[9px] text-zinc-500 uppercase tracking-tight">{new Date(comment.publishedDate).toLocaleString()}</span>
+                                        </div>
+                                        {isAuthor && (
+                                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => setEditingCommentId(comment.id)}
+                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
+                                                >
+                                                    <Edit2 className="w-3 h-3" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteComment(comment.id)}
+                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="text-[13px] text-zinc-300 prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {!isReplying ? (
+                        <button
+                            onClick={() => setIsReplying(true)}
+                            className="flex items-center space-x-1.5 text-[11px] font-medium text-zinc-500 hover:text-blue-400 transition-colors pl-9"
+                        >
+                            <Reply className="w-3 h-3" />
+                            <span>Reply...</span>
+                        </button>
+                    ) : (
+                        <div className="pl-9 mt-2">
                             <CommentDialog
-                                draftKey={`edit_${comment.id}`}
-                                initialValue={comment.content}
-                                onSubmit={(content) => handleUpdateComment(comment.id, content)}
-                                onCancel={() => setEditingCommentId(null)}
+                                draftKey={`reply_${thread.id}`}
+                                onSubmit={handleReply}
+                                onCancel={() => setIsReplying(false)}
                             />
                         </div>
-                    );
-                }
-
-                return (
-                    <div key={comment.id || idx} className="flex gap-3 group">
-                        <div className="h-6 w-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 shrink-0 uppercase font-bold border border-zinc-700 shadow-sm">
-                            {comment.author?.displayName?.[0] || "?"}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-baseline justify-between mb-0.5">
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-xs font-semibold text-zinc-200">{comment.author?.displayName}</span>
-                                    <span className="text-[9px] text-zinc-500 uppercase tracking-tight">{new Date(comment.publishedDate).toLocaleString()}</span>
-                                </div>
-                                {isAuthor && (
-                                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => setEditingCommentId(comment.id)}
-                                            className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
-                                        >
-                                            <Edit2 className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteComment(comment.id)}
-                                            className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="text-[13px] text-zinc-300 prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
-
-            {!isReplying ? (
-                <button
-                    onClick={() => setIsReplying(true)}
-                    className="flex items-center space-x-1.5 text-[11px] font-medium text-zinc-500 hover:text-blue-400 transition-colors pl-9"
-                >
-                    <Reply className="w-3 h-3" />
-                    <span>Reply...</span>
-                </button>
-            ) : (
-                <div className="pl-9 mt-2">
-                    <CommentDialog
-                        draftKey={`reply_${thread.id}`}
-                        onSubmit={handleReply}
-                        onCancel={() => setIsReplying(false)}
-                    />
+                    )}
                 </div>
             )}
         </div>
     );
+
 };
 
 class CommentThreadWidget extends WidgetType {
