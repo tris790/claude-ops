@@ -33,13 +33,13 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
 
 ## 3. Interactive Code Review
 - [ ] **Rich Commenting**:
-  - [ ] **Multi-line selection**: Implement range selection in CodeMirror using `EditorView.lineBlockAt`. Show a floating "Comment" button on selection end.
-  - [ ] **Azure DevOps Integration**: Map selection ranges to the `iterationContext` and `threadContext` in the PR Thread API.
+  - [x] **Multi-line selection**: Implement range selection in CodeMirror using `EditorView.lineBlockAt`. Show a floating "Comment" button on selection end.
+  - [x] **Azure DevOps Integration**: Map selection ranges to the `iterationContext` and `threadContext` in the PR Thread API.
   - [x] Markdown support in comments.
   - [x] Threaded replies.
 - [ ] **Review Submission**:
-  - [ ] **Local Drafts**: Store unsaved comment content in `localStorage` per PR/file to prevent data loss.
-  - [ ] **Status Control**: Add a "Review" menu in the PR header with one-click actions: `Approve`, `Approve with suggestions`, `Wait for author`, `Reject`.
+  - [x] **Local Drafts**: Store unsaved comment content in `localStorage` per PR/file to prevent data loss.
+  - [x] **Status Control**: Add a "Review" menu in the PR header with one-click actions: `Approve`, `Approve with suggestions`, `Wait for author`, `Reject`.
   - [ ] **Merge Integration**: Ensure "Complete PR" trigger is only enabled after successful review/policy checks.
 - [ ] **Review Progress & Iterations**:
   - [ ] **Iteration Management**:

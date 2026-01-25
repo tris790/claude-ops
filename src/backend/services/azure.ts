@@ -66,6 +66,22 @@ export class AzureDevOpsClient {
         }
     }
 
+    async getCurrentUser() {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const url = `${this.baseUrl}/_apis/connectionData?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch user info: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return data.authenticatedUser;
+    }
+
     private projectCache: { data: any[], timestamp: number } | null = null;
 
     async getProjects() {

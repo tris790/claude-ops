@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread } from "../api/prs";
+import { getCurrentUser } from "../api/auth";
 import {
     ArrowLeft,
     GitPullRequest,
@@ -14,7 +15,8 @@ import {
     Check,
     Minus,
     FileCode,
-    GitCommit
+    GitCommit,
+    ChevronDown
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -34,6 +36,8 @@ export function PRDetail() {
     const [activeTab, setActiveTab] = useState<"overview" | "files" | "commits">("overview");
     const [newComment, setNewComment] = useState("");
     const [postingComment, setPostingComment] = useState(false);
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [reviewMenuOpen, setReviewMenuOpen] = useState(false);
 
     const [error, setError] = useState<string | null>(null);
 
@@ -47,14 +51,16 @@ export function PRDetail() {
         try {
             const data = await getPullRequest(id!, searchParams.get("repoId") || undefined);
             setPr(data);
-            const [threadData, changeData, commitData] = await Promise.all([
+            const [threadData, changeData, commitData, userData] = await Promise.all([
                 getPullRequestThreads(id!, data.repository.id),
                 getPullRequestChanges(id!, data.repository.id),
-                getPullRequestCommits(id!, data.repository.id)
+                getPullRequestCommits(id!, data.repository.id),
+                getCurrentUser().catch(() => null)
             ]);
             setThreads(threadData);
             setChanges(changeData);
             setCommits(commitData);
+            setCurrentUser(userData);
             if (changeData.changes.length > 0) {
                 setSelectedFilePath(changeData.changes[0].item.path);
             }
@@ -68,16 +74,38 @@ export function PRDetail() {
 
     async function handleVote(vote: number) {
         if (!pr || !id) return;
+
+        if (!currentUser) {
+            alert("Unable to identify current user. Please ensure you are authenticated.");
+            return;
+        }
+
+        // Find current user in reviewers list
+        // Try matching by uniqueName (email) or id
+        const reviewer = pr.reviewers.find((r: any) =>
+            r.uniqueName === currentUser.emailAddress ||
+            r.id === currentUser.id ||
+            r.displayName === currentUser.providerDisplayName
+        );
+
+        if (!reviewer) {
+            // If not in reviewers list, we can't vote via the API usually unless we add ourselves?
+            // Azure DevOps API might handle it if we just pass our ID if we are not in the list (it might add us)
+            // But for safety, let's warn.
+            alert("You are not listed as a reviewer on this PR.");
+            return;
+        }
+
         try {
-            // Find current user as reviewer
-            // In a real app, we'd know who the current user is.
-            // For now, we'll try to find a reviewer that matches "us" or just pick the first one with no vote for demo?
-            // Actually, we should probably just send the vote and see what happens.
-            // Azure DevOps requires the reviewerId.
-            // Let's assume the first reviewer for now or just show a message.
-            alert("Voting functionality requires current user context (Reviewer ID)");
-        } catch (err) {
+            await votePullRequest(id, pr.repository.id, reviewer.id, vote);
+
+            // Optimistic update or reload
+            const updatedPr = await getPullRequest(id, pr.repository.id);
+            setPr(updatedPr);
+            setReviewMenuOpen(false);
+        } catch (err: any) {
             console.error(err);
+            alert("Failed to submitting vote: " + err.message);
         }
     }
 
@@ -139,12 +167,59 @@ export function PRDetail() {
                 </button>
 
                 <header className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <GitPullRequest className={`h-5 w-5 ${statusColors[pr.status] || "text-zinc-400"}`} />
-                        <span className="text-zinc-500 font-mono">#{pr.pullRequestId}</span>
-                        <span className={`px-2 py-0.5 rounded bg-zinc-800 text-xs font-medium uppercase tracking-wider ${statusColors[pr.status] || "text-zinc-400"}`}>
-                            {pr.status}
-                        </span>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <GitPullRequest className={`h-5 w-5 ${statusColors[pr.status] || "text-zinc-400"}`} />
+                            <span className="text-zinc-500 font-mono">#{pr.pullRequestId}</span>
+                            <span className={`px-2 py-0.5 rounded bg-zinc-800 text-xs font-medium uppercase tracking-wider ${statusColors[pr.status] || "text-zinc-400"}`}>
+                                {pr.status}
+                            </span>
+                        </div>
+
+                        {pr.status === 'active' && (
+                            <div className="relative">
+                                <button
+                                    onClick={() => setReviewMenuOpen(!reviewMenuOpen)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Review
+                                    <ChevronDown className={`h-4 w-4 transition-transform ${reviewMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {reviewMenuOpen && (
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-40"
+                                            onClick={() => setReviewMenuOpen(false)}
+                                        />
+                                        <div className="absolute right-0 mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden py-1">
+                                            <button onClick={() => handleVote(10)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
+                                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                                <span>Approve</span>
+                                            </button>
+                                            <button onClick={() => handleVote(5)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
+                                                <CheckCircle2 className="h-4 w-4 text-zinc-400" />
+                                                <span>Approve with suggestions</span>
+                                            </button>
+                                            <button onClick={() => handleVote(-5)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2">
+                                                <Clock className="h-4 w-4 text-amber-500" />
+                                                <span>Wait for author</span>
+                                            </button>
+                                            <button onClick={() => handleVote(-10)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-200 flex items-center gap-2 text-red-400">
+                                                <XCircle className="h-4 w-4 text-red-500" />
+                                                <span>Reject</span>
+                                            </button>
+                                            <div className="h-px bg-zinc-800 my-1"></div>
+                                            <button onClick={() => handleVote(0)} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800 text-sm text-zinc-400 flex items-center gap-2">
+                                                <Minus className="h-4 w-4" />
+                                                <span>Reset feedback</span>
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <h1 className="text-3xl font-bold text-zinc-100 leading-tight">
                         {pr.title}
@@ -282,20 +357,6 @@ export function PRDetail() {
                                         </div>
                                     </section>
 
-                                    <section className="pt-4 border-t border-zinc-800 flex flex-col gap-2">
-                                        <button
-                                            onClick={() => handleVote(10)}
-                                            className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-all shadow-lg"
-                                        >
-                                            Approve
-                                        </button>
-                                        <button
-                                            onClick={() => handleVote(5)}
-                                            className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-medium transition-all border border-zinc-700"
-                                        >
-                                            Approve with suggestions
-                                        </button>
-                                    </section>
                                 </div>
                             </div>
                         </div>
@@ -322,6 +383,7 @@ export function PRDetail() {
                                         projectName={pr.repository.project.name}
                                         repoName={pr.repository.name}
                                         isCloned={pr.repository.isCloned}
+                                        pullRequestId={pr.pullRequestId}
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center h-full text-zinc-500">
