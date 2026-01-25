@@ -19,6 +19,7 @@ import { Loader2, MessageSquarePlus, CheckSquare, Square } from "lucide-react";
 import { LSPClient } from "../../utils/lsp-client";
 import { getHighlighter } from "../../utils/shiki";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import { createCommentSystem } from "./DiffExtensions";
 
 interface DiffViewerProps {
@@ -54,6 +55,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     onCommentPosted,
     scrollToLine
 }) => {
+    const { user } = useAuth();
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<MergeView | null>(null);
@@ -383,7 +385,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                             gutter: true,
                         }),
                         ...createLSPExtensions(`file:///modified${normalizedPath}`),
-                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted })
+                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
                     ]
                 }),
                 parent: containerRef.current
@@ -399,7 +401,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     extensions: [
                         ...baseExtensions,
                         ...createLSPExtensions(`file:///modified${normalizedPath}`),
-                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted })
+                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
                     ]
                 }),
                 parent: containerRef.current
@@ -415,7 +417,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 extensions: [
                     ...baseExtensions,
                     ...createLSPExtensions(`file:///original${normalizedPath}`),
-                    ...createCommentSystem({ repoId, filePath, side: "original", pullRequestId, threads, onCommentPosted })
+                    ...createCommentSystem({ repoId, filePath, side: "original", pullRequestId, threads, onCommentPosted, currentUser: user })
                 ]
             },
             b: {
@@ -423,7 +425,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 extensions: [
                     ...baseExtensions,
                     ...createLSPExtensions(`file:///modified${normalizedPath}`),
-                    ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted })
+                    ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
                 ]
             },
             parent: containerRef.current,

@@ -7,7 +7,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CommentDialog } from "./CommentDialog";
 import { createPullRequestThread, updatePullRequestComment, deletePullRequestComment, updatePullRequestThread, addPullRequestComment } from "../../api/prs";
-import { useAuth } from "../../contexts/AuthContext";
 import { Edit2, Trash2, CheckCircle2, RotateCcw, Reply, MoreVertical } from "lucide-react";
 
 // --- Types ---
@@ -30,6 +29,7 @@ interface CommentSystemProps {
     side: "original" | "modified";
     threads?: any[];
     onCommentPosted?: () => void;
+    currentUser?: any;
 }
 
 // --- Effects ---
@@ -115,7 +115,7 @@ class CommentDraftWidget extends WidgetType {
 }
 
 const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ thread, props }) => {
-    const { user } = useAuth();
+    const user = props.currentUser;
     const [editingCommentId, setEditingCommentId] = React.useState<number | null>(null);
     const [isReplying, setIsReplying] = React.useState(false);
 
