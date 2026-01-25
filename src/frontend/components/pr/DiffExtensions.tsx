@@ -120,6 +120,18 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
     const [isReplying, setIsReplying] = React.useState(false);
     const isThreadResolved = thread.status === 2 || thread.status === 4;
     const [isCollapsed, setIsCollapsed] = React.useState(isThreadResolved);
+    const [showStatusMenu, setShowStatusMenu] = React.useState(false);
+
+    const statuses = [
+        { id: 1, label: "Active", color: "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30" },
+        { id: 2, label: "Resolved", color: "bg-green-500/20 text-green-400 hover:bg-green-500/30" },
+        { id: 3, label: "Won't Fix", color: "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700/70" },
+        { id: 4, label: "Closed", color: "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700/70" },
+        { id: 5, label: "By Design", color: "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30" },
+        { id: 6, label: "Pending", color: "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30" },
+    ] as const;
+
+    const currentStatus = statuses.find(s => s.id === (thread.status || 1)) ?? statuses[0];
 
     const handleUpdateComment = async (commentId: number, content: string) => {
         try {
@@ -144,6 +156,7 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
     const handleUpdateThreadStatus = async (status: number) => {
         try {
             await updatePullRequestThread(props.pullRequestId!, props.repoId, thread.id, status);
+            setShowStatusMenu(false);
             props.onCommentPosted?.();
         } catch (err: any) {
             alert("Failed to update thread status: " + err.message);
@@ -170,14 +183,35 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
                     >
                         {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </button>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${isThreadResolved ? "bg-green-500/20 text-green-400" : "bg-blue-500/20 text-blue-400"
-                        }`}>
-                        {thread.status === 1 ? "Active" :
-                            thread.status === 2 ? "Resolved" :
-                                thread.status === 3 ? "Won't Fix" :
-                                    thread.status === 4 ? "Closed" :
-                                        thread.status === 5 ? "By Design" : "Pending"}
-                    </span>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowStatusMenu(!showStatusMenu)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${currentStatus.color}`}
+                        >
+                            {currentStatus.label}
+                            <ChevronDown className="w-2.5 h-2.5" />
+                        </button>
+
+                        {showStatusMenu && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setShowStatusMenu(false)}
+                                />
+                                <div className="absolute top-full left-0 mt-1 w-32 bg-zinc-900 border border-zinc-800 rounded shadow-xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-1">
+                                    {statuses.map(s => (
+                                        <button
+                                            key={s.id}
+                                            onClick={() => handleUpdateThreadStatus(s.id)}
+                                            className={`w-full text-left px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${s.id === thread.status ? 'bg-white/10 ' + s.color : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'}`}
+                                        >
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
                     {isCollapsed && (
                         <span className="text-[11px] text-zinc-500 truncate max-w-[300px]">
                             {thread.comments[0]?.author?.displayName}: {thread.comments[0]?.content.substring(0, 60)}
@@ -187,23 +221,6 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
                     )}
                 </div>
                 <div className="flex items-center space-x-1">
-                    {isThreadResolved ? (
-                        <button
-                            onClick={() => handleUpdateThreadStatus(1)}
-                            className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200"
-                            title="Reactivate"
-                        >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => handleUpdateThreadStatus(2)}
-                            className="p-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200"
-                            title="Resolve"
-                        >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                        </button>
-                    )}
                 </div>
             </div>
 
