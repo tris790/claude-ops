@@ -1,7 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Search, FileCode, GitPullRequest, ArrowRight, LayoutGrid, Settings } from "lucide-react";
 import { cn } from "../utils/cn";
 import { useNavigate, useLocation } from "react-router-dom";
+import { fuzzyScore } from "../utils/fuzzy";
+import { RecencyService } from "../services/recency";
 
 interface CommandItem {
     id: string;
@@ -11,6 +13,9 @@ interface CommandItem {
     action?: () => void;
     path?: string;
     category?: string;
+    description?: string;
+    project?: string;
+    repo?: string;
 }
 
 export function CommandPalette() {
@@ -24,6 +29,11 @@ export function CommandPalette() {
     const [commands, setCommands] = useState<CommandItem[]>([]);
     const [searchResults, setSearchResults] = useState<CommandItem[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+
+    // Get current context
+    const match = location.pathname.match(/^\/repos\/([^\/]+)\/([^\/]+)/);
+    const currentProject = match ? match[1] : null;
+    const currentRepo = match ? match[2] : null;
 
     useEffect(() => {
         const baseCommands: CommandItem[] = [
@@ -39,32 +49,24 @@ export function CommandPalette() {
                 id: "create-pr",
                 label: "Create Pull Request",
                 icon: <GitPullRequest className="w-4 h-4" />,
-                action: () => console.log("Create PR action")
+                action: () => console.log("Create PR action"),
+                project: currentProject || undefined,
+                repo: currentRepo || undefined
             });
         }
 
         setCommands(baseCommands);
-    }, [location.pathname]);
+    }, [location.pathname, currentProject, currentRepo]);
 
     const [isRegex, setIsRegex] = useState(false);
-
-    // ... (keep existing useEffects, but modify the search effect)
+    const isFileSearch = query.startsWith("/");
 
     const parseQuery = (raw: string) => {
         const filters: Record<string, string[]> = {};
         const textParts: string[] = [];
 
-        const regex = /(\w+):"([^"]+)"|(\w+):([^ ]+)|([^ ]+)/g;
-        let match;
-
-        // Simple parser
-        // If isRegex is true, we might want to disable operator parsing to avoid conflicts?
-        // Or we key off spaces.
-        // Let's assume operators are space delimited unless quoted.
-
-        // Actually, splitting by space is easier but quotes are tricky.
-        // Let's iterate.
-
+        // Match quoted strings or non-space sequences
+        // This regex splits "file:foo bar" correctly
         const parts = raw.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
 
         for (const part of parts) {
@@ -92,12 +94,7 @@ export function CommandPalette() {
 
     // Search effect
     useEffect(() => {
-        // Match /repos/:project/:repo
-        const match = location.pathname.match(/^\/repos\/([^\/]+)\/([^\/]+)/);
-        const project = match ? match[1] : null;
-        const repo = match ? match[2] : null;
-
-        if (!project || !repo || query.length < 3) {
+        if (!currentProject || !currentRepo || query.length < 3) {
             setSearchResults([]);
             setIsSearching(false);
             return;
@@ -108,10 +105,10 @@ export function CommandPalette() {
             try {
                 const { text, filters } = parseQuery(query);
 
-                // If query ends up empty after extraction and we relied on it, handle that.
-                // But generally users type "file:foo bar" -> text="bar" filters={file:["foo"]}
+                // If in file search mode, strip the leading / from the text for the actual search
+                const effectiveText = isFileSearch && text.startsWith("/") ? text.slice(1) : text;
 
-                if (!text && Object.keys(filters).length === 0) {
+                if (!effectiveText && Object.keys(filters).length === 0 && !isFileSearch) {
                     setSearchResults([]);
                     setIsSearching(false);
                     return;
@@ -119,46 +116,136 @@ export function CommandPalette() {
 
                 // Build Query String
                 const params = new URLSearchParams();
-                params.set("project", project);
-                params.set("repo", repo);
-                params.set("query", text || query); // Fallback if text is empty? Search * is complex.
+                params.set("project", currentProject);
+                params.set("repo", currentRepo);
+                params.set("query", effectiveText || (isFileSearch ? query.slice(1) : query));
                 params.set("isRegex", isRegex.toString());
 
                 if (filters["file"]) filters["file"].forEach(f => params.append("file", f));
                 if (filters["ext"]) filters["ext"].forEach(e => params.append("file", `*.${e}`));
                 // "context" to 2 by default
                 params.set("context", "2");
+                if (isFileSearch) {
+                    params.set("type", "path");
+                }
 
                 const res = await fetch(`/api/repos/search?${params.toString()}`);
                 if (res.ok) {
                     const data = await res.json();
                     setSearchResults(data.map((item: any, i: number) => ({
-                        id: `search-${i}`,
+                        id: `search-${i}-${item.file}-${item.line}`,
                         label: item.file,
-                        icon: <FileCode className="w-4 h-4 text-blue-400" />,
+                        icon: <FileCode className="w-4 h-4 text-sapphire-400" />,
                         category: "Code Search",
-                        description: `${item.line}: ${item.content.trim()}`, // TODO: Show context?
-                        // We can store full item data to render differently
+                        description: item.line > 0 ? `${item.line}: ${item.content.trim()}` : item.file,
+                        project: currentProject,
+                        repo: currentRepo,
                         action: () => {
-                            navigate(`/repos/${project}/${repo}/blob/HEAD/${item.file}?line=${item.line}`);
+                            navigate(`/repos/${currentProject}/${currentRepo}/blob/HEAD/${item.file}?line=${item.line}`);
                         }
                     })));
+                } else {
+                    setSearchResults([]);
                 }
             } catch (e) {
                 console.error(e);
+                setSearchResults([]);
             } finally {
                 setIsSearching(false);
             }
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [query, isRegex, location.pathname, navigate]);
+    }, [query, isRegex, currentProject, currentRepo, navigate]);
 
+    // RANKING ALGORITHM
+    const filteredCommands = useMemo(() => {
+        const { text: cleanQuery } = parseQuery(query);
+        let searchInput = cleanQuery || query;
 
-    const filteredCommands = [
-        ...commands.filter(cmd => cmd.label.toLowerCase().includes(query.toLowerCase())),
-        ...searchResults
-    ];
+        if (isFileSearch && searchInput.startsWith("/")) {
+            searchInput = searchInput.slice(1);
+        }
+
+        // Combine static commands and search results
+        const allItems = [...commands, ...searchResults];
+
+        if (!searchInput) {
+            // If no query, show recently accessed commands first?
+            // For now, just return valid context commands and recents
+            return allItems.sort((a, b) => {
+                const scoreA = RecencyService.getScoreBoost(a.id);
+                const scoreB = RecencyService.getScoreBoost(b.id);
+                return scoreB - scoreA;
+            }).slice(0, 50); // limit
+        }
+
+        const scored = allItems.map(item => {
+            let score = 0;
+
+            // 1. Fuzzy Match Baseline
+            // Try to match against label, and maybe description or path
+            // Priority: Label > Path > Description
+            const labelScore = fuzzyScore(item.label, searchInput);
+
+            // If item label is a total mismatch, maybe we match on project/category?
+            // For commands setup, usually label is enough.
+
+            if (labelScore === -Infinity) {
+                // Check if description matches?
+                // const descScore = item.description ? fuzzyScore(item.description, searchInput) : -Infinity;
+                // if (descScore > -Infinity) ...
+                // For now strict on label for commands, maybe search results differ
+
+                // If it's a search result, we trust the backend returned a match, so we shouldn't filter it out by fuzzy
+                // unless the user typed MORE since the search result came in.
+                // If it's a search result, we trust the backend returned a match
+                if (item.category === "Code Search") {
+                    // Check if the filename matches the query
+                    const fileMatchScore = fuzzyScore(item.label, searchInput);
+
+                    if (fileMatchScore > -Infinity) {
+                        // Strong boost for filename match
+                        score = fileMatchScore + 50;
+                    } else {
+                        // Content match only
+                        score = 10;
+                    }
+
+                    // Extra boost if user explicitly asked for file search
+                    if (isFileSearch) {
+                        score += 20;
+                    }
+                } else {
+                    return { item, score: -Infinity };
+                }
+            } else {
+                score = labelScore;
+            }
+
+            // 2. Project Scope Boost
+            if (currentProject && item.project === currentProject) {
+                score += 20;
+            }
+            // Additional boost if repo matches
+            if (currentRepo && item.repo === currentRepo) {
+                score += 10;
+            }
+
+            // 3. Recency/Frequency Boost
+            const recencyBoost = RecencyService.getScoreBoost(item.id);
+            score += recencyBoost;
+
+            return { item, score };
+        });
+
+        return scored
+            .filter(x => x.score > -Infinity)
+            .sort((a, b) => b.score - a.score)
+            .map(x => x.item)
+            .slice(0, 50);
+
+    }, [commands, searchResults, query, currentProject, currentRepo]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -186,6 +273,18 @@ export function CommandPalette() {
     }, [isOpen]);
 
     const handleSelect = (command: CommandItem) => {
+        // Track selection for recency
+        RecencyService.track({
+            id: command.id,
+            label: command.label,
+            type: command.category === "Code Search" ? 'file' : 'command',
+            path: command.path || "",
+            meta: {
+                project: command.project,
+                repo: command.repo
+            }
+        });
+
         setIsOpen(false);
         if (command.action) {
             command.action();
@@ -223,17 +322,46 @@ export function CommandPalette() {
             <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 ring-1 ring-white/10">
                 <div className="flex items-center border-b border-zinc-800 px-4 h-14">
                     <Search className="w-5 h-5 text-zinc-500 mr-3" />
-                    <input
-                        ref={inputRef}
-                        className="flex-1 bg-transparent border-none outline-none text-zinc-100 placeholder-zinc-500 text-lg focus:ring-0"
-                        placeholder="Type a command or search code..."
-                        value={query}
-                        onChange={(e) => {
-                            setQuery(e.target.value);
-                            setSelectedIndex(0);
-                        }}
-                        onKeyDown={handleKeyDown}
-                    />
+                    <div className="relative flex-1">
+                        {isFileSearch && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 bg-sapphire-500/20 text-sapphire-400 border border-sapphire-500/30 px-1.5 py-0.5 rounded text-xs font-mono font-bold flex items-center shadow-sm z-10 select-none pointer-events-none">
+                                /
+                            </div>
+                        )}
+                        <input
+                            ref={inputRef}
+                            className={cn(
+                                "w-full bg-transparent border-none outline-none text-zinc-100 placeholder-zinc-500 text-lg focus:ring-0",
+                                isFileSearch && "pl-8"
+                            )}
+                            placeholder={isFileSearch ? "Search files..." : "Type a command or search code..."}
+                            value={isFileSearch ? query.slice(1) : query}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (isFileSearch) {
+                                    // If we are in file search, we maintain the slash in the state transparently?
+                                    // Actually, if user backspaces the content of input (which is query slice 1), we need to handle that.
+                                    // If user deletes everything in the input, e.target.value is empty.
+                                    // But query was "/". 
+                                    // If text is empty, we still keep "/" in state?
+                                    // Wait, if I change value to `slice(1)`, then `onChange` receives only the new text without slash.
+                                    // So I need to prepend slash when updating state.
+                                    setQuery("/" + val);
+                                } else {
+                                    setQuery(val);
+                                }
+                                setSelectedIndex(0);
+                            }}
+                            onKeyDown={(e) => {
+                                if (isFileSearch && e.key === "Backspace" && query === "/") {
+                                    // Remove the slash if empty and backspace
+                                    setQuery("");
+                                    e.preventDefault();
+                                }
+                                handleKeyDown(e);
+                            }}
+                        />
+                    </div>
                     <div className="flex gap-2 items-center">
                         <button
                             onClick={() => setIsRegex(!isRegex)}
@@ -255,7 +383,12 @@ export function CommandPalette() {
                 </div>
 
                 <div className="max-h-[60vh] overflow-y-auto py-2 p-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                    {filteredCommands.length === 0 ? (
+                    {isSearching && filteredCommands.length === 0 ? (
+                        <div className="py-8 flex flex-col items-center justify-center text-zinc-500 gap-2">
+                            <div className="w-5 h-5 border-2 border-zinc-600 border-t-zinc-400 rounded-full animate-spin" />
+                            <span className="text-sm">Searching...</span>
+                        </div>
+                    ) : filteredCommands.length === 0 ? (
                         <div className="py-8 text-center text-sm text-zinc-500">No results found.</div>
                     ) : (
                         <div className="space-y-1">
@@ -280,9 +413,24 @@ export function CommandPalette() {
                                         {cmd.icon}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="font-medium truncate">{cmd.label}</div>
-                                        {(cmd as any).description && (
-                                            <div className="text-xs text-zinc-500 truncate font-mono opacity-80">{(cmd as any).description}</div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium truncate">
+                                                {/* Highlight matches in label if possible, for now just text */}
+                                                {cmd.label}
+                                            </span>
+                                            {cmd.project && cmd.category !== "Code Search" && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500">
+                                                    {cmd.project}{cmd.repo ? `/${cmd.repo}` : ''}
+                                                </span>
+                                            )}
+                                            {cmd.category === "Code Search" && isFileSearch && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sapphire-900/30 text-sapphire-400 border border-sapphire-500/20">
+                                                    File Match
+                                                </span>
+                                            )}
+                                        </div>
+                                        {cmd.description && (
+                                            <div className="text-xs text-zinc-500 truncate font-mono opacity-80">{cmd.description}</div>
                                         )}
                                     </div>
                                     {cmd.shortcut && (
@@ -317,3 +465,4 @@ export function CommandPalette() {
         </div>
     );
 }
+

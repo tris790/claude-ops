@@ -68,7 +68,7 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
   - [x] **Contextual Results**: Show 2 lines of context around search matches in the results list.
 - [x] **Advanced Filters**: 
   - [x] **Operator Support**: Parse `author:`, `state:`, `project:`, `repo:`, `ext:`, `file:` in the command palette search string.
-  - [ ] **Ranking Algorithm**: 
-    - Boost items in the current project.
-    - Boost recently/frequently accessed items.
-    - Fuzzy match baseline.
+  - [x] **Ranking Algorithm**: 
+    - [x] Boost items in the current project.
+    - [x] Boost recently/frequently accessed items.
+    - [x] Fuzzy match baseline.

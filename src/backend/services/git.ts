@@ -238,10 +238,58 @@ export class GitService {
         return await new Response(proc.stdout).text();
     }
 
-    async search(projectName: string, repoName: string, query: string, options: { isRegex?: boolean, filePatterns?: string[], contextLines?: number } = {}): Promise<any[]> {
+    async search(projectName: string, repoName: string, query: string, options: { isRegex?: boolean, filePatterns?: string[], contextLines?: number, isPathSearch?: boolean } = {}): Promise<any[]> {
         const repoPath = this.getRepoPath(projectName, repoName);
         if (!(await this.isCloned(projectName, repoName))) {
             return [];
+        }
+
+        if (options.isPathSearch) {
+            try {
+                // Use git ls-files to search filenames
+                // git ls-files is robust. We can just list all and filter, or use grep if we want to rely on git
+                // Simple approach: git ls-files and filter in JS.
+                const proc = Bun.spawn(["git", "ls-files"], {
+                    cwd: repoPath,
+                    stdout: "pipe",
+                    stderr: "pipe"
+                });
+
+                const exitCode = await proc.exited;
+                if (exitCode !== 0) return [];
+
+                const output = await new Response(proc.stdout).text();
+                const files = output.split("\n").filter(Boolean);
+
+                const results: any[] = [];
+                const regex = options.isRegex ? new RegExp(query, "i") : null;
+                const lowerQuery = query.toLowerCase();
+
+                for (const file of files) {
+                    let match = false;
+                    if (regex) {
+                        match = regex.test(file);
+                    } else {
+                        // Smart case? Assuming case insensitive for filenames usually
+                        match = file.toLowerCase().includes(lowerQuery);
+                    }
+
+                    if (match) {
+                        results.push({
+                            file,
+                            line: 0,
+                            content: file, // Show filename as content
+                            type: 'file'
+                        });
+                    }
+                    if (results.length > 50) break; // Limit results
+                }
+                return results;
+
+            } catch (e) {
+                console.error("Path search error:", e);
+                return [];
+            }
         }
 
         try {
