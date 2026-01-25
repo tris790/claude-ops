@@ -332,8 +332,15 @@ export function PRDetail() {
                     </div>
 
                     <div className="flex items-center justify-between">
+                        <div className="flex gap-4">
+                            <TabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</TabButton>
+                            <TabButton active={activeTab === "files"} onClick={() => setActiveTab("files")}>Files</TabButton>
+                            <TabButton active={activeTab === "commits"} onClick={() => setActiveTab("commits")}>Commits</TabButton>
+                        </div>
+
                         <div className="flex items-center gap-2 text-[11px] text-zinc-500">
                             <div className="flex items-center gap-1 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-800">
+                                <span className="text-zinc-400 font-medium mr-1">{pr.repository.name}</span>
                                 <span className="font-mono text-zinc-300">{pr.sourceRefName.split('/').pop()}</span>
                                 <ArrowLeft className="h-3 w-3 rotate-180 text-zinc-600" />
                                 <span className="font-mono text-zinc-300">{pr.targetRefName.split('/').pop()}</span>
@@ -342,12 +349,6 @@ export function PRDetail() {
                             <span>Created by <span className="text-zinc-300 font-medium">{pr.createdBy.displayName}</span></span>
                             <span className="text-zinc-700">•</span>
                             <span>{new Date(pr.creationDate).toLocaleDateString()}</span>
-                        </div>
-
-                        <div className="flex gap-4">
-                            <TabButton active={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</TabButton>
-                            <TabButton active={activeTab === "files"} onClick={() => setActiveTab("files")}>Files</TabButton>
-                            <TabButton active={activeTab === "commits"} onClick={() => setActiveTab("commits")}>Commits</TabButton>
                         </div>
                     </div>
                 </div>
