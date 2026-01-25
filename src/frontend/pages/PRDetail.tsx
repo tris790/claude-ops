@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread, getPullRequestIterations } from "../api/prs";
+import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread, getPullRequestIterations, updatePullRequestThread } from "../api/prs";
 import { getCurrentUser } from "../api/auth";
 import {
     ArrowLeft,
@@ -27,6 +27,7 @@ import { FileTree } from "../components/pr/FileTree";
 import { DiffViewer } from "../components/pr/DiffViewer";
 import { CompleteDialog } from "../components/pr/CompleteDialog";
 import { IterationSelector } from "../components/pr/IterationSelector";
+import { ThreadStatusPicker } from "../components/pr/ThreadStatusPicker";
 
 export function PRDetail() {
     const { id } = useParams();
@@ -169,6 +170,8 @@ export function PRDetail() {
         if (!t.comments.some((c: any) => c.content)) return false;
         if (commentStatusFilter === "active") return t.status === 1 || t.status === 0;
         if (commentStatusFilter === "resolved") return t.status === 2 || t.status === 4;
+        if (commentStatusFilter === "closed") return t.status === 4;
+        if (commentStatusFilter === "pending") return t.status === 6;
         return true;
     });
 
@@ -234,6 +237,19 @@ export function PRDetail() {
             setError(err.message);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleUpdateThreadStatus(threadId: number, status: number) {
+        if (!pr) return;
+        try {
+            await updatePullRequestThread(id!, pr.repository.id, threadId, status);
+            // Refresh threads
+            const threadData = await getPullRequestThreads(id!, pr.repository.id);
+            setThreads(threadData);
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to update thread status: " + err.message);
         }
     }
 
@@ -443,7 +459,7 @@ export function PRDetail() {
                                             <h3>Activity</h3>
                                         </div>
                                         <div className="flex items-center gap-1 p-0.5 bg-zinc-900 rounded-md border border-zinc-800">
-                                            {["all", "active", "resolved"].map((status) => (
+                                            {["all", "active", "resolved", "closed", "pending"].map((status) => (
                                                 <button
                                                     key={status}
                                                     onClick={() => updateQueryParams({ commentStatus: status === "all" ? null : status })}
@@ -489,7 +505,22 @@ export function PRDetail() {
                                                                 L{thread.threadContext.rightFileStart?.line || thread.threadContext.leftFileStart?.line}
                                                             </span>
                                                         </span>
+                                                        <ThreadStatusPicker
+                                                            status={thread.status}
+                                                            onStatusChange={(status) => handleUpdateThreadStatus(thread.id, status)}
+                                                            compact
+                                                        />
                                                     </button>
+                                                )}
+                                                {!thread.threadContext && (
+                                                    <div className="px-4 py-2 bg-zinc-800/20 border-b border-zinc-800 flex items-center justify-between">
+                                                        <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold">General Thread</span>
+                                                        <ThreadStatusPicker
+                                                            status={thread.status}
+                                                            onStatusChange={(status) => handleUpdateThreadStatus(thread.id, status)}
+                                                            compact
+                                                        />
+                                                    </div>
                                                 )}
                                                 <div className="space-y-4 p-4">
                                                     {thread.comments.map((comment: any) => (
