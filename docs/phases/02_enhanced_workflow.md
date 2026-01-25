@@ -47,7 +47,7 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [x] **Iteration Selector**: Component to switch between specific code pushes.
     - [x] **Inter-iteration Diff**: Compare changes between arbitrary iterations (e.g., Iteration 2 vs Iteration 5).
   - [ ] **Review State**:
-    - [ ] **File Completion**: Implement "Mark as reviewed" checkboxes in the file tree.
+    - [x] **File Completion**: Implement "Mark as reviewed" checkboxes in the file tree.
     - [ ] **Cumulative Diff**: Show only "Changes since my last review" based on tracked iteration history.
     - [ ] **Show comments in context**: Show comments in context of the code. Both in the diff view and overview list
     - [ ] **CRUD operations on comments**: Implement CRUD operations on comments.

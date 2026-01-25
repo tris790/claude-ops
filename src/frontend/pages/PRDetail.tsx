@@ -45,11 +45,23 @@ export function PRDetail() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [reviewMenuOpen, setReviewMenuOpen] = useState(false);
     const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+    const [reviewedFiles, setReviewedFiles] = useState<Set<string>>(new Set());
 
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (id) loadData();
+        if (id) {
+            loadData();
+            // Load reviewed files from localStorage
+            const saved = localStorage.getItem(`pr-${id}-reviewed`);
+            if (saved) {
+                try {
+                    setReviewedFiles(new Set(JSON.parse(saved)));
+                } catch (e) {
+                    console.error("Failed to parse reviewed files", e);
+                }
+            }
+        }
     }, [id]);
 
     async function loadData() {
@@ -162,6 +174,19 @@ export function PRDetail() {
         } finally {
             setLoading(false);
         }
+    }
+
+    function toggleFileReviewed(path: string) {
+        setReviewedFiles(prev => {
+            const next = new Set(prev);
+            if (next.has(path)) {
+                next.delete(path);
+            } else {
+                next.add(path);
+            }
+            localStorage.setItem(`pr-${id}-reviewed`, JSON.stringify(Array.from(next)));
+            return next;
+        });
     }
 
     // Determine commit IDs for DiffViewer
@@ -460,6 +485,8 @@ export function PRDetail() {
                                     changes={changes?.changes || []}
                                     selectedPath={selectedFilePath}
                                     onSelect={setSelectedFilePath}
+                                    reviewedFiles={reviewedFiles}
+                                    onToggleReviewed={toggleFileReviewed}
                                 />
                             </div>
                             <div className="flex-1 min-w-0 bg-zinc-950">
@@ -473,6 +500,8 @@ export function PRDetail() {
                                         repoName={pr.repository.name}
                                         isCloned={pr.repository.isCloned}
                                         pullRequestId={pr.pullRequestId}
+                                        isReviewed={selectedFilePath ? reviewedFiles.has(selectedFilePath) : false}
+                                        onToggleReviewed={() => selectedFilePath && toggleFileReviewed(selectedFilePath)}
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center h-full text-zinc-500">

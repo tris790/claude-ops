@@ -15,7 +15,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getEditorTheme } from "../../styles/code-themes";
 import { getFileContent } from "../../api/repos";
-import { Loader2, MessageSquarePlus } from "lucide-react";
+import { Loader2, MessageSquarePlus, CheckSquare, Square } from "lucide-react";
 import { LSPClient } from "../../utils/lsp-client";
 import { getHighlighter } from "../../utils/shiki";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +30,8 @@ interface DiffViewerProps {
     repoName?: string;
     isCloned?: boolean;
     pullRequestId?: string;
+    isReviewed: boolean;
+    onToggleReviewed: () => void;
 }
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({
@@ -40,7 +42,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     projectName,
     repoName,
     isCloned,
-    pullRequestId
+    pullRequestId,
+    isReviewed,
+    onToggleReviewed
 }) => {
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement>(null);
@@ -426,6 +430,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
+                    <button
+                        onClick={onToggleReviewed}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors text-[10px] font-bold uppercase tracking-wider ${isReviewed ? 'bg-green-500/20 text-green-500 border border-green-500/30' : 'bg-zinc-800 text-zinc-500 border border-zinc-700 hover:text-zinc-300'}`}
+                    >
+                        {isReviewed ? <CheckSquare className="h-3 w-3" /> : <Square className="h-3 w-3" />}
+                        {isReviewed ? 'Reviewed' : 'Mark as reviewed'}
+                    </button>
                     <div className="flex items-center space-x-4 text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mr-4">
                         <span>Original</span>
                         <span className="text-zinc-700">|</span>

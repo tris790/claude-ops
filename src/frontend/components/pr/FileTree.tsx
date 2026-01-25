@@ -1,5 +1,4 @@
-import React from "react";
-import { FileCode, FilePlus, FileEdit, FileMinus } from "lucide-react";
+import { FileCode, FilePlus, FileEdit, FileMinus, CheckSquare, Square } from "lucide-react";
 
 interface FileChange {
     item: {
@@ -12,9 +11,17 @@ interface FileTreeProps {
     changes: FileChange[];
     selectedPath: string | null;
     onSelect: (path: string) => void;
+    reviewedFiles: Set<string>;
+    onToggleReviewed: (path: string) => void;
 }
 
-export const FileTree: React.FC<FileTreeProps> = ({ changes, selectedPath, onSelect }) => {
+export const FileTree: React.FC<FileTreeProps> = ({
+    changes,
+    selectedPath,
+    onSelect,
+    reviewedFiles,
+    onToggleReviewed
+}) => {
     return (
         <div className="flex flex-col h-full bg-zinc-900/50 border-r border-zinc-800">
             <div className="p-4 border-b border-zinc-800">
@@ -23,19 +30,34 @@ export const FileTree: React.FC<FileTreeProps> = ({ changes, selectedPath, onSel
             <div className="flex-1 overflow-auto py-2">
                 {changes.map((change) => {
                     const isSelected = selectedPath === change.item.path;
+                    const isReviewed = reviewedFiles.has(change.item.path);
                     const fileName = change.item.path.split('/').pop();
                     const dirPath = change.item.path.split('/').slice(0, -1).join('/');
 
                     return (
                         <div
                             key={change.item.path}
-                            onClick={() => onSelect(change.item.path)}
-                            className={`px-4 py-2 flex items-center gap-3 cursor-pointer transition-colors ${isSelected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}
+                            className={`px-4 py-2 flex items-center gap-3 cursor-pointer group transition-colors ${isSelected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'}`}
                         >
-                            <ChangeIcon type={change.changeType} />
-                            <div className="min-w-0">
-                                <div className="text-sm truncate font-medium">{fileName}</div>
-                                {dirPath && <div className="text-[10px] text-zinc-600 truncate">{dirPath}</div>}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleReviewed(change.item.path);
+                                }}
+                                className={`shrink-0 transition-colors ${isReviewed ? 'text-green-500' : 'text-zinc-600 group-hover:text-zinc-400'}`}
+                            >
+                                {isReviewed ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                            </button>
+
+                            <div
+                                className="flex items-center gap-3 min-w-0 flex-1"
+                                onClick={() => onSelect(change.item.path)}
+                            >
+                                <ChangeIcon type={change.changeType} />
+                                <div className="min-w-0">
+                                    <div className={`text-sm truncate font-medium ${isReviewed ? 'opacity-50' : ''}`}>{fileName}</div>
+                                    {dirPath && <div className="text-[10px] text-zinc-600 truncate">{dirPath}</div>}
+                                </div>
                             </div>
                         </div>
                     );
