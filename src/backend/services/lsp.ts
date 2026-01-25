@@ -1,4 +1,7 @@
 import { join, resolve } from "path";
+import { readdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { pathToFileURL } from "url";
 import type { Subprocess, ServerWebSocket, FileSink } from "bun";
 
 export interface LSPInstance {
@@ -13,6 +16,32 @@ export interface LSPInstance {
 
 export class LSPService {
     private instances: Map<string, LSPInstance> = new Map();
+
+    private async findExtensionBin(publisherAndName: string, binPath: string): Promise<string | null> {
+        const home = homedir();
+        if (!home) return null;
+
+        const extensionsDir = join(home, ".vscode/extensions");
+        try {
+            if (!await Bun.file(extensionsDir).size) { // Basic check if dir exists/is readable
+                // Actually Bun.file().exists() works for files, for dirs we can try readdir
+            }
+
+            const entries = await readdir(extensionsDir);
+            // Find directory starting with publisherAndName
+            // e.g. ms-dotnettools.csharp-1.25.0
+            const match = entries.find(e => e.startsWith(publisherAndName));
+            if (match) {
+                const fullPath = join(extensionsDir, match, binPath);
+                if (await Bun.file(fullPath).exists()) {
+                    return fullPath;
+                }
+            }
+        } catch (e) {
+            // ignore
+        }
+        return null;
+    }
 
     private getInstanceKey(rootPath: string, language: string) {
         return `${rootPath}::${language}`;
@@ -54,7 +83,7 @@ export class LSPService {
             this.rewriteURIs(payload, (uri) => {
                 if (uri.startsWith('file:///')) {
                     const relativePath = uri.slice(8);
-                    return `file://${join(rootPath, relativePath)}`;
+                    return pathToFileURL(join(rootPath, relativePath)).toString();
                 }
                 return uri;
             });
@@ -117,10 +146,18 @@ export class LSPService {
             // Tier 0: Local node_modules (Best for dev/self-contained)
             // Process CWD is expected to be the app root
             const projectRoot = process.cwd();
-            const localBin = resolve(projectRoot, "node_modules/.bin/typescript-language-server");
-            if (await Bun.file(localBin).exists()) {
-                console.log(`[LSP] Found local typescript-language-server at ${localBin}`);
-                return ["node", localBin, "--stdio"];
+            // Try to find the actual JS entry point which is safer for 'node' command across platforms
+            const potentialPaths = [
+                resolve(projectRoot, "node_modules/typescript-language-server/lib/cli.js"),
+                resolve(projectRoot, "node_modules/typescript-language-server/lib/cli.mjs"),
+                resolve(projectRoot, "node_modules/.bin/typescript-language-server")
+            ];
+
+            for (const p of potentialPaths) {
+                if (await Bun.file(p).exists()) {
+                    console.log(`[LSP] Found local typescript-language-server at ${p}`);
+                    return ["bun", p, "--stdio"];
+                }
             }
 
             const bin = Bun.which("typescript-language-server");
@@ -131,9 +168,14 @@ export class LSPService {
             // However, for the purpose of this task, we will attempt to launch it.
             // In a real scenario, we'd need a protocol adapter (like typescript-language-server).
             const vscodePaths = [
+                // Linux
                 "/opt/visual-studio-code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
                 "/usr/share/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                "/usr/lib/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js"
+                "/usr/lib/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
+                // Windows (System)
+                "C:/Program Files/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
+                // Windows (User)
+                join(homedir(), "AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib/tsserver.js")
             ];
 
             for (const p of vscodePaths) {
@@ -151,10 +193,42 @@ export class LSPService {
 
             // Check for VS Code extension
             // ~/.vscode/extensions/golang.go-*/bin/gopls
-            // This requires listing directory to find version
+            const extBin = await this.findExtensionBin("golang.go", "bin/gopls");
+            if (extBin) return [extBin];
+
         } else if (language === 'python') {
             const bin = Bun.which("pylsp");
             if (bin) return [bin];
+        } else if (language === 'c' || language === 'cpp') {
+            const bin = Bun.which("clangd");
+            const args = [
+                "--background-index",
+                "--clang-tidy",
+                "--completion-style=detailed",
+                "--header-insertion=iwyu",
+                "-j=4"
+            ];
+            if (bin) return [bin, ...args];
+            // Linux common paths
+            if (await Bun.file("/usr/bin/clangd").exists()) return ["/usr/bin/clangd", ...args];
+            // Windows common paths
+            if (await Bun.file("C:/Program Files/LLVM/bin/clangd.exe").exists()) return ["C:/Program Files/LLVM/bin/clangd.exe", ...args];
+        } else if (language === 'csharp') {
+            // Try csharp-ls (simple LSP for C#)
+            const bin = Bun.which("csharp-ls");
+            if (bin) return [bin];
+
+            // Try OmniSharp (system)
+            const omnisharp = Bun.which("OmniSharp");
+            if (omnisharp) return [omnisharp, "-lsp"];
+
+            // Try VS Code extension for OmniSharp (path varies by version/platform, this is a best guess for modern versions)
+            // Modern C# Dev Kit uses a different server, but older C# extension used .omnisharp
+            // We'll try to find a standalone executable if possible, otherwise we might fail if we need 'dotnet'
+
+            // Note: Common path in older extensions: .omnisharp/<version>/OmniSharp
+            // This is hard to glob without more logic. 
+            // We will rely on system tools for now or 'csharp-ls' which is easier to install.
         }
 
         throw new Error(`Language server for ${language} not found. Please install proper LSP support.`);
@@ -357,9 +431,11 @@ export class LSPService {
                     }
 
                     this.rewriteURIs(payload, (uri) => {
-                        if (uri.startsWith(`file://${instance.rootPath}`)) {
-                            let rel = uri.slice(`file://${instance.rootPath}`.length);
-                            if (rel.startsWith('/')) rel = rel.slice(1);
+                        const rootUrl = pathToFileURL(instance.rootPath).toString();
+                        if (uri.startsWith(rootUrl)) {
+                            let rel = uri.slice(rootUrl.length);
+                            // Normalize to client-style absolute path /foo/bar
+                            if (rel.startsWith('/') || rel.startsWith('\\')) rel = rel.slice(1);
                             return `file:///${rel}`;
                         }
                         return uri;

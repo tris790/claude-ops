@@ -19,6 +19,8 @@ import { getFileContent, type GitItem } from "../../api/repos";
 import { LSPClient } from "../../utils/lsp-client";
 import { useNavigate } from "react-router-dom";
 import { getHighlighter } from "../../utils/shiki";
+import { cpp } from "@codemirror/lang-cpp";
+import { go } from "@codemirror/lang-go";
 
 interface FileViewerProps {
     repoId: string;
@@ -81,6 +83,9 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') language = 'typescript';
         else if (ext === 'go') language = 'go';
         else if (ext === 'py') language = 'python';
+        else if (ext === 'c' || ext === 'h') language = 'c';
+        else if (ext === 'cpp' || ext === 'hpp' || ext === 'cc') language = 'cpp';
+        else if (ext === 'cs') language = 'csharp';
 
         if (!language) {
             console.log("[FileViewer] No mapping for extension", ext);
@@ -405,6 +410,17 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                     break;
                 case "md":
                     extensions.push(mdLang());
+                    break;
+                case "c":
+                case "h":
+                case "cpp":
+                case "hpp":
+                case "cc":
+                case "cs": // Use C++ highlighting for C# as fallback
+                    extensions.push(cpp());
+                    break;
+                case "go":
+                    extensions.push(go());
                     break;
             }
             return extensions;

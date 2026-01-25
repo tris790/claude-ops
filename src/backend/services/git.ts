@@ -86,7 +86,7 @@ export class GitService {
 
         const targetPath = this.getRepoPath(projectName, repoName);
 
-        const proc = Bun.spawn(["git", "clone", cloneUrl, targetPath], {
+        const proc = Bun.spawn(["git", "clone", "--depth", "1", cloneUrl, targetPath], {
             stdout: "pipe",
             stderr: "pipe",
         });
