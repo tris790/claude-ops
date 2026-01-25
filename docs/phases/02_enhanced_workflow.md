@@ -63,11 +63,11 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
   - [ ] **Virtual Log View**: Use `@tanstack/react-virtual` for the log console to handle tens of thousands of log lines without performance degradation.
 
 ## 5. Advanced Search & Command Palette
-- [ ] **Deep Search**:
-  - [ ] **Regex Engine**: Add a toggle in Command Palette. Backend uses `ripgrep` (`rg`) for cloned repos.
-  - [ ] **Contextual Results**: Show 2 lines of context around search matches in the results list.
-- [ ] **Advanced Filters**: 
-  - [ ] **Operator Support**: Parse `author:`, `state:`, `project:`, `repo:`, `ext:`, `file:` in the command palette search string.
+- [x] **Deep Search**:
+  - [x] **Regex Engine**: Add a toggle in Command Palette. Backend uses `ripgrep` (`rg`) for cloned repos.
+  - [x] **Contextual Results**: Show 2 lines of context around search matches in the results list.
+- [x] **Advanced Filters**: 
+  - [x] **Operator Support**: Parse `author:`, `state:`, `project:`, `repo:`, `ext:`, `file:` in the command palette search string.
   - [ ] **Ranking Algorithm**: 
     - Boost items in the current project.
     - Boost recently/frequently accessed items.

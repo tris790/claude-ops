@@ -56,7 +56,17 @@ export const repoRoutes = {
 
                 if (targetProject && targetRepo) {
                     if (await gitService.isCloned(targetProject, targetRepo)) {
-                        const results = await gitService.search(targetProject, targetRepo, query);
+                        const isRegex = url.searchParams.get("isRegex") === "true";
+                        const contextLines = parseInt(url.searchParams.get("context") || "2", 10);
+                        const filePatterns = url.searchParams.getAll("file"); // Support multiple file= params, or split by comma?
+                        // Let's assume the frontend might send multiple `file` params or we can parse a single one if comma separated.
+                        // Standard URLSearchParams handles multiple keys well.
+
+                        const results = await gitService.search(targetProject, targetRepo, query, {
+                            isRegex,
+                            contextLines,
+                            filePatterns: filePatterns.length ? filePatterns : undefined
+                        });
                         return Response.json(results);
                     }
                 }

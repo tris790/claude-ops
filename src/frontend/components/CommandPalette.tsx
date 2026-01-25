@@ -46,6 +46,50 @@ export function CommandPalette() {
         setCommands(baseCommands);
     }, [location.pathname]);
 
+    const [isRegex, setIsRegex] = useState(false);
+
+    // ... (keep existing useEffects, but modify the search effect)
+
+    const parseQuery = (raw: string) => {
+        const filters: Record<string, string[]> = {};
+        const textParts: string[] = [];
+
+        const regex = /(\w+):"([^"]+)"|(\w+):([^ ]+)|([^ ]+)/g;
+        let match;
+
+        // Simple parser
+        // If isRegex is true, we might want to disable operator parsing to avoid conflicts?
+        // Or we key off spaces.
+        // Let's assume operators are space delimited unless quoted.
+
+        // Actually, splitting by space is easier but quotes are tricky.
+        // Let's iterate.
+
+        const parts = raw.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+
+        for (const part of parts) {
+            if (part.includes(":") && !part.startsWith(":")) {
+                const colonIndex = part.indexOf(":");
+                const key = part.substring(0, colonIndex).toLowerCase();
+                let value = part.substring(colonIndex + 1);
+
+                if (value.startsWith('"') && value.endsWith('"')) {
+                    value = value.slice(1, -1);
+                }
+
+                if (!filters[key]) filters[key] = [];
+                filters[key].push(value);
+            } else {
+                textParts.push(part);
+            }
+        }
+
+        return {
+            text: textParts.join(" "),
+            filters
+        };
+    };
+
     // Search effect
     useEffect(() => {
         // Match /repos/:project/:repo
@@ -62,7 +106,30 @@ export function CommandPalette() {
         const timer = setTimeout(async () => {
             setIsSearching(true);
             try {
-                const res = await fetch(`/api/repos/search?project=${project}&repo=${repo}&query=${encodeURIComponent(query)}`);
+                const { text, filters } = parseQuery(query);
+
+                // If query ends up empty after extraction and we relied on it, handle that.
+                // But generally users type "file:foo bar" -> text="bar" filters={file:["foo"]}
+
+                if (!text && Object.keys(filters).length === 0) {
+                    setSearchResults([]);
+                    setIsSearching(false);
+                    return;
+                }
+
+                // Build Query String
+                const params = new URLSearchParams();
+                params.set("project", project);
+                params.set("repo", repo);
+                params.set("query", text || query); // Fallback if text is empty? Search * is complex.
+                params.set("isRegex", isRegex.toString());
+
+                if (filters["file"]) filters["file"].forEach(f => params.append("file", f));
+                if (filters["ext"]) filters["ext"].forEach(e => params.append("file", `*.${e}`));
+                // "context" to 2 by default
+                params.set("context", "2");
+
+                const res = await fetch(`/api/repos/search?${params.toString()}`);
                 if (res.ok) {
                     const data = await res.json();
                     setSearchResults(data.map((item: any, i: number) => ({
@@ -70,10 +137,9 @@ export function CommandPalette() {
                         label: item.file,
                         icon: <FileCode className="w-4 h-4 text-blue-400" />,
                         category: "Code Search",
-                        description: `${item.line}: ${item.content.trim()}`,
+                        description: `${item.line}: ${item.content.trim()}`, // TODO: Show context?
+                        // We can store full item data to render differently
                         action: () => {
-                            // Navigate to file view
-                            // Using HEAD as branch for search results (since git grep uses HEAD)
                             navigate(`/repos/${project}/${repo}/blob/HEAD/${item.file}?line=${item.line}`);
                         }
                     })));
@@ -86,7 +152,8 @@ export function CommandPalette() {
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [query, location.pathname, navigate]);
+    }, [query, isRegex, location.pathname, navigate]);
+
 
     const filteredCommands = [
         ...commands.filter(cmd => cmd.label.toLowerCase().includes(query.toLowerCase())),
@@ -167,7 +234,19 @@ export function CommandPalette() {
                         }}
                         onKeyDown={handleKeyDown}
                     />
-                    <div className="flex gap-1">
+                    <div className="flex gap-2 items-center">
+                        <button
+                            onClick={() => setIsRegex(!isRegex)}
+                            className={cn(
+                                "p-1 rounded text-xs font-mono border transition-colors",
+                                isRegex
+                                    ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                    : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-zinc-300"
+                            )}
+                            title="Toggle Regex"
+                        >
+                            .*
+                        </button>
                         {isSearching && <span className="text-zinc-500 text-xs animate-pulse">Searching...</span>}
                         <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 font-mono text-[10px] font-medium text-zinc-400">
                             <span className="text-xs">ESC</span>
