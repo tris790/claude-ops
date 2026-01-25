@@ -46,6 +46,10 @@ export function PRDetail() {
     const [reviewMenuOpen, setReviewMenuOpen] = useState(false);
     const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
     const [reviewedFiles, setReviewedFiles] = useState<Set<string>>(new Set());
+    const [treeWidth, setTreeWidth] = useState(() => {
+        const saved = localStorage.getItem("pr-tree-width");
+        return saved ? parseInt(saved, 10) : 256;
+    });
 
     const [error, setError] = useState<string | null>(null);
 
@@ -472,8 +476,11 @@ export function PRDetail() {
 
                 {activeTab === "files" && (
                     <div className="flex flex-col h-full bg-zinc-950">
-                        <div className="flex h-[calc(100vh-120px)] border-zinc-800 overflow-hidden">
-                            <div className="w-64 flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30 flex flex-col">
+                        <div className="flex h-[calc(100vh-120px)] border-zinc-800 overflow-hidden relative">
+                            <div
+                                className="flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30 flex flex-col"
+                                style={{ width: treeWidth }}
+                            >
                                 <div className="p-2 border-b border-zinc-800">
                                     <IterationSelector
                                         iterations={iterations}
@@ -482,14 +489,42 @@ export function PRDetail() {
                                         onSelect={handleIterationSelect}
                                     />
                                 </div>
-                                <FileTree
-                                    changes={changes?.changes || []}
-                                    selectedPath={selectedFilePath}
-                                    onSelect={setSelectedFilePath}
-                                    reviewedFiles={reviewedFiles}
-                                    onToggleReviewed={toggleFileReviewed}
-                                />
+                                <div className="flex-1 overflow-hidden">
+                                    <FileTree
+                                        changes={changes?.changes || []}
+                                        selectedPath={selectedFilePath}
+                                        onSelect={setSelectedFilePath}
+                                        reviewedFiles={reviewedFiles}
+                                        onToggleReviewed={toggleFileReviewed}
+                                    />
+                                </div>
                             </div>
+
+                            {/* Resize Handle */}
+                            <div
+                                className="w-1 cursor-col-resize hover:bg-sapphire-500/50 transition-colors active:bg-sapphire-500 z-10 shrink-0"
+                                onMouseDown={(e) => {
+                                    const startX = e.pageX;
+                                    const startWidth = treeWidth;
+
+                                    function onMouseMove(e: MouseEvent) {
+                                        const delta = e.pageX - startX;
+                                        const newWidth = Math.max(150, Math.min(600, startWidth + delta));
+                                        setTreeWidth(newWidth);
+                                        localStorage.setItem("pr-tree-width", newWidth.toString());
+                                    }
+
+                                    function onMouseUp() {
+                                        window.removeEventListener("mousemove", onMouseMove);
+                                        window.removeEventListener("mouseup", onMouseUp);
+                                        document.body.style.cursor = "default";
+                                    }
+
+                                    window.addEventListener("mousemove", onMouseMove);
+                                    window.addEventListener("mouseup", onMouseUp);
+                                    document.body.style.cursor = "col-resize";
+                                }}
+                            />
                             <div className="flex-1 min-w-0 bg-zinc-950">
                                 {selectedFilePath ? (
                                     <DiffViewer

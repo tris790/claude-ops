@@ -54,8 +54,9 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [ ] **Diff view improvements**: 
         - [ ] **Resizable diff panels**
         - [x] **Diff view modes**: Unified, Side-by-Side, Inline
-        - [ ] **File tree/list**
-        - [ ] **Resizable/collapsible file tree**
+        - [x] **File tree/list**
+        - [x] **Resizable/collapsible file tree**
+      
     - [ ] **Add browser navigation history for review**: add the review tab in the url and more details as needed such as file or commit
 
 
