@@ -89,15 +89,13 @@ export function PRDetail() {
         );
 
         if (!reviewer) {
-            // If not in reviewers list, we can't vote via the API usually unless we add ourselves?
-            // Azure DevOps API might handle it if we just pass our ID if we are not in the list (it might add us)
-            // But for safety, let's warn.
-            alert("You are not listed as a reviewer on this PR.");
-            return;
+            console.log("User not in reviewers list, auto-joining/voting as current user.");
         }
 
+        const reviewerId = reviewer ? reviewer.id : currentUser.id;
+
         try {
-            await votePullRequest(id, pr.repository.id, reviewer.id, vote);
+            await votePullRequest(id, pr.repository.id, reviewerId, vote);
 
             // Optimistic update or reload
             const updatedPr = await getPullRequest(id, pr.repository.id);
@@ -105,7 +103,7 @@ export function PRDetail() {
             setReviewMenuOpen(false);
         } catch (err: any) {
             console.error(err);
-            alert("Failed to submitting vote: " + err.message);
+            alert("Failed to submit vote: " + err.message);
         }
     }
 
