@@ -4,6 +4,7 @@ import { cn } from "../utils/cn";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fuzzyScore } from "../utils/fuzzy";
 import { RecencyService } from "../services/recency";
+import { useRepositoryCache } from "../hooks/useRepositoryCache";
 
 interface CommandItem {
     id: string;
@@ -29,6 +30,9 @@ export function CommandPalette() {
     const [commands, setCommands] = useState<CommandItem[]>([]);
     const [searchResults, setSearchResults] = useState<CommandItem[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+
+    // Repos Cache
+    const { repos } = useRepositoryCache();
 
     // Get current context
     const match = location.pathname.match(/^\/repos\/([^\/]+)\/([^\/]+)/);
@@ -64,9 +68,6 @@ export function CommandPalette() {
     const parseQuery = (raw: string) => {
         const filters: Record<string, string[]> = {};
         const textParts: string[] = [];
-
-        // Match quoted strings or non-space sequences
-        // This regex splits "file:foo bar" correctly
         const parts = raw.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
 
         for (const part of parts) {
@@ -104,8 +105,6 @@ export function CommandPalette() {
             setIsSearching(true);
             try {
                 const { text, filters } = parseQuery(query);
-
-                // If in file search mode, strip the leading / from the text for the actual search
                 const effectiveText = isFileSearch && text.startsWith("/") ? text.slice(1) : text;
 
                 if (!effectiveText && Object.keys(filters).length === 0 && !isFileSearch) {
@@ -114,7 +113,6 @@ export function CommandPalette() {
                     return;
                 }
 
-                // Build Query String
                 const params = new URLSearchParams();
                 params.set("project", currentProject);
                 params.set("repo", currentRepo);
@@ -123,7 +121,6 @@ export function CommandPalette() {
 
                 if (filters["file"]) filters["file"].forEach(f => params.append("file", f));
                 if (filters["ext"]) filters["ext"].forEach(e => params.append("file", `*.${e}`));
-                // "context" to 2 by default
                 params.set("context", "2");
                 if (isFileSearch) {
                     params.set("type", "path");
@@ -167,52 +164,43 @@ export function CommandPalette() {
             searchInput = searchInput.slice(1);
         }
 
-        // Combine static commands and search results
-        const allItems = [...commands, ...searchResults];
+        // Convert repos to commands
+        const repoCommands: CommandItem[] = repos.map(r => ({
+            id: `repo:${r.id}`,
+            label: r.name,
+            icon: <LayoutGrid className="w-4 h-4 text-zinc-400" />,
+            category: "Repositories",
+            project: r.project.name,
+            repo: r.name,
+            description: r.project.name,
+            path: `/repos/${r.project.name}/${r.name}`
+        }));
+
+        const allItems = [...commands, ...repoCommands, ...searchResults];
 
         if (!searchInput) {
-            // If no query, show recently accessed commands first?
-            // For now, just return valid context commands and recents
             return allItems.sort((a, b) => {
                 const scoreA = RecencyService.getScoreBoost(a.id);
                 const scoreB = RecencyService.getScoreBoost(b.id);
                 return scoreB - scoreA;
-            }).slice(0, 50); // limit
+            }).slice(0, 50);
         }
 
         const scored = allItems.map(item => {
             let score = 0;
 
-            // 1. Fuzzy Match Baseline
-            // Try to match against label, and maybe description or path
-            // Priority: Label > Path > Description
             const labelScore = fuzzyScore(item.label, searchInput);
 
-            // If item label is a total mismatch, maybe we match on project/category?
-            // For commands setup, usually label is enough.
-
             if (labelScore === -Infinity) {
-                // Check if description matches?
-                // const descScore = item.description ? fuzzyScore(item.description, searchInput) : -Infinity;
-                // if (descScore > -Infinity) ...
-                // For now strict on label for commands, maybe search results differ
-
-                // If it's a search result, we trust the backend returned a match, so we shouldn't filter it out by fuzzy
-                // unless the user typed MORE since the search result came in.
-                // If it's a search result, we trust the backend returned a match
                 if (item.category === "Code Search") {
-                    // Check if the filename matches the query
                     const fileMatchScore = fuzzyScore(item.label, searchInput);
 
                     if (fileMatchScore > -Infinity) {
-                        // Strong boost for filename match
                         score = fileMatchScore + 50;
                     } else {
-                        // Content match only
                         score = 10;
                     }
 
-                    // Extra boost if user explicitly asked for file search
                     if (isFileSearch) {
                         score += 20;
                     }
@@ -223,18 +211,20 @@ export function CommandPalette() {
                 score = labelScore;
             }
 
-            // 2. Project Scope Boost
             if (currentProject && item.project === currentProject) {
                 score += 20;
             }
-            // Additional boost if repo matches
             if (currentRepo && item.repo === currentRepo) {
                 score += 10;
             }
 
-            // 3. Recency/Frequency Boost
             const recencyBoost = RecencyService.getScoreBoost(item.id);
             score += recencyBoost;
+
+            // Boost Repos slightly over static commands if search matches
+            if (item.category === "Repositories") {
+                score += 5;
+            }
 
             return { item, score };
         });
@@ -245,7 +235,7 @@ export function CommandPalette() {
             .map(x => x.item)
             .slice(0, 50);
 
-    }, [commands, searchResults, query, currentProject, currentRepo]);
+    }, [commands, searchResults, query, currentProject, currentRepo, repos]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -264,7 +254,6 @@ export function CommandPalette() {
 
     useEffect(() => {
         if (isOpen) {
-            // slight delay to ensure render
             setTimeout(() => inputRef.current?.focus(), 10);
             setQuery("");
             setSelectedIndex(0);
@@ -273,7 +262,6 @@ export function CommandPalette() {
     }, [isOpen]);
 
     const handleSelect = (command: CommandItem) => {
-        // Track selection for recency
         RecencyService.track({
             id: command.id,
             label: command.label,
@@ -312,13 +300,11 @@ export function CommandPalette() {
 
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4 font-sans">
-            {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
                 onClick={() => setIsOpen(false)}
             />
 
-            {/* Modal */}
             <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 ring-1 ring-white/10">
                 <div className="flex items-center border-b border-zinc-800 px-4 h-14">
                     <Search className="w-5 h-5 text-zinc-500 mr-3" />
@@ -339,13 +325,6 @@ export function CommandPalette() {
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (isFileSearch) {
-                                    // If we are in file search, we maintain the slash in the state transparently?
-                                    // Actually, if user backspaces the content of input (which is query slice 1), we need to handle that.
-                                    // If user deletes everything in the input, e.target.value is empty.
-                                    // But query was "/". 
-                                    // If text is empty, we still keep "/" in state?
-                                    // Wait, if I change value to `slice(1)`, then `onChange` receives only the new text without slash.
-                                    // So I need to prepend slash when updating state.
                                     setQuery("/" + val);
                                 } else {
                                     setQuery(val);
@@ -354,7 +333,6 @@ export function CommandPalette() {
                             }}
                             onKeyDown={(e) => {
                                 if (isFileSearch && e.key === "Backspace" && query === "/") {
-                                    // Remove the slash if empty and backspace
                                     setQuery("");
                                     e.preventDefault();
                                 }
@@ -445,7 +423,6 @@ export function CommandPalette() {
                     )}
                 </div>
 
-                {/* Footer */}
                 <div className="h-9 bg-zinc-900 border-t border-zinc-800 flex items-center justify-between px-4 text-[11px] text-zinc-500">
                     <div className="flex gap-3">
                         <span className="flex items-center gap-1">
@@ -465,4 +442,3 @@ export function CommandPalette() {
         </div>
     );
 }
-
