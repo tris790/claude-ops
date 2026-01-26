@@ -575,12 +575,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 <div ref={containerRef} className="h-full w-full" />
                 {diffMode === 'side-by-side' && !loading && !error && (
                     <div
-                        className="absolute top-0 bottom-0 w-1 cursor-col-resize z-50 hover:bg-blue-500/50 transition-colors group"
+                        className="absolute top-0 bottom-0 w-1 cursor-col-resize z-[100] hover:bg-blue-500/10 transition-colors group"
                         style={{ left: `calc(${splitRatio * 100}%)`, transform: 'translateX(-50%)' }}
                         onMouseDown={handleMouseDown}
                     >
                         {/* Visual indicator on hover/drag */}
-                        <div className={`w-0.5 h-full bg-blue-500/0 mx-auto transition-colors ${isResizing ? 'bg-blue-500' : 'group-hover:bg-blue-500/50'}`} />
+                        <div className={`w-0.5 h-full mx-auto transition-colors ${isResizing ? 'bg-blue-500' : 'bg-blue-500/30 group-hover:bg-blue-500'}`} />
                     </div>
                 )}
             </div>
