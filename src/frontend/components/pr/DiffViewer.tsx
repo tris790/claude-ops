@@ -596,23 +596,28 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 }
                 .resizable-merge-view .cm-mergeViewEditors {
                      display: flex !important;
+                     width: 100%;
                      flex: 1;
                 }
-                /** 
-                 * Target the two editors. CM6 structure is usually:
-                 * .cm-mergeView -> .cm-mergeViewEditors -> [.cm-editor (Original), .cm-merge-gutter, .cm-editor (Modified)]
-                 * We need to be careful with the selector.
-                 */
-                .resizable-merge-view .cm-editor.cm-mergeViewEditor:first-child,
-                .resizable-merge-view .cm-mergeViewEditors > .cm-editor:first-child {
+                
+                /* Target the wrappers (cm-mergeViewEditor), NOT the internal cm-editor */
+                .resizable-merge-view .cm-mergeViewEditors > .cm-mergeViewEditor:nth-child(1) {
                     flex: 0 0 calc(var(--split-ratio) * 100%) !important;
                     width: calc(var(--split-ratio) * 100%) !important;
+                    min-width: 100px;
+                    max-width: calc(100% - 100px);
                 }
                 
-                .resizable-merge-view .cm-editor.cm-mergeViewEditor:last-child,
-                .resizable-merge-view .cm-mergeViewEditors > .cm-editor:last-child {
+                /* The gutter is usually the 2nd child in DOM, and Right Editor is 3rd (last) */
+                .resizable-merge-view .cm-mergeViewEditors > .cm-mergeViewEditor:last-child {
                     flex: 1 !important;
                     width: auto !important;
+                    min-width: 100px;
+                }
+                
+                /* Ensure the editor instance inside fills the wrapper */
+                .resizable-merge-view .cm-mergeViewEditor > .cm-editor {
+                    height: 100% !important;
                 }
             `}</style>
 
