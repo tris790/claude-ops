@@ -111,6 +111,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         else if (ext === 'tsx' || ext === 'jsx') language = 'typescriptreact';
         else if (ext === 'go') language = 'go';
         else if (ext === 'py') language = 'python';
+        else if (ext === 'c' || ext === 'h') language = 'c';
+        else if (ext === 'cpp' || ext === 'hpp' || ext === 'cc') language = 'cpp';
+        else if (ext === 'cs') language = 'csharp';
 
         if (!language) return;
 
