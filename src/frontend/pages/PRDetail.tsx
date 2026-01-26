@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread, getPullRequestIterations, updatePullRequestThread } from "../api/prs";
+import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread, getPullRequestIterations, updatePullRequestThread, updatePullRequestComment, deletePullRequestComment, updatePullRequest } from "../api/prs";
 import { getCurrentUser } from "../api/auth";
 import {
     ArrowLeft,
@@ -19,7 +19,11 @@ import {
     ChevronDown,
     PanelLeftClose,
     PanelLeftOpen,
-    RotateCcw
+    RotateCcw,
+    Edit2,
+    Trash2,
+    Save,
+    X
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -29,6 +33,7 @@ import { DiffViewer } from "../components/pr/DiffViewer";
 import { CompleteDialog } from "../components/pr/CompleteDialog";
 import { IterationSelector } from "../components/pr/IterationSelector";
 import { ThreadStatusPicker, isThreadActive, isThreadResolved, isThreadClosed, isThreadPending } from "../components/pr/ThreadStatusPicker";
+import { CommentDialog } from "../components/pr/CommentDialog";
 
 export function PRDetail() {
     const { id } = useParams();
@@ -53,6 +58,9 @@ export function PRDetail() {
     const [isTreeCollapsed, setIsTreeCollapsed] = useState(false);
     const [lastReviewedIterationId, setLastReviewedIterationId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+    const [isEditingDescription, setIsEditingDescription] = useState(false);
+    const [descriptionDraft, setDescriptionDraft] = useState("");
 
     // Sync state with URL search params
     const selectedIteration = searchParams.get("iteration") ? parseInt(searchParams.get("iteration")!, 10) : null;
@@ -203,6 +211,45 @@ export function PRDetail() {
             alert("Failed to post comment: " + err.message);
         } finally {
             setPostingComment(false);
+        }
+    }
+
+    async function handleUpdateComment(threadId: number, commentId: number, content: string) {
+        if (!pr) return;
+        try {
+            await updatePullRequestComment(id!, pr.repository.id, threadId, commentId, content);
+            setEditingCommentId(null);
+            // Refresh threads
+            const threadData = await getPullRequestThreads(id!, pr.repository.id);
+            setThreads(threadData);
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to update comment: " + err.message);
+        }
+    }
+
+    async function handleDeleteComment(threadId: number, commentId: number) {
+        if (!pr || !confirm("Are you sure you want to delete this comment?")) return;
+        try {
+            await deletePullRequestComment(id!, pr.repository.id, threadId, commentId);
+            // Refresh threads
+            const threadData = await getPullRequestThreads(id!, pr.repository.id);
+            setThreads(threadData);
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to delete comment: " + err.message);
+        }
+    }
+
+    async function handleUpdateDescription() {
+        if (!pr) return;
+        try {
+            await updatePullRequest(id!, pr.repository.id, { description: descriptionDraft });
+            setPr({ ...pr, description: descriptionDraft });
+            setIsEditingDescription(false);
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to update description: " + err.message);
         }
     }
 
@@ -440,16 +487,55 @@ export function PRDetail() {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div className="lg:col-span-2 space-y-8">
                                 <section className="bg-zinc-900/20 rounded-xl border border-zinc-800 overflow-hidden">
-                                    <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/40">
+                                    <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/40 flex items-center justify-between">
                                         <h3 className="text-sm font-semibold text-zinc-200">Description</h3>
+                                        {!isEditingDescription && (
+                                            <button
+                                                onClick={() => {
+                                                    setDescriptionDraft(pr.description || "");
+                                                    setIsEditingDescription(true);
+                                                }}
+                                                className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400 transition-colors"
+                                                title="Edit description"
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="p-6 text-zinc-300 prose prose-invert max-w-none">
-                                        {pr.description ? (
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                {pr.description}
-                                            </ReactMarkdown>
+                                        {isEditingDescription ? (
+                                            <div className="space-y-4">
+                                                <textarea
+                                                    value={descriptionDraft}
+                                                    onChange={(e) => setDescriptionDraft(e.target.value)}
+                                                    className="w-full h-64 bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-sm text-zinc-300 focus:border-sapphire-500 focus:ring-1 focus:ring-sapphire-500 outline-none resize-y font-mono"
+                                                    placeholder="Add a description..."
+                                                    autoFocus
+                                                />
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        onClick={() => setIsEditingDescription(false)}
+                                                        className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition-colors"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        onClick={handleUpdateDescription}
+                                                        className="px-3 py-1.5 text-xs font-medium bg-sapphire-600 hover:bg-sapphire-500 text-white rounded-md transition-colors flex items-center gap-1.5"
+                                                    >
+                                                        <Save className="w-3.5 h-3.5" />
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            </div>
                                         ) : (
-                                            <p className="italic text-zinc-600">No description provided.</p>
+                                            pr.description ? (
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                    {pr.description}
+                                                </ReactMarkdown>
+                                            ) : (
+                                                <p className="italic text-zinc-600">No description provided.</p>
+                                            )
                                         )}
                                     </div>
                                 </section>
@@ -531,22 +617,61 @@ export function PRDetail() {
                                                     </div>
                                                 )}
                                                 <div className="space-y-4 p-4">
-                                                    {thread.comments.map((comment: any) => (
-                                                        <div key={comment.id} className="flex gap-4">
-                                                            <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-400 shrink-0">
-                                                                {comment.author.displayName[0]}
-                                                            </div>
-                                                            <div className="space-y-1 min-w-0">
-                                                                <div className="flex items-baseline gap-2">
-                                                                    <span className="font-medium text-sm text-zinc-200">{comment.author.displayName}</span>
-                                                                    <span className="text-[10px] text-zinc-500">{new Date(comment.publishedDate).toLocaleString()}</span>
+                                                    {thread.comments.map((comment: any) => {
+                                                        const isAuthor = currentUser && comment.author && (currentUser.id === comment.author.id || currentUser.emailAddress === comment.author.uniqueName);
+                                                        const commentKey = `${thread.id}-${comment.id}`;
+                                                        const isEditing = editingCommentId === commentKey;
+
+                                                        if (isEditing) {
+                                                            return (
+                                                                <div key={comment.id} className="ml-12">
+                                                                    <CommentDialog
+                                                                        draftKey={`edit_${comment.id}`}
+                                                                        initialValue={comment.content}
+                                                                        onSubmit={(content) => handleUpdateComment(thread.id, comment.id, content)}
+                                                                        onCancel={() => setEditingCommentId(null)}
+                                                                    />
                                                                 </div>
-                                                                <div className="text-sm text-zinc-400 break-words">
-                                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <div key={comment.id} className="flex gap-4 group/comment">
+                                                                <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-400 shrink-0 uppercase font-bold border border-zinc-700">
+                                                                    {comment.author.displayName?.[0] || "?"}
+                                                                </div>
+                                                                <div className="space-y-1 min-w-0 flex-1">
+                                                                    <div className="flex items-baseline justify-between">
+                                                                        <div className="flex items-baseline gap-2">
+                                                                            <span className="font-medium text-sm text-zinc-200">{comment.author.displayName}</span>
+                                                                            <span className="text-[10px] text-zinc-500">{new Date(comment.publishedDate).toLocaleString()}</span>
+                                                                        </div>
+                                                                        {isAuthor && (
+                                                                            <div className="flex items-center space-x-1 opacity-100 sm:opacity-0 sm:group-hover/comment:opacity-100 transition-opacity">
+                                                                                <button
+                                                                                    onClick={() => setEditingCommentId(commentKey)}
+                                                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
+                                                                                    title="Edit comment"
+                                                                                >
+                                                                                    <Edit2 className="w-3 h-3" />
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => handleDeleteComment(thread.id, comment.id)}
+                                                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
+                                                                                    title="Delete comment"
+                                                                                >
+                                                                                    <Trash2 className="w-3 h-3" />
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-sm text-zinc-400 break-words prose prose-invert max-w-none">
+                                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         ))}
@@ -734,7 +859,7 @@ export function PRDetail() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
 

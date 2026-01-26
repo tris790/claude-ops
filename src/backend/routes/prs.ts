@@ -117,7 +117,7 @@ export const prRoutes = {
 
             try {
                 const body = await req.json();
-                const { repoId, status, lastMergeSourceCommit, completionOptions } = body;
+                const { repoId, status, lastMergeSourceCommit, completionOptions, description } = body;
 
                 if (!repoId) return Response.json({ error: "repoId is required" }, { status: 400 });
 
@@ -126,6 +126,7 @@ export const prRoutes = {
                 if (status) updateData.status = status;
                 if (lastMergeSourceCommit) updateData.lastMergeSourceCommit = lastMergeSourceCommit;
                 if (completionOptions) updateData.completionOptions = completionOptions;
+                if (description !== undefined) updateData.description = description;
 
                 const pr = await azureClient.updatePullRequest(repoId, id, updateData);
                 return Response.json(pr);
