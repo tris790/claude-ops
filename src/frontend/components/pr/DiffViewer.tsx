@@ -85,6 +85,17 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
     const [contents, setContents] = useState<{ original: string; modified: string } | null>(null);
 
+    // Global keyboard listener for F12
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "F12") {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
     // LSP Connection Effect
     useEffect(() => {
         if (!isCloned || !projectName || !repoName || !filePath || loading || !contents) {
@@ -101,7 +112,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         if (!language) return;
 
         setLspStatus("connecting");
-        const client = new LSPClient(projectName, repoName, language);
+        const client = new LSPClient(projectName!, repoName!, language);
         lspRef.current = client;
 
         client.connect().then(() => {
@@ -109,16 +120,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
             const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
 
-            // Notify opened files. We use virtual URIs to distinguish versions.
-            // Note: Some LSP servers might not like these URIs for import resolution, 
-            // but for a diff view it's better than nothing.
-
             client.sendNotification('textDocument/didOpen', {
                 textDocument: {
                     uri: `file:///original${normalizedPath}`,
                     languageId: language,
                     version: 1,
-                    text: contents.original
+                    text: contents!.original
                 }
             });
 
@@ -127,7 +134,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     uri: `file:///modified${normalizedPath}`,
                     languageId: language,
                     version: 1,
-                    text: contents.modified
+                    text: contents!.modified
                 }
             });
         }).catch(err => {
@@ -279,6 +286,27 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                                                         return inline ?
                                                             <code className="bg-zinc-800/80 px-1 py-0.5 rounded text-blue-300 font-mono text-[0.9em]" {...props}>{children}</code> :
                                                             <pre className="bg-zinc-950/50 p-3 rounded-md overflow-x-auto border border-zinc-800/50" {...props}><code className={className}>{children}</code></pre>;
+                                                    },
+                                                    a({ href, children }: any) {
+                                                        const handleClick = (e: React.MouseEvent) => {
+                                                            e.preventDefault();
+                                                            if (href?.startsWith("file:///")) {
+                                                                const dummyLocation = { uri: href, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } } };
+                                                                handleLSPDefinition(dummyLocation, {
+                                                                    projectName: projectName || "",
+                                                                    repoName: repoName || "",
+                                                                    pullRequestId: pullRequestId,
+                                                                    modifiedFiles: modifiedFiles,
+                                                                }, navigate);
+                                                            } else if (href) {
+                                                                window.open(href, "_blank");
+                                                            }
+                                                        };
+                                                        return (
+                                                            <a href={href} onClick={handleClick} className="text-blue-400 hover:underline">
+                                                                {children}
+                                                            </a>
+                                                        );
                                                     }
                                                 }}
                                             >
@@ -354,6 +382,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 EditorView.domEventHandlers({
                     mousedown: (event, view) => {
                         if ((event.ctrlKey || event.metaKey) && event.button === 0) {
+                            event.preventDefault();
                             const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
                             if (pos !== null) {
                                 view.dispatch({ selection: { anchor: pos } });
@@ -605,8 +634,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             <div ref={tooltipRef} className="fixed inset-0 pointer-events-none z-[9999]" />
 
             <style>{`
-                .cm-merge-view { height: 100% !important; }
-                .cm-merge-view-editor { height: 100% !important; }
+                .cm-mergeView { height: 100% !important; }
+                .cm-mergeViewEditor { height: 100% !important; }
+                .cm-mergeViewEditors { height: 100% !important; }
                 .cm-editor { height: 100% !important; }
                 .cm-lsp-tooltip-container { font-family: var(--font-sans); }
                 .cm-tooltip { pointer-events: auto !important; } /* Re-enable pointer events for interactions */
@@ -614,11 +644,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 /* Resizable Styles */
                 .resizable-merge-view .cm-mergeView {
                     display: flex !important;
+                    height: 100% !important;
                 }
                 .resizable-merge-view .cm-mergeViewEditors {
                      display: flex !important;
                      width: 100%;
                      flex: 1;
+                     height: 100% !important;
                 }
                 
                 /* Target the wrappers (cm-mergeViewEditor), NOT the internal cm-editor */
@@ -627,6 +659,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     width: calc(var(--split-ratio) * 100%) !important;
                     min-width: 20px;
                     max-width: calc(100% - 20px);
+                    height: 100% !important;
                 }
                 
                 /* The gutter is usually the 2nd child in DOM, and Right Editor is 3rd (last) */
@@ -634,6 +667,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     flex: 1 !important;
                     width: auto !important;
                     min-width: 20px;
+                    height: 100% !important;
                 }
                 
                 /* Ensure the editor instance inside fills the wrapper */
@@ -644,6 +678,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 .cm-tooltip {
                     z-index: 9999 !important;
                 }
+
+                /* Fix for vertical scrolling in MergeView */
+                .cm-scroller { overflow: auto !important; }
             `}</style>
         </div>
     );

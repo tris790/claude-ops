@@ -35,6 +35,8 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
     onClose,
     isLoading = false
 }) => {
+    const [height, setHeight] = useState(300);
+    const [isResizing, setIsResizing] = useState(false);
     const [groupedRefs, setGroupedRefs] = useState<Map<string, ReferenceItem[]>>(new Map());
     const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
     const [loadingContexts, setLoadingContexts] = useState(false);
@@ -100,10 +102,49 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
         });
     };
 
+    // Resize handling
+    const startResizing = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+    };
+
+    useEffect(() => {
+        if (!isResizing) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const newHeight = window.innerHeight - e.clientY;
+            setHeight(Math.max(100, Math.min(newHeight, window.innerHeight - 100)));
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+    }, [isResizing]);
+
     if (!isLoading && references.length === 0) return null;
 
     return (
-        <div className="flex flex-col h-full bg-zinc-900 border-t border-zinc-800 shadow-2xl animate-in slide-in-from-bottom duration-300">
+        <div
+            className="flex flex-col bg-zinc-900 border-t border-zinc-800 shadow-2xl animate-in slide-in-from-bottom duration-300 relative"
+            style={{ height: `${height}px` }}
+        >
+            {/* Resize Handle */}
+            <div
+                className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500/50 transition-colors z-[101]"
+                onMouseDown={startResizing}
+            />
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-2 bg-zinc-800 border-b border-zinc-700">
                 <div className="flex items-center gap-2">

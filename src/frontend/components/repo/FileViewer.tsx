@@ -49,6 +49,17 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
 
     const isMarkdown = file.path.toLowerCase().endsWith(".md");
 
+    // Global keyboard listener for F12
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "F12") {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
     useEffect(() => {
         if (isMarkdown) {
             setViewMode("markdown");
@@ -96,7 +107,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         }
 
         setLspStatus("connecting");
-        const client = new LSPClient(projectName, repoName, language);
+        const client = new LSPClient(projectName!, repoName!, language);
         lspRef.current = client;
 
         client.connect().then(() => {
@@ -282,12 +293,19 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                                                 a({ href, children }: any) {
                                                     const handleClick = (e: React.MouseEvent) => {
                                                         e.preventDefault();
-                                                        if (href?.startsWith("file://") || href?.startsWith("http")) {
+                                                        if (href?.startsWith("file:///")) {
+                                                            let targetPath = href.slice(8);
+                                                            if (targetPath.startsWith("original/")) targetPath = targetPath.slice(9);
+                                                            else if (targetPath.startsWith("modified/")) targetPath = targetPath.slice(9);
+                                                            if (!targetPath.startsWith("/")) targetPath = "/" + targetPath;
+
+                                                            navigate(`/repos/${projectName}/${repoName}/blob/${branch}${targetPath}`);
+                                                        } else if (href) {
                                                             window.open(href, "_blank");
                                                         }
                                                     };
                                                     return (
-                                                        <a href={href} onClick={handleClick}>
+                                                        <a href={href} onClick={handleClick} className="text-blue-400 hover:underline">
                                                             {children}
                                                         </a>
                                                     );
@@ -381,6 +399,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                 EditorView.domEventHandlers({
                     mousedown: (event, view) => {
                         if ((event.ctrlKey || event.metaKey) && event.button === 0) {
+                            event.preventDefault();
                             const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
                             if (pos !== null) {
                                 view.dispatch({ selection: { anchor: pos } });
@@ -528,6 +547,12 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                     </div>
                 )}
             </div>
+            <style>{`
+                .cm-editor { height: 100% !important; }
+                .cm-scroller { overflow: auto !important; }
+                .cm-lsp-tooltip-container { font-family: var(--font-sans); }
+                .cm-tooltip { pointer-events: auto !important; z-index: 9999 !important; }
+            `}</style>
         </div>
     );
 };
