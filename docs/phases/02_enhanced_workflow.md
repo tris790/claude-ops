@@ -67,7 +67,7 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
 
 ## 4. Real-Time Interactions
 - [ ] **Live Updates**:
-  - [ ] **Smart Polling**: Implement a `usePolling` hook via `Page Visibility API`. 
+  - [x] **Smart Polling**: Implement a `usePolling` hook via `Page Visibility API`. 
     - Active view: 5s interval.
     - Background/Hidden: Pause or 30s interval.
   - [ ] **Optimistic UI**: Implement React Query `onMutate` handlers for:
