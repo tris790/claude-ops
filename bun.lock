@@ -16,6 +16,7 @@
         "@codemirror/language": "^6.12.1",
         "@codemirror/lint": "^6.9.2",
         "@codemirror/merge": "^6.11.2",
+        "@codemirror/search": "^6.6.0",
         "@codemirror/state": "^6.5.4",
         "@codemirror/view": "^6.39.11",
         "ansi-to-html": "^0.7.2",

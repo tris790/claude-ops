@@ -23,6 +23,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { createCommentSystem } from "./DiffExtensions";
 import { handleLSPDefinition } from "../../features/lsp/navigation";
 import { type LSPLocation } from "../../components/lsp/ReferencesPanel";
+import { highlightSelectionMatches } from "@codemirror/search";
 
 interface DiffViewerProps {
     repoId: string;
@@ -414,6 +415,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 ...historyKeymap,
             ]),
             EditorState.readOnly.of(true),
+            highlightSelectionMatches({ highlightWordAroundCursor: true }),
             cmTooltips({ position: 'fixed', parent: tooltipRef.current || document.body }),
         ];
 

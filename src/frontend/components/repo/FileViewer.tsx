@@ -23,6 +23,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import { go } from "@codemirror/lang-go";
 import { handleLSPDefinition } from "../../features/lsp/navigation";
 import { type LSPLocation } from "../../components/lsp/ReferencesPanel";
+import { highlightSelectionMatches } from "@codemirror/search";
 
 interface FileViewerProps {
     repoId: string;
@@ -416,6 +417,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                     }
                 }),
                 EditorState.readOnly.of(true),
+                highlightSelectionMatches({ highlightWordAroundCursor: true }),
                 hoverExtension,
                 linter(async (view) => {
                     return [];

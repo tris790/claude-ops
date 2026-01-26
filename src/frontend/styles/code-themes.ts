@@ -55,6 +55,11 @@ export const darkThemeExtension = EditorView.theme({
     ".cm-activeLineGutter": {
         backgroundColor: darkColors.lineHighlight,
     },
+    ".cm-selectionMatch": {
+        backgroundColor: "rgba(173, 214, 255, 0.18)",
+        border: "1px solid rgba(173, 214, 255, 0.1)",
+        borderRadius: "2px",
+    },
 }, { dark: true });
 
 
@@ -108,6 +113,10 @@ export const lightThemeExtension = EditorView.theme({
     },
     ".cm-activeLineGutter": {
         backgroundColor: lightColors.lineHighlight,
+    },
+    ".cm-selectionMatch": {
+        backgroundColor: "rgba(9, 105, 218, 0.1)",
+        borderRadius: "2px",
     },
 });
 
