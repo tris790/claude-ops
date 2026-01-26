@@ -40,6 +40,10 @@ interface DiffViewerProps {
 
 type DiffMode = "side-by-side" | "unified" | "new-only";
 
+const DEFAULT_SPLIT_RATIO = 0.5;
+const STORAGE_KEY_SPLIT = "claude-ops-diff-split";
+
+
 export const DiffViewer: React.FC<DiffViewerProps> = ({
     repoId,
     filePath,
@@ -65,6 +69,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [lspStatus, setLspStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
     const [diffMode, setDiffMode] = useState<DiffMode>("side-by-side");
+    const [splitRatio, setSplitRatio] = useState(() => {
+        const saved = localStorage.getItem(STORAGE_KEY_SPLIT);
+        return saved ? parseFloat(saved) : DEFAULT_SPLIT_RATIO;
+    });
+    const [isResizing, setIsResizing] = useState(false);
+
 
     const [contents, setContents] = useState<{ original: string; modified: string } | null>(null);
 
@@ -469,6 +479,46 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         }
     }, [scrollToLine, loading, diffMode]);
 
+    // Handle Resizing
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+    };
+
+    useEffect(() => {
+        if (!isResizing) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            if (containerRef.current) {
+                const rect = containerRef.current.getBoundingClientRect();
+                const ratio = (e.clientX - rect.left) / rect.width;
+                const clamped = Math.min(Math.max(ratio, 0.2), 0.8);
+                setSplitRatio(clamped);
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+            localStorage.setItem(STORAGE_KEY_SPLIT, splitRatio.toString());
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+        };
+    }, [isResizing, splitRatio]); // Added splitRatio dependency for localStorage save, though ref is better.
+    // Actually splitRatio in deps of effect might cause re-bind, but it's fine for mouseUp. 
+    // Optimization: Use a ref for current splitRatio in mouseUp? 
+    // Strict mode safety: Let's stick to simple deps.
+
+
 
     return (
         <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
@@ -518,13 +568,54 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     {error}
                 </div>
             )}
-            <div ref={containerRef} className={`flex-1 overflow-auto ${loading ? 'hidden' : ''}`} />
+            <div
+                className={`flex-1 overflow-hidden relative ${loading ? 'hidden' : ''} ${diffMode === 'side-by-side' ? 'resizable-merge-view' : ''}`}
+                style={{ "--split-ratio": splitRatio } as React.CSSProperties}
+            >
+                <div ref={containerRef} className="h-full w-full" />
+                {diffMode === 'side-by-side' && !loading && !error && (
+                    <div
+                        className="absolute top-0 bottom-0 w-1 cursor-col-resize z-50 hover:bg-blue-500/50 transition-colors group"
+                        style={{ left: `calc(${splitRatio * 100}%)`, transform: 'translateX(-50%)' }}
+                        onMouseDown={handleMouseDown}
+                    >
+                        {/* Visual indicator on hover/drag */}
+                        <div className={`w-0.5 h-full bg-blue-500/0 mx-auto transition-colors ${isResizing ? 'bg-blue-500' : 'group-hover:bg-blue-500/50'}`} />
+                    </div>
+                )}
+            </div>
             <style>{`
                 .cm-merge-view { height: 100% !important; }
                 .cm-merge-view-editor { height: 100% !important; }
                 .cm-editor { height: 100% !important; }
                 .cm-lsp-tooltip-container { font-family: var(--font-sans); }
+                
+                /* Resizable Styles */
+                .resizable-merge-view .cm-mergeView {
+                    display: flex !important;
+                }
+                .resizable-merge-view .cm-mergeViewEditors {
+                     display: flex !important;
+                     flex: 1;
+                }
+                /** 
+                 * Target the two editors. CM6 structure is usually:
+                 * .cm-mergeView -> .cm-mergeViewEditors -> [.cm-editor (Original), .cm-merge-gutter, .cm-editor (Modified)]
+                 * We need to be careful with the selector.
+                 */
+                .resizable-merge-view .cm-editor.cm-mergeViewEditor:first-child,
+                .resizable-merge-view .cm-mergeViewEditors > .cm-editor:first-child {
+                    flex: 0 0 calc(var(--split-ratio) * 100%) !important;
+                    width: calc(var(--split-ratio) * 100%) !important;
+                }
+                
+                .resizable-merge-view .cm-editor.cm-mergeViewEditor:last-child,
+                .resizable-merge-view .cm-mergeViewEditors > .cm-editor:last-child {
+                    flex: 1 !important;
+                    width: auto !important;
+                }
             `}</style>
+
         </div>
     );
 };
