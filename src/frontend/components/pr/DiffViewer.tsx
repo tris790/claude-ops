@@ -492,7 +492,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             if (containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
                 const ratio = (e.clientX - rect.left) / rect.width;
-                const clamped = Math.min(Math.max(ratio, 0.2), 0.8);
+                const clamped = Math.min(Math.max(ratio, 0.02), 0.98);
                 setSplitRatio(clamped);
             }
         };
@@ -604,15 +604,15 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 .resizable-merge-view .cm-mergeViewEditors > .cm-mergeViewEditor:nth-child(1) {
                     flex: 0 0 calc(var(--split-ratio) * 100%) !important;
                     width: calc(var(--split-ratio) * 100%) !important;
-                    min-width: 100px;
-                    max-width: calc(100% - 100px);
+                    min-width: 20px;
+                    max-width: calc(100% - 20px);
                 }
                 
                 /* The gutter is usually the 2nd child in DOM, and Right Editor is 3rd (last) */
                 .resizable-merge-view .cm-mergeViewEditors > .cm-mergeViewEditor:last-child {
                     flex: 1 !important;
                     width: auto !important;
-                    min-width: 100px;
+                    min-width: 20px;
                 }
                 
                 /* Ensure the editor instance inside fills the wrapper */
