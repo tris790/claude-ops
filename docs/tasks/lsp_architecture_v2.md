@@ -51,7 +51,7 @@ Connect the PR opening flow to the new backend capabilities.
 ### 4. Smart Navigation (Definition)
 "Chromium-style" jumping between diffs and files.
 
-- [ ] **Implement `LSPDefinitionHandler`**
+- [x] **Implement `LSPDefinitionHandler`**
     - **Goal**: Intercept `textDocument/definition` results and route correctly.
     - **Path**: `src/frontend/features/lsp/navigation.ts`
     - **Logic**:
@@ -67,7 +67,7 @@ Connect the PR opening flow to the new backend capabilities.
 ### 5. Smart Navigation (References)
 View usage across the codebase.
 
-- [ ] **Create `ReferencesPanel` Component**
+- [x] **Create `ReferencesPanel` Component**
     - **Goal**: Display `textDocument/references` results.
     - **Path**: `src/frontend/components/lsp/ReferencesPanel.tsx`
     - **UI**:
@@ -78,13 +78,17 @@ View usage across the codebase.
         - Click action: Uses the same logic as `LSPDefinitionHandler` (jump to Diff or File).
     - **UX**: Show a loading skeleton while fetching references.
 
-- [ ] **End-to-End Test: Hot Start**
-    1. Open PR A. Wait for LSP (cold start).
-    2. Navigate to Dashboard.
-    3. Open PR A again immediately.
-    4. **Verify**: LSP features (hover) work instantly (no startup delay).
+### 6. Bug fixes
+### 6.1 Diff View
+- [ ] **Vertical scrolling broken in Diff View**
+    - **Fix**: Inspect CSS in `DiffViewer.tsx`. Ensure the flex container allows the `MergeView` to calculate its height correctly. Remove `overflow-hidden` where it might be clipping the inner scrollable content. Ensure `.cm-mergeView` is set to `height: 100%`.
 
-- [ ] **End-to-End Test: Context Accuracy**
-    1. Open PR B (which modifies `utils.ts`).
-    2. Go to definition of a function modified in `utils.ts`.
-    3. **Verify**: Lands in Diff View, pointing to the new line.
+### 6.2 UI & Navigation
+- [ ] **F12 opens DevTools instead of "Go to Definition"**
+    - **Fix**: Add a global `window` keydown listener to intercept `F12` and call `e.preventDefault()`. Alternatively, ensure CodeMirror's `keymap` returns `true` and the event doesn't bubble. Should only be applied when user is viewing a pr diff or browsing code etc.
+- [ ] **Ctrl + Click opens a blank new page**
+    - **Fix**: In `FileViewer.tsx` and `DiffViewer.tsx`, the `mousedown` handler must call `event.preventDefault()` to suppress the browser's default behavior for modified clicks.
+    - **Fix**: Update the `a` tag renderer in the hover tooltip to intercept `file:///` URIs and use internal navigation instead of `window.open`.
+- [ ] **References Panel cannot be resized**
+    - **Fix**: Implement a resize handle at the top of `ReferencesPanel.tsx`. Use `mousedown`/`mousemove` listeners to update a `height` state.
+

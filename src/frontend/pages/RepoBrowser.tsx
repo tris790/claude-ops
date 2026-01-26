@@ -4,6 +4,8 @@ import { FileTree } from "../components/repo/FileTree";
 import { Breadcrumbs } from "../components/repo/Breadcrumbs";
 import { FileViewer } from "../components/repo/FileViewer";
 import { getRepositories, getBranches, type GitItem, type GitRepository } from "../api/repos";
+import { ReferencesPanel, type LSPLocation } from "../components/lsp/ReferencesPanel";
+import { handleLSPDefinition } from "../features/lsp/navigation";
 
 export function RepoBrowser() {
     const { project, repo, "*": splat } = useParams<{ project: string; repo: string; "*": string }>();
@@ -15,6 +17,12 @@ export function RepoBrowser() {
     const [branches, setBranches] = useState<{ name: string; objectId: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // LSP References State
+    const [references, setReferences] = useState<LSPLocation[]>([]);
+    const [referencesLoading, setReferencesLoading] = useState(false);
+    const [showReferences, setShowReferences] = useState(false);
+    const [refsPanelHeight, setRefsPanelHeight] = useState(300);
 
     useEffect(() => {
         if (!project || !repo) return;
@@ -113,6 +121,11 @@ export function RepoBrowser() {
                                 repoName={gitRepo.name}
                                 isCloned={!!gitRepo.isCloned}
                                 branch={currentBranch}
+                                onFindReferences={(refs, loading) => {
+                                    setReferences(refs);
+                                    setReferencesLoading(loading);
+                                    setShowReferences(true);
+                                }}
                             />
                         </div>
                     ) : (
@@ -125,6 +138,47 @@ export function RepoBrowser() {
                     )}
                 </div>
             </div>
+
+            {/* References Panel */}
+            {showReferences && (
+                <div
+                    className="relative z-40 flex flex-col shrink-0"
+                    style={{ height: refsPanelHeight }}
+                >
+                    <div
+                        className="h-1 bg-zinc-800 hover:bg-sapphire-500 cursor-ns-resize transition-colors"
+                        onMouseDown={(e: React.MouseEvent) => {
+                            const startY = e.pageY;
+                            const startHeight = refsPanelHeight;
+                            const onMouseMove = (moveEvent: MouseEvent) => {
+                                const delta = startY - moveEvent.pageY;
+                                setRefsPanelHeight(Math.max(100, Math.min(600, startHeight + delta)));
+                            };
+                            const onMouseUp = () => {
+                                window.removeEventListener("mousemove", onMouseMove);
+                                window.removeEventListener("mouseup", onMouseUp);
+                            };
+                            window.addEventListener("mousemove", onMouseMove);
+                            window.addEventListener("mouseup", onMouseUp);
+                        }}
+                    />
+                    <ReferencesPanel
+                        references={references}
+                        repoId={gitRepo.id}
+                        repoName={gitRepo.name}
+                        projectName={gitRepo.project.name}
+                        isLoading={referencesLoading}
+                        onClose={() => setShowReferences(false)}
+                        onSelect={(loc: LSPLocation) => {
+                            handleLSPDefinition(loc, {
+                                projectName: gitRepo.project.name,
+                                repoName: gitRepo.name,
+                                branch: currentBranch
+                            }, navigate);
+                        }}
+                    />
+                </div>
+            )}
         </div>
     );
 }

@@ -21,6 +21,8 @@ import { getHighlighter } from "../../utils/shiki";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { createCommentSystem } from "./DiffExtensions";
+import { handleLSPDefinition } from "../../features/lsp/navigation";
+import { type LSPLocation } from "../../components/lsp/ReferencesPanel";
 
 interface DiffViewerProps {
     repoId: string;
@@ -36,6 +38,8 @@ interface DiffViewerProps {
     threads?: any[];
     onCommentPosted?: () => void;
     scrollToLine?: number | null;
+    modifiedFiles?: string[];
+    onFindReferences?: (refs: LSPLocation[], isLoading: boolean) => void;
 }
 
 type DiffMode = "side-by-side" | "unified" | "new-only";
@@ -57,7 +61,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     onToggleReviewed,
     threads,
     onCommentPosted,
-    scrollToLine
+    scrollToLine,
+    modifiedFiles,
+    onFindReferences
 }) => {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -305,31 +311,35 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     });
 
                     if (!result) return false;
-                    const location = Array.isArray(result) ? result[0] : result;
-                    if (!location) return false;
 
-                    const targetUri = 'uri' in location ? location.uri : (location as any).targetUri;
-                    const range = 'range' in location ? location.range : (location as any).targetSelectionRange;
-
-                    if (targetUri === uri) {
-                        const targetPos = view.state.doc.line(range.start.line + 1).from + range.start.character;
-                        view.dispatch({
-                            selection: { anchor: targetPos },
-                            scrollIntoView: true
-                        });
-                        return true;
-                    } else if (targetUri.startsWith("file:///")) {
-                        // For cross-file navigation, we need to strip the virtual prefix if any
-                        let targetPath = targetUri.slice(8);
-                        if (targetPath.startsWith("original/")) targetPath = targetPath.slice(9);
-                        else if (targetPath.startsWith("modified/")) targetPath = targetPath.slice(9);
-
-                        const targetURL = `/repos/${projectName}/${repoName}/blob/main/${targetPath}`;
-                        navigate(targetURL);
-                        return true;
-                    }
-                    return false;
+                    return handleLSPDefinition(result, {
+                        projectName: projectName || "",
+                        repoName: repoName || "",
+                        pullRequestId: pullRequestId,
+                        modifiedFiles: modifiedFiles,
+                    }, navigate);
                 } catch (e) {
+                    return false;
+                }
+            };
+
+            const handleFindReferences = async (view: EditorView) => {
+                if (!lspRef.current || lspStatus !== 'connected' || !onFindReferences) return false;
+                const pos = view.state.selection.main.head;
+                const line = view.state.doc.lineAt(pos);
+                const character = pos - line.from;
+
+                onFindReferences([], true);
+                try {
+                    const result = await lspRef.current.sendRequest("textDocument/references", {
+                        textDocument: { uri },
+                        position: { line: line.number - 1, character },
+                        context: { includeDeclaration: true }
+                    });
+                    onFindReferences(result || [], false);
+                    return true;
+                } catch (e) {
+                    onFindReferences([], false);
                     return false;
                 }
             };
@@ -338,7 +348,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 hoverExtension,
                 linter(async () => []),
                 keymap.of([
-                    { key: "F12", run: (view) => { handleGoToDefinition(view); return true; } }
+                    { key: "F12", run: (view) => { handleGoToDefinition(view); return true; } },
+                    { key: "Shift-F12", run: (view) => { handleFindReferences(view); return true; } }
                 ]),
                 EditorView.domEventHandlers({
                     mousedown: (event, view) => {
@@ -346,7 +357,11 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                             const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
                             if (pos !== null) {
                                 view.dispatch({ selection: { anchor: pos } });
-                                handleGoToDefinition(view);
+                                if (event.shiftKey) {
+                                    handleFindReferences(view);
+                                } else {
+                                    handleGoToDefinition(view);
+                                }
                                 return true;
                             }
                         }

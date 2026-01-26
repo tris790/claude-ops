@@ -21,6 +21,8 @@ import { useNavigate } from "react-router-dom";
 import { getHighlighter } from "../../utils/shiki";
 import { cpp } from "@codemirror/lang-cpp";
 import { go } from "@codemirror/lang-go";
+import { handleLSPDefinition } from "../../features/lsp/navigation";
+import { type LSPLocation } from "../../components/lsp/ReferencesPanel";
 
 interface FileViewerProps {
     repoId: string;
@@ -29,9 +31,10 @@ interface FileViewerProps {
     repoName?: string;
     isCloned?: boolean;
     branch?: string;
+    onFindReferences?: (refs: LSPLocation[], isLoading: boolean) => void;
 }
 
-export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectName, repoName, isCloned, branch = "main" }) => {
+export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectName, repoName, isCloned, branch = "main", onFindReferences }) => {
     const navigate = useNavigate();
     const [content, setContent] = useState<string>("");
     const [loading, setLoading] = useState(true);
@@ -327,34 +330,36 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
 
                 if (!result) return false;
 
-                // result can be Location | Location[] | LocationLink[]
-                const location = Array.isArray(result) ? result[0] : result;
-                if (!location) return false;
-
-                // Handle navigation
-                // In a real app, we might need to change the active file.
-                // For now, if it's the same file, we can jump.
-                const targetUri = 'uri' in location ? location.uri : (location as any).targetUri;
-                const range = 'range' in location ? location.range : (location as any).targetSelectionRange;
-
-                if (targetUri === `file://${normalizedPath}`) {
-                    const targetPos = view.state.doc.line(range.start.line + 1).from + range.start.character;
-                    view.dispatch({
-                        selection: { anchor: targetPos },
-                        scrollIntoView: true
-                    });
-                    return true;
-                } else if (targetUri.startsWith("file:///")) {
-                    const targetPath = targetUri.slice(8);
-                    const targetURL = `/repos/${projectName}/${repoName}/blob/${branch}/${targetPath}`;
-                    navigate(targetURL);
-                    return true;
-                } else {
-                    console.log("[LSP] Navigate to other file", targetUri, range);
-                    return false;
-                }
+                return handleLSPDefinition(result, {
+                    projectName: projectName || "",
+                    repoName: repoName || "",
+                    branch: branch
+                }, navigate);
             } catch (e) {
                 console.error("[LSP] Definition request failed", e);
+                return false;
+            }
+        };
+
+        const handleFindReferences = async (view: EditorView) => {
+            if (!lspRef.current || !onFindReferences) return false;
+            const pos = view.state.selection.main.head;
+            const line = view.state.doc.lineAt(pos);
+            const character = pos - line.from;
+
+            onFindReferences([], true);
+            try {
+                const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+                const result = await lspRef.current.sendRequest("textDocument/references", {
+                    textDocument: { uri: `file://${normalizedPath}` },
+                    position: { line: line.number - 1, character },
+                    context: { includeDeclaration: true }
+                });
+                onFindReferences(result || [], false);
+                return true;
+            } catch (e) {
+                onFindReferences([], false);
+                console.error("[LSP] References request failed", e);
                 return false;
             }
         };
@@ -370,7 +375,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                 keymap.of([
                     ...defaultKeymap,
                     ...historyKeymap,
-                    { key: "F12", run: (view) => { handleGoToDefinition(view); return true; } }
+                    { key: "F12", run: (view) => { handleGoToDefinition(view); return true; } },
+                    { key: "Shift-F12", run: (view) => { handleFindReferences(view); return true; } }
                 ]),
                 EditorView.domEventHandlers({
                     mousedown: (event, view) => {
@@ -378,7 +384,11 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                             const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
                             if (pos !== null) {
                                 view.dispatch({ selection: { anchor: pos } });
-                                handleGoToDefinition(view);
+                                if (event.shiftKey) {
+                                    handleFindReferences(view);
+                                } else {
+                                    handleGoToDefinition(view);
+                                }
                                 return true;
                             }
                         }

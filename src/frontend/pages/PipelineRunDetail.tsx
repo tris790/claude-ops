@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getRunTimeline, getLogContent } from "../api/pipelines";
+import { usePolling } from "../hooks/usePolling";
 import {
     ArrowLeft,
     Clock,
@@ -27,18 +28,30 @@ export function PipelineRunDetail() {
         if (id) loadTimeline();
     }, [id]);
 
-    async function loadTimeline() {
-        setLoading(true);
+    const isRunning = timeline?.records?.some((r: any) => r.state === "inProgress") || timeline?.status === "inProgress";
+
+    usePolling(async () => {
+        await loadTimeline(true);
+    }, {
+        enabled: !!id && (isRunning || !timeline),
+        activeInterval: 5000,
+        backgroundInterval: 30000,
+    });
+
+    async function loadTimeline(silent = false) {
+        if (!silent) setLoading(true);
         try {
             const data = await getRunTimeline(parseInt(id!));
             setTimeline(data);
-            // Select first job by default
-            const firstJob = data.records.find((r: any) => r.type === "Job");
-            if (firstJob) setSelectedRecordId(firstJob.id);
+            // Select first job by default if none selected
+            if (!selectedRecordId) {
+                const firstJob = data.records.find((r: any) => r.type === "Job");
+                if (firstJob) setSelectedRecordId(firstJob.id);
+            }
         } catch (err) {
             console.error(err);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }
 

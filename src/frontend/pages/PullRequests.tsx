@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPullRequests } from "../api/prs";
+import { usePolling } from "../hooks/usePolling";
 import {
     GitPullRequest,
     CheckCircle2,
@@ -22,15 +23,23 @@ export function PullRequests() {
         loadPrs();
     }, [filter]);
 
-    async function loadPrs() {
-        setLoading(true);
+    usePolling(async () => {
+        await loadPrs(true);
+    }, {
+        enabled: filter === "active",
+        activeInterval: 5000,
+        backgroundInterval: 30000,
+    });
+
+    async function loadPrs(silent = false) {
+        if (!silent) setLoading(true);
         try {
             const data = await getPullRequests(filter);
             setPrs(data);
         } catch (err) {
             console.error(err);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }
 

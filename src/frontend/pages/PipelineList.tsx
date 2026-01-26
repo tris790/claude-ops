@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPipelines, getRecentRuns, runPipeline, cancelRun } from "../api/pipelines";
+import { usePolling } from "../hooks/usePolling";
 import {
     Play,
     StopCircle,
@@ -24,11 +25,18 @@ export function PipelineList() {
 
     useEffect(() => {
         loadData();
-        const interval = setInterval(loadData, 10000); // Poll every 10s
-        return () => clearInterval(interval);
     }, []);
 
-    async function loadData() {
+    usePolling(async () => {
+        await loadData(true);
+    }, {
+        enabled: true,
+        activeInterval: 5000,
+        backgroundInterval: 30000,
+    });
+
+    async function loadData(silent = false) {
+        if (!silent) setLoading(true);
         try {
             const [pipelineData, runData] = await Promise.all([
                 getPipelines(),
@@ -39,7 +47,7 @@ export function PipelineList() {
         } catch (err) {
             console.error(err);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }
 

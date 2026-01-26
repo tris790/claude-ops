@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread, getPullRequestIterations, updatePullRequestThread, updatePullRequestComment, deletePullRequestComment, updatePullRequest } from "../api/prs";
 import { getCurrentUser } from "../api/auth";
+import { usePolling } from "../hooks/usePolling";
 import {
     ArrowLeft,
     GitPullRequest,
@@ -34,6 +35,8 @@ import { CompleteDialog } from "../components/pr/CompleteDialog";
 import { IterationSelector } from "../components/pr/IterationSelector";
 import { ThreadStatusPicker, isThreadActive, isThreadResolved, isThreadClosed, isThreadPending } from "../components/pr/ThreadStatusPicker";
 import { CommentDialog } from "../components/pr/CommentDialog";
+import { ReferencesPanel, type LSPLocation } from "../components/lsp/ReferencesPanel";
+import { handleLSPDefinition } from "../features/lsp/navigation";
 
 export function PRDetail() {
     const { id } = useParams();
@@ -61,6 +64,12 @@ export function PRDetail() {
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [descriptionDraft, setDescriptionDraft] = useState("");
+
+    // LSP References State
+    const [references, setReferences] = useState<LSPLocation[]>([]);
+    const [referencesLoading, setReferencesLoading] = useState(false);
+    const [showReferences, setShowReferences] = useState(false);
+    const [refsPanelHeight, setRefsPanelHeight] = useState(300);
 
     // Sync state with URL search params
     const selectedIteration = searchParams.get("iteration") ? parseInt(searchParams.get("iteration")!, 10) : null;
@@ -101,8 +110,18 @@ export function PRDetail() {
         }
     }, [id]);
 
-    async function loadData() {
-        setLoading(true);
+    const isPollingEnabled = pr?.status === "active";
+
+    usePolling(async () => {
+        await loadData(true);
+    }, {
+        enabled: isPollingEnabled,
+        activeInterval: 5000,
+        backgroundInterval: 30000,
+    });
+
+    async function loadData(silent = false) {
+        if (!silent) setLoading(true);
         setError(null);
         try {
             const data = await getPullRequest(id!, searchParams.get("repoId") || undefined);
@@ -118,15 +137,15 @@ export function PRDetail() {
             setChanges(changeData);
             setCommits(commitData);
             setIterations(iterData);
-            setCurrentUser(userData);
-            if (changeData.changes.length > 0 && !selectedFilePath) {
+            if (!currentUser) setCurrentUser(userData);
+            if (!silent && changeData.changes.length > 0 && !selectedFilePath) {
                 setSelectedFilePath(changeData.changes[0].item.path, true);
             }
         } catch (err: any) {
             console.error(err);
-            setError(err.message || "An error occurred");
+            if (!silent) setError(err.message || "An error occurred");
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }
 
@@ -346,7 +365,7 @@ export function PRDetail() {
         <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-4">
             <div className="text-red-500 font-medium">Error: {error}</div>
             <button
-                onClick={loadData}
+                onClick={() => loadData()}
                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm transition-colors"
             >
                 Retry
@@ -817,6 +836,12 @@ export function PRDetail() {
                                             getPullRequestThreads(id!, pr.repository.id).then(setThreads);
                                         }}
                                         scrollToLine={scrollToLine}
+                                        modifiedFiles={changes?.changes?.map((c: any) => c.item.path)}
+                                        onFindReferences={(refs, loading) => {
+                                            setReferences(refs);
+                                            setReferencesLoading(loading);
+                                            setShowReferences(true);
+                                        }}
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center h-full text-zinc-500">
@@ -825,6 +850,48 @@ export function PRDetail() {
                                 )}
                             </div>
                         </div>
+
+                        {/* References Panel */}
+                        {showReferences && (
+                            <div
+                                className="absolute bottom-0 left-0 right-0 z-40 flex flex-col"
+                                style={{ height: refsPanelHeight }}
+                            >
+                                <div
+                                    className="h-1 bg-zinc-800 hover:bg-sapphire-500 cursor-ns-resize transition-colors"
+                                    onMouseDown={(e: React.MouseEvent) => {
+                                        const startY = e.pageY;
+                                        const startHeight = refsPanelHeight;
+                                        const onMouseMove = (moveEvent: MouseEvent) => {
+                                            const delta = startY - moveEvent.pageY;
+                                            setRefsPanelHeight(Math.max(100, Math.min(600, startHeight + delta)));
+                                        };
+                                        const onMouseUp = () => {
+                                            window.removeEventListener("mousemove", onMouseMove);
+                                            window.removeEventListener("mouseup", onMouseUp);
+                                        };
+                                        window.addEventListener("mousemove", onMouseMove);
+                                        window.addEventListener("mouseup", onMouseUp);
+                                    }}
+                                />
+                                <ReferencesPanel
+                                    references={references}
+                                    repoId={pr.repository.id}
+                                    repoName={pr.repository.name}
+                                    projectName={pr.repository.project.name}
+                                    isLoading={referencesLoading}
+                                    onClose={() => setShowReferences(false)}
+                                    onSelect={(loc: LSPLocation) => {
+                                        handleLSPDefinition(loc, {
+                                            projectName: pr.repository.project.name,
+                                            repoName: pr.repository.name,
+                                            pullRequestId: pr.pullRequestId,
+                                            modifiedFiles: changes?.changes?.map((c: any) => c.item.path) || []
+                                        }, navigate);
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
