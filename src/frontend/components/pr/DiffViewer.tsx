@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { EditorState, StateField } from "@codemirror/state";
-import { EditorView, lineNumbers, hoverTooltip, drawSelection, keymap, showTooltip, type Tooltip, Decoration } from "@codemirror/view";
+import { EditorView, lineNumbers, hoverTooltip, drawSelection, keymap, showTooltip, type Tooltip, Decoration, tooltips as cmTooltips } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { MergeView, unifiedMergeView } from "@codemirror/merge";
@@ -65,6 +65,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     const viewRef = useRef<MergeView | null>(null);
     const editorRef = useRef<EditorView | null>(null);
     const lspRef = useRef<LSPClient | null>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [lspStatus, setLspStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
@@ -226,7 +227,6 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     return {
                         pos,
                         end: pos,
-                        above: true,
                         create(view) {
                             const dom = document.createElement("div");
                             dom.className = "cm-lsp-tooltip-container group p-0 max-w-2xl bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95";
@@ -370,6 +370,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 ...historyKeymap,
             ]),
             EditorState.readOnly.of(true),
+            cmTooltips({ position: 'fixed', parent: tooltipRef.current || document.body }),
         ];
 
         // Setup Diagnostics for both panes
@@ -521,7 +522,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
 
     return (
-        <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
+        <div className="flex flex-col h-full bg-zinc-950 overflow-hidden relative">
             <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0">
                 <div className="flex items-center space-x-3 text-xs">
                     <span className="text-zinc-500 font-mono truncate max-w-[300px]">{filePath}</span>
@@ -584,11 +585,16 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Tooltip Container - Fixed position to avoid clipping but inside logic */}
+            <div ref={tooltipRef} className="fixed inset-0 pointer-events-none z-[9999]" />
+
             <style>{`
                 .cm-merge-view { height: 100% !important; }
                 .cm-merge-view-editor { height: 100% !important; }
                 .cm-editor { height: 100% !important; }
                 .cm-lsp-tooltip-container { font-family: var(--font-sans); }
+                .cm-tooltip { pointer-events: auto !important; } /* Re-enable pointer events for interactions */
                 
                 /* Resizable Styles */
                 .resizable-merge-view .cm-mergeView {
@@ -619,8 +625,11 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 .resizable-merge-view .cm-mergeViewEditor > .cm-editor {
                     height: 100% !important;
                 }
+                
+                .cm-tooltip {
+                    z-index: 9999 !important;
+                }
             `}</style>
-
         </div>
     );
 };
