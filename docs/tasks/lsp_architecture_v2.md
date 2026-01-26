@@ -19,7 +19,7 @@ Manage the local repository state to match the PR's context using direct checkou
 ### 2. LSP Process Lifecycle (Persistence)
 Solve the startup latency problem by keeping processes alive.
 
-- [ ] **Update `LSPManager` for Persistence**
+- [x] **Update `LSPManager` for Persistence**
     - **Goal**: Reuse LSP instances across navigation events.
     - **Path**: `src/backend/services/lsp/LSPManager.ts`
     - **Changes**:
@@ -28,7 +28,7 @@ Solve the startup latency problem by keeping processes alive.
         - **Keep-Alive**: When a client disconnects (navigates away), do **not** kill the process immediately. Set `lastUsed = now()`.
         - **Documentation**: Add inline comments explaining the state machine (Active -> Idle -> Killed).
 
-- [ ] **Implement TTL and LRU Eviction**
+- [x] **Implement TTL and LRU Eviction**
     - **Goal**: Prevent resource exhaustion.
     - **Path**: `src/backend/services/lsp/LSPManager.ts`
     - **Task**:

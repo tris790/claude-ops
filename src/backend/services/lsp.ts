@@ -12,10 +12,86 @@ export interface LSPInstance {
     buffer: string;
     isInitialized: boolean;
     pendingNotifications: any[];
+    /**
+     * Persistence State Machine:
+     * - **Active**: `clients.size > 0`. Process is in use. `lastUsed` updated on activity.
+     * - **Idle**: `clients.size === 0`. Keeping alive for `LSP_TTL_MS`.
+     * - **Killed**: 
+     *   - After `LSP_TTL_MS` in Idle state (Eviction Check).
+     *   - Or if `instances.size > MAX_LSP_PROCESSES` (LRU Eviction).
+     */
+    lastUsed: number;
 }
+
+const MAX_LSP_PROCESSES = 3;
+const LSP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const EVICTION_INTERVAL_MS = 60 * 1000; // Check every minute
 
 export class LSPService {
     private instances: Map<string, LSPInstance> = new Map();
+
+    constructor() {
+        // Check for idle processes periodically
+        setInterval(() => this.checkEviction(), EVICTION_INTERVAL_MS);
+    }
+
+    private checkEviction() {
+        const now = Date.now();
+        for (const [key, instance] of this.instances.entries()) {
+            // If process is idle (no clients) and has exceeded TTL
+            if (instance.clients.size === 0 && (now - instance.lastUsed > LSP_TTL_MS)) {
+                console.log(`[LSP] Evicting idle server for ${key} (idle for ${Math.round((now - instance.lastUsed) / 60000)}m)`);
+                this.killInstance(key, instance);
+            }
+        }
+    }
+
+    private evictLRU() {
+        let OldestKey: string | null = null;
+        let oldestTime = Infinity;
+
+        for (const [key, instance] of this.instances.entries()) {
+            // Prefer evicting idle processes first
+            if (instance.clients.size === 0 && instance.lastUsed < oldestTime) {
+                oldestTime = instance.lastUsed;
+                OldestKey = key;
+            }
+        }
+
+        // If no idle processes, find the oldest active one (though ideally we shouldn't kill active ones, 
+        // but simple LRU implies strictly capping size)
+        // However, killing an active LSP is bad UX. 
+        // Let's refine: Only kill if we really have to. 
+        // If all are active, maybe we allow going over limit slightly or we kill the LRU one anyway.
+        // For this task, "LRU Cap: Max 3 concurrent LSP processes. If spawning a 4th, kill the one with the oldest lastUsed."
+        // implies hard limit.
+        if (!OldestKey) {
+            for (const [key, instance] of this.instances.entries()) {
+                if (instance.lastUsed < oldestTime) {
+                    oldestTime = instance.lastUsed;
+                    OldestKey = key;
+                }
+            }
+        }
+
+        if (OldestKey) {
+            const instance = this.instances.get(OldestKey);
+            if (instance) {
+                console.log(`[LSP] Evicting LRU server ${OldestKey} to make room`);
+                this.killInstance(OldestKey, instance);
+            }
+        }
+    }
+
+    private killInstance(key: string, instance: LSPInstance) {
+        try {
+            instance.process.kill();
+        } catch (e) {
+            console.error(`[LSP] Failed to kill process ${key}:`, e);
+        }
+        this.instances.delete(key);
+        console.log(`[LSP] Killed server for ${key}`);
+    }
 
     private async findExtensionBin(publisherAndName: string, binPath: string): Promise<string | null> {
         const home = homedir();
@@ -64,6 +140,7 @@ export class LSPService {
         }
 
         instance.clients.add(ws);
+        instance.lastUsed = Date.now();
         console.log(`[LSP] Client connected to ${language} server for ${rootPath}`);
     }
 
@@ -74,6 +151,8 @@ export class LSPService {
             console.warn(`[LSP] Received message for non-existent server: ${key}`);
             return;
         }
+
+        instance.lastUsed = Date.now();
 
         const json = typeof message === 'string' ? message : message.toString();
         let payload: any;
@@ -132,10 +211,9 @@ export class LSPService {
         if (instance) {
             instance.clients.delete(ws);
             if (instance.clients.size === 0) {
-                // We could kill the server here if we want to save resources
-                // instance.process.kill();
-                // this.instances.delete(key);
-                console.log(`[LSP] Last client disconnected from ${language}/${rootPath}`);
+                // Do not kill immediately. Mark as last used now.
+                instance.lastUsed = Date.now();
+                console.log(`[LSP] Last client disconnected from ${language}/${rootPath}. Process kept alive (TTL: ${LSP_TTL_MS / 60000}m).`);
             }
         }
     }
@@ -249,6 +327,11 @@ export class LSPService {
         console.log(`[LSP] Root Path: ${rootPath}`);
         console.log(`[LSP] Command: ${cmd.join(' ')}`);
 
+        // Enforce max processes
+        if (this.instances.size >= MAX_LSP_PROCESSES) {
+            this.evictLRU();
+        }
+
         const process = Bun.spawn(cmd, {
             cwd: rootPath,
             stdin: "pipe",
@@ -263,7 +346,8 @@ export class LSPService {
             clients: new Set(),
             buffer: "",
             isInitialized: false,
-            pendingNotifications: []
+            pendingNotifications: [],
+            lastUsed: Date.now()
         };
 
         // Start processing stdout
