@@ -69,7 +69,6 @@ export function PRDetail() {
     const [references, setReferences] = useState<LSPLocation[]>([]);
     const [referencesLoading, setReferencesLoading] = useState(false);
     const [showReferences, setShowReferences] = useState(false);
-    const [refsPanelHeight, setRefsPanelHeight] = useState(300);
 
     // Sync state with URL search params
     const selectedIteration = searchParams.get("iteration") ? parseInt(searchParams.get("iteration")!, 10) : null;
@@ -853,27 +852,7 @@ export function PRDetail() {
 
                         {/* References Panel */}
                         {showReferences && (
-                            <div
-                                className="absolute bottom-0 left-0 right-0 z-40 flex flex-col"
-                                style={{ height: refsPanelHeight }}
-                            >
-                                <div
-                                    className="h-1 bg-zinc-800 hover:bg-sapphire-500 cursor-ns-resize transition-colors"
-                                    onMouseDown={(e: React.MouseEvent) => {
-                                        const startY = e.pageY;
-                                        const startHeight = refsPanelHeight;
-                                        const onMouseMove = (moveEvent: MouseEvent) => {
-                                            const delta = startY - moveEvent.pageY;
-                                            setRefsPanelHeight(Math.max(100, Math.min(600, startHeight + delta)));
-                                        };
-                                        const onMouseUp = () => {
-                                            window.removeEventListener("mousemove", onMouseMove);
-                                            window.removeEventListener("mouseup", onMouseUp);
-                                        };
-                                        window.addEventListener("mousemove", onMouseMove);
-                                        window.addEventListener("mouseup", onMouseUp);
-                                    }}
-                                />
+                            <div className="absolute bottom-0 left-0 right-0 z-40">
                                 <ReferencesPanel
                                     references={references}
                                     repoId={pr.repository.id}

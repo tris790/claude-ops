@@ -13,7 +13,7 @@ Implement the core code review experience: viewing file changes, navigating the 
 - **Diff Data**: `GET /_apis/git/repositories/{repo}/pullRequests/{id}/iterations/{last}/changes`.
 - **File Content**: Need Original and Modified content for each file (Parallel fetch).
 
-### 2. UI View (`/pr/:id/files` or inside Files tab)
+### 2. UI View (`/prs/:id?tab=files` or inside Files tab)
 - **Layout**:
   - **Left**: File Tree (Modified files only). Icons for Add/Edit/Delete.
   - **Main**: Diff Viewer.

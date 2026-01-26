@@ -31,10 +31,11 @@ interface FileViewerProps {
     repoName?: string;
     isCloned?: boolean;
     branch?: string;
+    scrollToLine?: number | null;
     onFindReferences?: (refs: LSPLocation[], isLoading: boolean) => void;
 }
 
-export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectName, repoName, isCloned, branch = "main", onFindReferences }) => {
+export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectName, repoName, isCloned, branch = "main", scrollToLine, onFindReferences }) => {
     const navigate = useNavigate();
     const [content, setContent] = useState<string>("");
     const [loading, setLoading] = useState(true);
@@ -500,6 +501,27 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
             view.destroy();
         };
     }, [content, loading, viewMode, file.path, lspStatus]); // Added lspStatus to re-bind helpers if connection changes
+
+    // Handle Scrolling
+    useEffect(() => {
+        if (!scrollToLine || loading || viewMode !== "code") return;
+        if (!viewRef.current) return;
+
+        try {
+            const view = viewRef.current;
+            const lineCount = view.state.doc.lines;
+            const targetLine = Math.min(scrollToLine, lineCount);
+            const line = view.state.doc.line(targetLine);
+
+            view.dispatch({
+                selection: { anchor: line.from },
+                scrollIntoView: true,
+                effects: EditorView.scrollIntoView(line.from, { y: 'center' })
+            });
+        } catch (e) {
+            console.warn("Failed to scroll to line", scrollToLine, e);
+        }
+    }, [scrollToLine, loading, viewMode]);
 
     if (loading) return <div className="p-8 text-center text-zinc-500">Loading content...</div>;
     if (error) return <div className="p-8 text-center text-red-500">{error}</div>;

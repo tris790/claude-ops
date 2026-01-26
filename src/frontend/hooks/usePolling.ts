@@ -20,6 +20,7 @@ export function usePolling(
         immediate = false,
     }: PollingOptions = {}
 ) {
+    return;
     const callbackRef = useRef(callback);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

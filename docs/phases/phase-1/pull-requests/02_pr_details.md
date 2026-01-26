@@ -13,7 +13,7 @@ The landing page for a specific PR. Shows description, status checks, reviewers,
 - **API**: `GET /_apis/git/pullrequests/{id}`.
 - **Threads/Comments**: `GET /_apis/git/repositories/{repoId}/pullRequests/{id}/threads`.
 
-### 2. UI View (`/pr/:id`)
+### 2. UI View (`/prs/:id`)
 - **Header**: Title, Status (Active/Completed), Source -> Target branch.
 - **Tabs**: [Overview] [Files] [Commits].
 - **Overview Tab**:

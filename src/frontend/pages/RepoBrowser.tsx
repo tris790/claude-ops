@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { FileTree } from "../components/repo/FileTree";
 import { Breadcrumbs } from "../components/repo/Breadcrumbs";
 import { FileViewer } from "../components/repo/FileViewer";
@@ -11,6 +11,8 @@ export function RepoBrowser() {
     const { project, repo, "*": splat } = useParams<{ project: string; repo: string; "*": string }>();
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchParams] = useSearchParams();
+    const scrollToLine = searchParams.get("line") ? parseInt(searchParams.get("line")!, 10) : null;
 
     const [selectedFile, setSelectedFile] = useState<GitItem | null>(null);
     const [gitRepo, setGitRepo] = useState<GitRepository | null>(null);
@@ -22,7 +24,6 @@ export function RepoBrowser() {
     const [references, setReferences] = useState<LSPLocation[]>([]);
     const [referencesLoading, setReferencesLoading] = useState(false);
     const [showReferences, setShowReferences] = useState(false);
-    const [refsPanelHeight, setRefsPanelHeight] = useState(300);
 
     useEffect(() => {
         if (!project || !repo) return;
@@ -121,6 +122,7 @@ export function RepoBrowser() {
                                 repoName={gitRepo.name}
                                 isCloned={!!gitRepo.isCloned}
                                 branch={currentBranch}
+                                scrollToLine={scrollToLine}
                                 onFindReferences={(refs, loading) => {
                                     setReferences(refs);
                                     setReferencesLoading(loading);
@@ -141,27 +143,7 @@ export function RepoBrowser() {
 
             {/* References Panel */}
             {showReferences && (
-                <div
-                    className="relative z-40 flex flex-col shrink-0"
-                    style={{ height: refsPanelHeight }}
-                >
-                    <div
-                        className="h-1 bg-zinc-800 hover:bg-sapphire-500 cursor-ns-resize transition-colors"
-                        onMouseDown={(e: React.MouseEvent) => {
-                            const startY = e.pageY;
-                            const startHeight = refsPanelHeight;
-                            const onMouseMove = (moveEvent: MouseEvent) => {
-                                const delta = startY - moveEvent.pageY;
-                                setRefsPanelHeight(Math.max(100, Math.min(600, startHeight + delta)));
-                            };
-                            const onMouseUp = () => {
-                                window.removeEventListener("mousemove", onMouseMove);
-                                window.removeEventListener("mouseup", onMouseUp);
-                            };
-                            window.addEventListener("mousemove", onMouseMove);
-                            window.addEventListener("mouseup", onMouseUp);
-                        }}
-                    />
+                <div className="relative z-40 shrink-0">
                     <ReferencesPanel
                         references={references}
                         repoId={gitRepo.id}

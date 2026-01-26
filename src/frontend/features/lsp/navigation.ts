@@ -66,7 +66,7 @@ export function handleLSPDefinition(
         });
 
         if (isModified) {
-            navigate(`/pr/${options.pullRequestId}?tab=files&path=${encodeURIComponent(targetPath)}&line=${line}`);
+            navigate(`/prs/${options.pullRequestId}?tab=files&path=${encodeURIComponent(targetPath)}&line=${line}`);
             return true;
         }
     }
