@@ -10,6 +10,7 @@ import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
 import { json } from "@codemirror/lang-json";
 import { markdown as mdLang } from "@codemirror/lang-markdown";
+import { csharp } from "@replit/codemirror-lang-csharp";
 import { linter, type Diagnostic, setDiagnostics } from "@codemirror/lint";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -199,6 +200,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 case "css": return css();
                 case "json": return json();
                 case "md": return mdLang();
+                case "cs": return csharp();
                 default: return [];
             }
         };

@@ -21,6 +21,7 @@ import { useNavigate } from "react-router-dom";
 import { getHighlighter } from "../../utils/shiki";
 import { cpp } from "@codemirror/lang-cpp";
 import { go } from "@codemirror/lang-go";
+import { csharp } from "@replit/codemirror-lang-csharp";
 import { handleLSPDefinition } from "../../features/lsp/navigation";
 import { type LSPLocation } from "../../components/lsp/ReferencesPanel";
 import { highlightSelectionMatches } from "@codemirror/search";
@@ -444,12 +445,14 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                 case "md":
                     extensions.push(mdLang());
                     break;
+                case "cs":
+                    extensions.push(csharp());
+                    break;
                 case "c":
                 case "h":
                 case "cpp":
                 case "hpp":
                 case "cc":
-                case "cs": // Use C++ highlighting for C# as fallback
                     extensions.push(cpp());
                     break;
                 case "go":

@@ -23,6 +23,7 @@
     "@codemirror/search": "^6.6.0",
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.11",
+    "@replit/codemirror-lang-csharp": "^6.2.0",
     "ansi-to-html": "^0.7.2",
     "ansi-to-react": "^6.2.6",
     "bun-plugin-tailwind": "^0.1.2",

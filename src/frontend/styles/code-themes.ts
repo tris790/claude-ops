@@ -60,6 +60,24 @@ export const darkThemeExtension = EditorView.theme({
         border: "1px solid rgba(173, 214, 255, 0.1)",
         borderRadius: "2px",
     },
+    /* Diff / Merge View Styles */
+    ".cm-deletedChunk": {
+        backgroundColor: "rgba(244, 63, 94, 0.15)", // Rose-500 optimized
+    },
+    ".cm-insertedChunk": {
+        backgroundColor: "rgba(34, 197, 94, 0.15)", // Green-500 optimized
+    },
+    ".cm-deletedText": {
+        backgroundColor: "rgba(244, 63, 94, 0.35)",
+        color: "#ffcdd2",
+    },
+    ".cm-insertedText": {
+        backgroundColor: "rgba(34, 197, 94, 0.35)",
+        color: "#c8e6c9",
+    },
+    ".cm-changedLine": {
+        backgroundColor: "rgba(59, 130, 246, 0.15)", // Blue for changed lines (if used)
+    },
 }, { dark: true });
 
 

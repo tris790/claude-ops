@@ -297,21 +297,54 @@ export class LSPService {
             // Windows common paths
             if (await Bun.file("C:/Program Files/LLVM/bin/clangd.exe").exists()) return ["C:/Program Files/LLVM/bin/clangd.exe", ...args];
         } else if (language === 'csharp') {
-            // Try csharp-ls (simple LSP for C#)
+            // Priority 1: Modern Roslyn (C# Dev Kit / C# Extension)
+            // It uses Microsoft.CodeAnalysis.LanguageServer.dll
+
+            // We need dotnet to run it
+            const dotnet = Bun.which("dotnet") || (await Bun.file("/usr/bin/dotnet").exists() ? "/usr/bin/dotnet" : null);
+
+            if (dotnet) {
+                const home = homedir();
+                const extensionsDir = join(home, ".vscode/extensions");
+
+                try {
+                    if (await Bun.file(extensionsDir).exists() || (await readdir(extensionsDir)).length > 0) {
+                        const entries = await readdir(extensionsDir);
+                        // Find latest C# extension
+                        const csharpExts = entries.filter(e => e.startsWith("ms-dotnettools.csharp-")).sort().reverse();
+
+                        for (const ext of csharpExts) {
+                            // Check for .roslyn/Microsoft.CodeAnalysis.LanguageServer.dll
+                            const dllPath = join(extensionsDir, ext, ".roslyn", "Microsoft.CodeAnalysis.LanguageServer.dll");
+                            if (await Bun.file(dllPath).exists()) {
+                                console.log(`[LSP] Found Roslyn Language Server at ${dllPath}`);
+                                return [dotnet, dllPath];
+                            }
+
+                            // Legacy: .omnisharp/...
+                            // Just in case
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+
+                // Try csharp-ls if dotnet is available (installed as tool?)
+                const csharpLs = Bun.which("csharp-ls");
+                if (csharpLs) return [csharpLs];
+            } else {
+                console.warn("[LSP] 'dotnet' not found in PATH or standard locations. C# LSP might fail.");
+            }
+
+            // Fallbacks for standalone binaries
             const bin = Bun.which("csharp-ls");
             if (bin) return [bin];
 
-            // Try OmniSharp (system)
             const omnisharp = Bun.which("OmniSharp");
             if (omnisharp) return [omnisharp, "-lsp"];
 
-            // Try VS Code extension for OmniSharp (path varies by version/platform, this is a best guess for modern versions)
-            // Modern C# Dev Kit uses a different server, but older C# extension used .omnisharp
-            // We'll try to find a standalone executable if possible, otherwise we might fail if we need 'dotnet'
-
-            // Note: Common path in older extensions: .omnisharp/<version>/OmniSharp
-            // This is hard to glob without more logic. 
-            // We will rely on system tools for now or 'csharp-ls' which is easier to install.
+            // If we have dotnet but couldn't find the DLL, maybe we can run a custom command if configured?
+            // For now, fail gracefully.
         }
 
         throw new Error(`Language server for ${language} not found. Please install proper LSP support.`);
