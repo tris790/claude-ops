@@ -124,7 +124,8 @@ export class LSPService {
     }
 
     async handleConnection(ws: ServerWebSocket<any>, rootPath: string, language: string) {
-        const key = this.getInstanceKey(rootPath, language);
+        const normalizedLanguage = (language === 'typescriptreact' || language === 'javascriptreact') ? language.replace('react', '') : language;
+        const key = this.getInstanceKey(rootPath, normalizedLanguage);
         let instance = this.instances.get(key);
 
         if (!instance) {
@@ -145,7 +146,8 @@ export class LSPService {
     }
 
     handleMessage(ws: ServerWebSocket<any>, rootPath: string, language: string, message: string | Buffer) {
-        const key = this.getInstanceKey(rootPath, language);
+        const normalizedLanguage = (language === 'typescriptreact' || language === 'javascriptreact') ? language.replace('react', '') : language;
+        const key = this.getInstanceKey(rootPath, normalizedLanguage);
         const instance = this.instances.get(key);
         if (!instance) {
             console.warn(`[LSP] Received message for non-existent server: ${key}`);
@@ -162,7 +164,9 @@ export class LSPService {
             this.rewriteURIs(payload, (uri) => {
                 if (uri.startsWith('file:///')) {
                     const relativePath = uri.slice(8);
-                    return pathToFileURL(join(rootPath, relativePath)).toString();
+                    // Standardize: ensure we don't have multiple slashes if relativePath already starts with one
+                    const targetPath = join(rootPath, relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
+                    return pathToFileURL(targetPath).toString();
                 }
                 return uri;
             });
@@ -206,7 +210,8 @@ export class LSPService {
     }
 
     handleClose(ws: ServerWebSocket<any>, rootPath: string, language: string) {
-        const key = this.getInstanceKey(rootPath, language);
+        const normalizedLanguage = (language === 'typescriptreact' || language === 'javascriptreact') ? language.replace('react', '') : language;
+        const key = this.getInstanceKey(rootPath, normalizedLanguage);
         const instance = this.instances.get(key);
         if (instance) {
             instance.clients.delete(ws);
@@ -220,7 +225,7 @@ export class LSPService {
 
     private async resolveLSPCommand(language: string): Promise<string[]> {
         // Tier 1: System Path (Preferred if installed intentionally)
-        if (language === 'typescript' || language === 'javascript') {
+        if (language === 'typescript' || language === 'javascript' || language === 'typescriptreact' || language === 'javascriptreact') {
             // Tier 0: Local node_modules (Best for dev/self-contained)
             // Process CWD is expected to be the app root
             const projectRoot = process.cwd();
@@ -234,7 +239,7 @@ export class LSPService {
             for (const p of potentialPaths) {
                 if (await Bun.file(p).exists()) {
                     console.log(`[LSP] Found local typescript-language-server at ${p}`);
-                    return ["bun", p, "--stdio"];
+                    return ["node", p, "--stdio"];
                 }
             }
 
@@ -327,20 +332,27 @@ export class LSPService {
         console.log(`[LSP] Root Path: ${rootPath}`);
         console.log(`[LSP] Command: ${cmd.join(' ')}`);
 
+        const hasTsConfig = await Bun.file(join(rootPath, "tsconfig.json")).exists();
+        console.log(`[LSP] tsconfig.json found: ${hasTsConfig}`);
+
         // Enforce max processes
         if (this.instances.size >= MAX_LSP_PROCESSES) {
             this.evictLRU();
         }
 
-        const process = Bun.spawn(cmd, {
+        const lspProcess = Bun.spawn(cmd, {
             cwd: rootPath,
             stdin: "pipe",
             stdout: "pipe",
             stderr: "pipe",
+            env: {
+                ...process.env,
+                NODE_OPTIONS: "--max-old-space-size=4096"
+            }
         });
 
         const instance: LSPInstance = {
-            process: process as Subprocess<"pipe", "pipe", "pipe">,
+            process: lspProcess as Subprocess<"pipe", "pipe", "pipe">,
             language,
             rootPath,
             clients: new Set(),
@@ -356,18 +368,22 @@ export class LSPService {
         // Log stderr
         this.logStderr(instance);
 
+        const rootUri = pathToFileURL(rootPath).toString();
+        const rootUriWithSlash = rootUri.endsWith('/') ? rootUri : rootUri + '/';
+
         // Send 'initialize'
         const initMsg = {
             jsonrpc: "2.0",
             id: "internal-init",
             method: "initialize",
             params: {
-                processId: process.pid,
-                rootUri: `file://${rootPath}`,
+                processId: lspProcess.pid,
+                rootPath: rootPath,
+                rootUri: rootUriWithSlash,
                 workspaceFolders: [
                     {
                         name: "root",
-                        uri: `file://${rootPath}`
+                        uri: rootUriWithSlash
                     }
                 ],
                 capabilities: {
@@ -392,11 +408,77 @@ export class LSPService {
                         },
                         references: {
                             dynamicRegistration: true
+                        },
+                        documentSymbol: {
+                            dynamicRegistration: true,
+                            hierarchicalDocumentSymbolSupport: true
+                        },
+                        codeAction: {
+                            dynamicRegistration: true,
+                            codeActionLiteralSupport: {
+                                codeActionKind: {
+                                    valueSet: ["", "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports"]
+                                }
+                            }
+                        },
+                        rename: {
+                            dynamicRegistration: true,
+                            prepareSupport: true
+                        },
+                        signatureHelp: {
+                            dynamicRegistration: true,
+                            signatureInformation: {
+                                documentationFormat: ["markdown", "plaintext"]
+                            }
+                        },
+                        completion: {
+                            dynamicRegistration: true,
+                            completionItem: {
+                                snippetSupport: true,
+                                commitCharactersSupport: true,
+                                documentationFormat: ["markdown", "plaintext"],
+                                deprecatedSupport: true,
+                                preselectSupport: true
+                            },
+                            contextSupport: true
                         }
                     },
                     workspace: {
                         workspaceFolders: true,
-                        configuration: true
+                        configuration: true,
+                        didChangeConfiguration: {
+                            dynamicRegistration: true
+                        },
+                        didChangeWatchedFiles: {
+                            dynamicRegistration: true
+                        },
+                        symbol: {
+                            dynamicRegistration: true,
+                            symbolKind: {
+                                valueSet: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
+                            }
+                        },
+                        executeCommand: {
+                            dynamicRegistration: true
+                        }
+                    }
+                },
+                initializationOptions: {
+                    preferences: {
+                        includePackageJsonAutoImports: "auto",
+                        importModuleSpecifierPreference: "non-relative",
+                        includeExternalModuleExports: true,
+                        includeInsertArgumentPlaceholders: true
+                    },
+                    tsserver: {
+                        logVerbosity: "normal",
+                        path: await (async () => {
+                            const projectTs = resolve(rootPath, "node_modules/typescript/lib/tsserver.js");
+                            if (await Bun.file(projectTs).exists()) return projectTs;
+                            const appTs = resolve(process.cwd(), "node_modules/typescript/lib/tsserver.js");
+                            if (await Bun.file(appTs).exists()) return appTs;
+                            return "tsserver"; // Fallback to system path
+                        })()
                     }
                 }
             }
@@ -499,28 +581,57 @@ export class LSPService {
                     // Internal initialization handling
                     if (payload.id === "internal-init" && !instance.isInitialized) {
                         console.log(`[LSP] Server initialized successfully`);
-                        instance.isInitialized = true;
+                        // instance.isInitialized = true; // DO NOT set here yet, wait for replay
                         this.sendToInstance(instance, {
                             jsonrpc: "2.0",
                             method: "initialized",
                             params: {}
                         });
 
-                        // Send buffered client messages
-                        for (const msg of instance.pendingNotifications) {
-                            console.log(`[LSP] Replay buffered message: ${msg.method || 'request'}`);
-                            this.forwardToProcess(instance, JSON.stringify(msg));
-                        }
-                        instance.pendingNotifications = [];
+                        // Notify configuration change to trigger indexing
+                        this.sendToInstance(instance, {
+                            jsonrpc: "2.0",
+                            method: "workspace/didChangeConfiguration",
+                            params: {
+                                settings: {
+                                    typescript: {
+                                        tsserver: {
+                                            logVerbosity: "normal"
+                                        }
+                                    },
+                                    javascript: {
+                                        tsserver: {
+                                            logVerbosity: "normal"
+                                        }
+                                    }
+                                }
+                            }
+                        });
+
+                        // Reduced delay for replaying buffered messages, but set initialized AFTER
+                        setTimeout(() => {
+                            for (const msg of instance.pendingNotifications) {
+                                console.log(`[LSP] Replay buffered message: ${msg.method || 'request'}`);
+                                this.forwardToProcess(instance, JSON.stringify(msg));
+                            }
+                            instance.pendingNotifications = [];
+                            instance.isInitialized = true; // NOW it is ready for new messages
+                            console.log(`[LSP] Server ready and buffered messages replayed`);
+                        }, 1000); // 1 second should be enough for basic startup handover
                     }
 
                     this.rewriteURIs(payload, (uri) => {
                         const rootUrl = pathToFileURL(instance.rootPath).toString();
-                        if (uri.startsWith(rootUrl)) {
-                            let rel = uri.slice(rootUrl.length);
-                            // Normalize to client-style absolute path /foo/bar
-                            if (rel.startsWith('/') || rel.startsWith('\\')) rel = rel.slice(1);
+                        const rootUrlPrefix = rootUrl.endsWith('/') ? rootUrl : rootUrl + '/';
+
+                        if (uri.startsWith(rootUrlPrefix)) {
+                            const rel = uri.slice(rootUrlPrefix.length);
                             return `file:///${rel}`;
+                        } else if (uri.startsWith(rootUrl)) {
+                            // Fallback for exact root match or missing trailing slash in comparison
+                            const rel = uri.slice(rootUrl.length);
+                            const normalizedRel = rel.startsWith('/') ? rel.slice(1) : rel;
+                            return `file:///${normalizedRel}`;
                         }
                         return uri;
                     });

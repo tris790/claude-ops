@@ -1,4 +1,3 @@
-
 import { gitService } from "../git";
 
 export class GitContextManager {
@@ -17,8 +16,6 @@ export class GitContextManager {
         const repoPath = gitService.getRepoPath(projectName, repoName);
 
         // 2. Check Dirty State
-        // We don't want to destroy user's uncommitted work by switching branches/commits forcefully
-        // or getting into a conflict state.
         const dirty = await this.isDirty(repoPath);
         if (dirty) {
             return {
@@ -35,16 +32,16 @@ export class GitContextManager {
 
         // 4. Attempt Checkout
         try {
-            // Ensure we have the latest refs? 
-            // gitService.fetch() might be too heavy to do ALWAYS.
-            // But if checkout fails (commit not found), we should try fetching.
-
             try {
+                // Optimistic attempt: assume we have the commit locally
                 await this.checkout(repoPath, commitHash);
             } catch (checkoutError) {
-                // If checkout failed, maybe we don't have the commit. Fetch and try again.
-                // Assuming origin is the remote.
-                await this.fetch(repoPath);
+                // 4b. Missing Commit / Shallow Clone Scenario
+                // If the checkout fails, it is likely because the commit does not exist 
+                // in the local shallow clone. We must fetch the SPECIFIC hash from origin.
+                await this.fetch(repoPath, commitHash);
+
+                // Retry checkout after fetch
                 await this.checkout(repoPath, commitHash);
             }
 
@@ -70,7 +67,6 @@ export class GitContextManager {
 
         const exitCode = await proc.exited;
         if (exitCode !== 0) {
-            // If git status fails, assume it's unsafe to proceed
             throw new Error("Failed to check git status");
         }
 
@@ -89,8 +85,22 @@ export class GitContextManager {
         return output.trim();
     }
 
-    private async fetch(repoPath: string): Promise<void> {
-        const proc = Bun.spawn(["git", "fetch"], {
+    /**
+     * Fetches updates. If a commitHash is provided, it specifically fetches that hash
+     * from origin. This is required for shallow clones to access older history or 
+     * remote branches without unshallowing the whole repo.
+     */
+    private async fetch(repoPath: string, commitHash?: string): Promise<void> {
+        const args = ["git", "fetch", "origin"];
+
+        if (commitHash) {
+            // Fetch the specific commit object.
+            // This works on most modern git servers (GitHub/GitLab) even if the 
+            // commit isn't the tip of a branch.
+            args.push(commitHash);
+        }
+
+        const proc = Bun.spawn(args, {
             cwd: repoPath,
             stdout: "ignore",
             stderr: "pipe",

@@ -106,7 +106,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
         const ext = filePath.split('.').pop()?.toLowerCase();
         let language = "";
-        if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') language = 'typescript';
+        if (ext === 'ts' || ext === 'js') language = 'typescript';
+        else if (ext === 'tsx' || ext === 'jsx') language = 'typescriptreact';
         else if (ext === 'go') language = 'go';
         else if (ext === 'py') language = 'python';
 
@@ -132,7 +133,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
             client.sendNotification('textDocument/didOpen', {
                 textDocument: {
-                    uri: `file:///modified${normalizedPath}`,
+                    uri: `file://${normalizedPath}`, // Use real path for modified side
                     languageId: language,
                     version: 1,
                     text: contents!.modified
@@ -441,7 +442,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                             highlightChanges: true,
                             gutter: true,
                         }),
-                        ...createLSPExtensions(`file:///modified${normalizedPath}`),
+                        ...createLSPExtensions(`file://${normalizedPath}`),
                         ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
                     ]
                 }),
@@ -457,7 +458,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     doc: contents.modified,
                     extensions: [
                         ...baseExtensions,
-                        ...createLSPExtensions(`file:///modified${normalizedPath}`),
+                        ...createLSPExtensions(`file://${normalizedPath}`),
                         ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
                     ]
                 }),
@@ -481,7 +482,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 doc: contents.modified,
                 extensions: [
                     ...baseExtensions,
-                    ...createLSPExtensions(`file:///modified${normalizedPath}`),
+                    ...createLSPExtensions(`file://${normalizedPath}`),
                     ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
                 ]
             },
@@ -489,7 +490,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         });
 
         const unbindA = setupDiagnostics("a", `file:///original${normalizedPath}`);
-        const unbindB = setupDiagnostics("b", `file:///modified${normalizedPath}`);
+        const unbindB = setupDiagnostics("b", `file://${normalizedPath}`);
 
         return () => {
             unbindA?.();

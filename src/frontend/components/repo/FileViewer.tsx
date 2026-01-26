@@ -96,7 +96,8 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
 
         const ext = file.path.split('.').pop()?.toLowerCase();
         let language = "";
-        if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') language = 'typescript';
+        if (ext === 'ts' || ext === 'js') language = 'typescript';
+        else if (ext === 'tsx' || ext === 'jsx') language = 'typescriptreact';
         else if (ext === 'go') language = 'go';
         else if (ext === 'py') language = 'python';
         else if (ext === 'c' || ext === 'h') language = 'c';
