@@ -160,6 +160,7 @@ export class LSPService {
         let payload: any;
         try {
             payload = JSON.parse(json);
+
             // Rewrite URIs from client to server (bridge rootPath)
             this.rewriteURIs(payload, (uri) => {
                 if (uri.startsWith('file:///')) {
@@ -298,53 +299,50 @@ export class LSPService {
             if (await Bun.file("C:/Program Files/LLVM/bin/clangd.exe").exists()) return ["C:/Program Files/LLVM/bin/clangd.exe", ...args];
         } else if (language === 'csharp') {
             // Priority 1: Modern Roslyn (C# Dev Kit / C# Extension)
-            // It uses Microsoft.CodeAnalysis.LanguageServer.dll
+            // It uses Microsoft.CodeAnalysis.LanguageServer.dll/.exe
+            const home = homedir();
+            const extensionsDir = join(home, ".vscode/extensions");
 
-            // We need dotnet to run it
-            const dotnet = Bun.which("dotnet") || (await Bun.file("/usr/bin/dotnet").exists() ? "/usr/bin/dotnet" : null);
+            try {
+                const entries = await readdir(extensionsDir);
+                // Find latest C# extension (includes platform suffix like -win32-x64)
+                const csharpExts = entries.filter(e => e.startsWith("ms-dotnettools.csharp-")).sort().reverse();
 
-            if (dotnet) {
-                const home = homedir();
-                const extensionsDir = join(home, ".vscode/extensions");
+                for (const ext of csharpExts) {
+                    const roslynDir = join(extensionsDir, ext, ".roslyn");
 
-                try {
-                    if (await Bun.file(extensionsDir).exists() || (await readdir(extensionsDir)).length > 0) {
-                        const entries = await readdir(extensionsDir);
-                        // Find latest C# extension
-                        const csharpExts = entries.filter(e => e.startsWith("ms-dotnettools.csharp-")).sort().reverse();
+                    // Roslyn requires --logLevel and --extensionLogDirectory
+                    const logDir = join(home, ".claude-ops", "logs", "roslyn");
+                    const roslynArgs = ["--stdio", "--logLevel", "Warning", "--extensionLogDirectory", logDir];
 
-                        for (const ext of csharpExts) {
-                            // Check for .roslyn/Microsoft.CodeAnalysis.LanguageServer.dll
-                            const dllPath = join(extensionsDir, ext, ".roslyn", "Microsoft.CodeAnalysis.LanguageServer.dll");
-                            if (await Bun.file(dllPath).exists()) {
-                                console.log(`[LSP] Found Roslyn Language Server at ${dllPath}`);
-                                return [dotnet, dllPath];
-                            }
+                    // On Windows, prefer the native EXE (no dotnet required)
+                    const exePath = join(roslynDir, "Microsoft.CodeAnalysis.LanguageServer.exe");
+                    if (await Bun.file(exePath).exists()) {
+                        console.log(`[LSP] Found Roslyn Language Server EXE at ${exePath}`);
+                        return [exePath, ...roslynArgs];
+                    }
 
-                            // Legacy: .omnisharp/...
-                            // Just in case
+                    // Fallback to DLL with dotnet
+                    const dllPath = join(roslynDir, "Microsoft.CodeAnalysis.LanguageServer.dll");
+                    if (await Bun.file(dllPath).exists()) {
+                        const dotnet = Bun.which("dotnet") || (await Bun.file("/usr/bin/dotnet").exists() ? "/usr/bin/dotnet" : null);
+                        if (dotnet) {
+                            console.log(`[LSP] Found Roslyn Language Server DLL at ${dllPath}`);
+                            return [dotnet, dllPath, ...roslynArgs];
                         }
                     }
-                } catch (e) {
-                    // ignore
                 }
-
-                // Try csharp-ls if dotnet is available (installed as tool?)
-                const csharpLs = Bun.which("csharp-ls");
-                if (csharpLs) return [csharpLs];
-            } else {
-                console.warn("[LSP] 'dotnet' not found in PATH or standard locations. C# LSP might fail.");
+            } catch (e) {
+                console.warn("[LSP] Error reading VS Code extensions:", e);
             }
 
-            // Fallbacks for standalone binaries
-            const bin = Bun.which("csharp-ls");
-            if (bin) return [bin];
+            // Try csharp-ls if available
+            const csharpLs = Bun.which("csharp-ls");
+            if (csharpLs) return [csharpLs];
 
+            // Fallback to OmniSharp
             const omnisharp = Bun.which("OmniSharp");
             if (omnisharp) return [omnisharp, "-lsp"];
-
-            // If we have dotnet but couldn't find the DLL, maybe we can run a custom command if configured?
-            // For now, fail gracefully.
         }
 
         throw new Error(`Language server for ${language} not found. Please install proper LSP support.`);
@@ -533,6 +531,36 @@ export class LSPService {
         }
     }
 
+    private async openCSharpSolution(instance: LSPInstance) {
+        try {
+            const entries = await readdir(instance.rootPath);
+            const slnFile = entries.find(e => e.endsWith('.sln'));
+
+            if (slnFile) {
+                const slnPath = join(instance.rootPath, slnFile);
+                const slnUri = pathToFileURL(slnPath).toString();
+                console.log(`[LSP] Opening C# solution: ${slnPath}`);
+
+                this.sendToInstance(instance, {
+                    jsonrpc: "2.0",
+                    id: "internal-solution-open",
+                    method: "solution/open",
+                    params: { solution: slnUri }
+                });
+            } else {
+                // Try to find a .csproj file instead
+                const csprojFile = entries.find(e => e.endsWith('.csproj'));
+                if (csprojFile) {
+                    console.log(`[LSP] No .sln found, but found ${csprojFile} - Roslyn may auto-discover it`);
+                } else {
+                    console.warn(`[LSP] No .sln or .csproj found in ${instance.rootPath}`);
+                }
+            }
+        } catch (e) {
+            console.error(`[LSP] Error opening C# solution:`, e);
+        }
+    }
+
     private async processOutput(instance: LSPInstance) {
         if (!instance.process.stdout) return;
 
@@ -607,7 +635,7 @@ export class LSPService {
                 let payload: any;
                 try {
                     payload = JSON.parse(message);
-                    if (payload.method !== 'textDocument/publishDiagnostics') {
+                    if (payload.method !== 'textDocument/publishDiagnostics' && payload.method !== 'window/logMessage') {
                         console.log(`[LSP] << ${payload.method || ('id:' + payload.id)}`);
                     }
 
@@ -620,6 +648,11 @@ export class LSPService {
                             method: "initialized",
                             params: {}
                         });
+
+                        // For C# projects, open the solution file
+                        if (instance.language === 'csharp') {
+                            this.openCSharpSolution(instance);
+                        }
 
                         // Notify configuration change to trigger indexing
                         this.sendToInstance(instance, {
@@ -642,6 +675,8 @@ export class LSPService {
                         });
 
                         // Reduced delay for replaying buffered messages, but set initialized AFTER
+                        // For C#, use a longer delay to allow solution loading
+                        const delay = instance.language === 'csharp' ? 3000 : 1000;
                         setTimeout(() => {
                             for (const msg of instance.pendingNotifications) {
                                 console.log(`[LSP] Replay buffered message: ${msg.method || 'request'}`);
@@ -650,7 +685,7 @@ export class LSPService {
                             instance.pendingNotifications = [];
                             instance.isInitialized = true; // NOW it is ready for new messages
                             console.log(`[LSP] Server ready and buffered messages replayed`);
-                        }, 1000); // 1 second should be enough for basic startup handover
+                        }, delay);
                     }
 
                     this.rewriteURIs(payload, (uri) => {
@@ -693,9 +728,9 @@ export class LSPService {
                 const { done, value } = await reader.read();
                 if (done) break;
                 const text = decoder.decode(value);
-                // Don't spam console too much, but useful for debugging
-                if (process.env.NODE_ENV !== 'production') {
-                    console.error(`[LSP STDERR]`, text);
+                // Log stderr for debugging (filter out verbose messages)
+                if (!text.includes('[Informational]')) {
+                    console.error(`[LSP STDERR]`, text.slice(0, 200));
                 }
             }
         } catch (e) {
@@ -715,6 +750,12 @@ export class LSPService {
                 language = "python";
             } else if (await Bun.file(join(rootPath, "CMakeLists.txt")).exists()) {
                 language = "cpp";
+            } else {
+                // Check for C# projects (.csproj or .sln files)
+                const entries = await readdir(rootPath);
+                if (entries.some(e => e.endsWith(".csproj") || e.endsWith(".sln"))) {
+                    language = "csharp";
+                }
             }
         } catch (e) {
             // ignore fs errors
