@@ -1,5 +1,7 @@
 import { azureClient } from "../services/azure";
 import { gitService } from "../services/git";
+import { gitContextManager } from "../services/git/GitContextManager";
+import { lspService } from "../services/lsp";
 
 
 function getPrId(req: Request, params: any): string {
@@ -100,6 +102,31 @@ export const prRoutes = {
                 // Add isCloned status
                 if (pr.repository) {
                     pr.repository.isCloned = await gitService.isCloned(pr.repository.project.name, pr.repository.name);
+
+                    // Hook into PR Open Event (LSP Architecture V2)
+                    // If cloned, ensure we are on the correct commit and warm up LSP
+                    if (pr.repository.isCloned && pr.lastMergeSourceCommit) {
+                        const projectName = pr.repository.project.name;
+                        const repoName = pr.repository.name;
+                        const commitHash = pr.lastMergeSourceCommit.commitId;
+
+                        // Run in background
+                        (async () => {
+                            try {
+                                console.log(`[PR-Hook] Ensuring context for PR ${id} (${commitHash})`);
+                                const result = await gitContextManager.ensureCommit(projectName, repoName, commitHash);
+
+                                if (result.success) {
+                                    const repoPath = gitService.getRepoPath(projectName, repoName);
+                                    await lspService.warmup(repoPath);
+                                } else {
+                                    console.warn(`[PR-Hook] Context switch failed: ${result.error}`);
+                                }
+                            } catch (bgError) {
+                                console.error(`[PR-Hook] Background task error:`, bgError);
+                            }
+                        })();
+                    }
                 }
 
                 return Response.json(pr);

@@ -558,6 +558,38 @@ export class LSPService {
             // ignore
         }
     }
+    public async warmup(rootPath: string) {
+        // Simple heuristic to detect language
+        let language = "";
+
+        try {
+            if (await Bun.file(join(rootPath, "package.json")).exists()) {
+                language = "typescript";
+            } else if (await Bun.file(join(rootPath, "go.mod")).exists()) {
+                language = "go";
+            } else if (await Bun.file(join(rootPath, "requirements.txt")).exists() || await Bun.file(join(rootPath, "pyproject.toml")).exists()) {
+                language = "python";
+            } else if (await Bun.file(join(rootPath, "CMakeLists.txt")).exists()) {
+                language = "cpp";
+            }
+        } catch (e) {
+            // ignore fs errors
+        }
+
+        if (!language) return;
+
+        const key = this.getInstanceKey(rootPath, language);
+        if (this.instances.has(key)) return; // Already running
+
+        try {
+            console.log(`[LSP] Warming up ${language} server for ${rootPath}`);
+            const instance = await this.spawnServer(rootPath, language);
+            this.instances.set(key, instance);
+        } catch (e) {
+            // Be silent on warmup failure, it's an optimization
+            console.warn(`[LSP] Failed to warm up server for ${rootPath}:`, e);
+        }
+    }
 }
 
 export const lspService = new LSPService();

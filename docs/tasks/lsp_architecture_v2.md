@@ -39,7 +39,7 @@ Solve the startup latency problem by keeping processes alive.
 ### 3. PR View Integration
 Connect the PR opening flow to the new backend capabilities.
 
-- [ ] **Hook into PR Open Event**
+- [x] **Hook into PR Open Event**
     - **Goal**: Prepare the LSP environment when a user opens a PR.
     - **Path**: `src/backend/routes/pr.ts` (or equivalent controller)
     - **Task**:
