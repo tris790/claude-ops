@@ -215,15 +215,16 @@ export class GitService {
         }
     }
 
-    async getFileContent(projectName: string, repoName: string, path: string): Promise<string> {
+    async getFileContent(projectName: string, repoName: string, path: string, version?: string): Promise<string> {
         const repoPath = this.getRepoPath(projectName, repoName);
         if (!(await this.isCloned(projectName, repoName))) {
             throw new Error("Repository not cloned");
         }
 
         const relPath = path.replace(/^\//, "");
+        const ref = version || "HEAD";
 
-        const proc = Bun.spawn(["git", "show", `HEAD:${relPath}`], {
+        const proc = Bun.spawn(["git", "show", `${ref}:${relPath}`], {
             cwd: repoPath,
             stdout: "pipe",
             stderr: "pipe"

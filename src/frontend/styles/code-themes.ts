@@ -60,23 +60,40 @@ export const darkThemeExtension = EditorView.theme({
         border: "1px solid rgba(173, 214, 255, 0.1)",
         borderRadius: "2px",
     },
-    /* Diff / Merge View Styles */
+    /* Diff / Merge View Styles - Side-by-side mode */
+    "&.cm-merge-a .cm-changedLine": {
+        backgroundColor: "rgba(244, 63, 94, 0.15)", // Red for deletions (side A = original)
+    },
+    "&.cm-merge-b .cm-changedLine": {
+        backgroundColor: "rgba(34, 197, 94, 0.15)", // Green for additions (side B = modified)
+    },
+    "&.cm-merge-a .cm-changedText": {
+        backgroundColor: "rgba(244, 63, 94, 0.4)",
+        color: "#fca5a5",
+    },
+    "&.cm-merge-b .cm-changedText": {
+        backgroundColor: "rgba(34, 197, 94, 0.4)",
+        color: "#86efac",
+    },
+    /* Diff / Merge View Styles - Unified mode */
     ".cm-deletedChunk": {
-        backgroundColor: "rgba(244, 63, 94, 0.15)", // Rose-500 optimized
+        backgroundColor: "rgba(244, 63, 94, 0.15)",
     },
-    ".cm-insertedChunk": {
-        backgroundColor: "rgba(34, 197, 94, 0.15)", // Green-500 optimized
+    ".cm-deletedChunk .cm-deletedLine": {
+        backgroundColor: "rgba(244, 63, 94, 0.2)",
     },
-    ".cm-deletedText": {
-        backgroundColor: "rgba(244, 63, 94, 0.35)",
-        color: "#ffcdd2",
+    ".cm-deletedChunk .cm-deletedText": {
+        backgroundColor: "rgba(244, 63, 94, 0.4)",
+        color: "#fca5a5",
     },
-    ".cm-insertedText": {
-        backgroundColor: "rgba(34, 197, 94, 0.35)",
-        color: "#c8e6c9",
+    ".cm-insertedLine": {
+        backgroundColor: "rgba(34, 197, 94, 0.15)",
     },
-    ".cm-changedLine": {
-        backgroundColor: "rgba(59, 130, 246, 0.15)", // Blue for changed lines (if used)
+    ".cm-changedLineGutter": {
+        backgroundColor: "#ef4444",
+    },
+    ".cm-deletedLineGutter": {
+        backgroundColor: "#ef4444",
     },
 }, { dark: true });
 

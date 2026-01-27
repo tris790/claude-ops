@@ -189,7 +189,7 @@ export const repoRoutes = {
 
                 if (repoInfo && repoInfo.project && repoInfo.name) {
                     if (await gitService.isCloned(repoInfo.project.name, repoInfo.name)) {
-                        const content = await gitService.getFileContent(repoInfo.project.name, repoInfo.name, path);
+                        const content = await gitService.getFileContent(repoInfo.project.name, repoInfo.name, path, version || undefined);
                         return Response.json({ content });
                     }
                 }
