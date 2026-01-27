@@ -1,12 +1,29 @@
-import { createHighlighter, type Highlighter } from 'shiki';
+import { createHighlighterCore, type HighlighterCore } from 'shiki/core';
+import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 
-let highlighter: Highlighter | null = null;
+let highlighter: HighlighterCore | null = null;
 
 export async function getHighlighter() {
     if (highlighter) return highlighter;
-    highlighter = await createHighlighter({
-        themes: ['github-dark', 'github-light'],
-        langs: ['typescript', 'javascript', 'go', 'python', 'json', 'bash', 'markdown', 'csharp', 'cpp', 'html', 'css']
+    highlighter = await createHighlighterCore({
+        themes: [
+            import('shiki/themes/github-dark.mjs'),
+            import('shiki/themes/github-light.mjs'),
+        ],
+        langs: [
+            import('shiki/langs/typescript.mjs'),
+            import('shiki/langs/javascript.mjs'),
+            import('shiki/langs/go.mjs'),
+            import('shiki/langs/python.mjs'),
+            import('shiki/langs/json.mjs'),
+            import('shiki/langs/bash.mjs'),
+            import('shiki/langs/markdown.mjs'),
+            import('shiki/langs/csharp.mjs'),
+            import('shiki/langs/cpp.mjs'),
+            import('shiki/langs/html.mjs'),
+            import('shiki/langs/css.mjs'),
+        ],
+        engine: createJavaScriptRegexEngine(),
     });
     return highlighter;
 }
