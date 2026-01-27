@@ -7,6 +7,24 @@ export async function getPipelines() {
     return res.json();
 }
 
+export async function getPipeline(pipelineId: number) {
+    const res = await fetch(`/api/pipelines/${pipelineId}`);
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to fetch pipeline");
+    }
+    return res.json();
+}
+
+export async function getPipelineRuns(pipelineId: number) {
+    const res = await fetch(`/api/pipelines/${pipelineId}/runs`);
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to fetch pipeline runs");
+    }
+    return res.json();
+}
+
 export async function getRecentRuns() {
     const res = await fetch("/api/pipelines/runs");
     if (!res.ok) {
@@ -36,6 +54,15 @@ export async function cancelRun(runId: number) {
     if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to cancel run");
+    }
+    return res.json();
+}
+
+export async function getRun(runId: number) {
+    const res = await fetch(`/api/pipelines/runs/${runId}`);
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to fetch run details");
     }
     return res.json();
 }

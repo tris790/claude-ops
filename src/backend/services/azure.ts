@@ -30,6 +30,9 @@ export class AzureDevOpsClient {
         return url.replace(/\/$/, "");
     }
 
+    private pipelineProjectCache = new Map<number, string>();
+    private buildProjectCache = new Map<number, string>();
+
     private get baseUrl() {
         return this.normalizeUrl(process.env.AZURE_DEVOPS_ORG_URL);
     }
@@ -725,15 +728,55 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/pipelines?api-version=7.0`;
+        const projects = await this.getProjects();
+        const results = await Promise.all(
+            projects.map(async (p: any) => {
+                try {
+                    const url = `${this.baseUrl}/${p.name}/_apis/pipelines?api-version=7.0-preview.1`;
+                    const res = await fetch(url, { headers: this.headers });
+                    if (!res.ok) return [];
+                    const data = await res.json();
+                    const pipelines = data.value || [];
+                    pipelines.forEach((pipe: any) => {
+                        this.pipelineProjectCache.set(pipe.id, p.name);
+                    });
+                    return pipelines.map((pipe: any) => ({
+                        ...pipe,
+                        project: { name: p.name, id: p.id }
+                    }));
+                } catch (e) {
+                    return [];
+                }
+            })
+        );
+
+        return results.flat();
+    }
+
+    async getPipeline(pipelineId: number) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const projectName = await this.getProjectForPipeline(pipelineId);
+        const url = `${this.baseUrl}/${projectName}/_apis/pipelines/${pipelineId}?api-version=7.0-preview.1`;
         const res = await fetch(url, { headers: this.headers });
 
         if (!res.ok) {
-            throw new Error(`Failed to fetch pipelines: ${res.status} ${res.statusText}`);
+            throw new Error(`Failed to fetch pipeline: ${res.status} ${res.statusText}`);
         }
 
-        const data = await res.json();
-        return data.value || [];
+        return await res.json();
+    }
+
+    private async getProjectForPipeline(pipelineId: number) {
+        let projectName = this.pipelineProjectCache.get(pipelineId);
+        if (!projectName) {
+            await this.getPipelines();
+            projectName = this.pipelineProjectCache.get(pipelineId);
+        }
+        if (!projectName) throw new Error(`Project for pipeline ${pipelineId} not found`);
+        return projectName;
     }
 
     async getRecentRuns() {
@@ -741,16 +784,75 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        // Using builds API for better run history
-        const url = `${this.baseUrl}/_apis/build/builds?api-version=7.0&maxBuildsPerDefinition=1`;
+        const projects = await this.getProjects();
+        const results = await Promise.all(
+            projects.map(async (p: any) => {
+                try {
+                    const url = `${this.baseUrl}/${p.name}/_apis/build/builds?api-version=7.0&maxBuildsPerDefinition=1`;
+                    const res = await fetch(url, { headers: this.headers });
+                    if (!res.ok) return [];
+                    const data = await res.json();
+                    const builds = data.value || [];
+                    builds.forEach((build: any) => {
+                        this.buildProjectCache.set(build.id, p.name);
+                    });
+                    return builds.map((build: any) => ({
+                        ...build,
+                        project: { name: p.name, id: p.id }
+                    }));
+                } catch (e) {
+                    return [];
+                }
+            })
+        );
+
+        return results.flat();
+    }
+
+    async getPipelineRuns(pipelineId: number, top: number = 10) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const projectName = await this.getProjectForPipeline(pipelineId);
+        const url = `${this.baseUrl}/${projectName}/_apis/build/builds?definitions=${pipelineId}&$top=${top}&api-version=7.0`;
         const res = await fetch(url, { headers: this.headers });
 
         if (!res.ok) {
-            throw new Error(`Failed to fetch recent runs: ${res.status} ${res.statusText}`);
+            throw new Error(`Failed to fetch pipeline runs: ${res.status} ${res.statusText}`);
         }
 
         const data = await res.json();
-        return data.value || [];
+        const builds = data.value || [];
+        builds.forEach((build: any) => {
+            this.buildProjectCache.set(build.id, projectName);
+        });
+        return builds.map((build: any) => ({
+            ...build,
+            project: { name: projectName }
+        }));
+    }
+
+    private async getProjectForBuild(buildId: number) {
+        let projectName = this.buildProjectCache.get(buildId);
+        if (!projectName) {
+            await this.getRecentRuns();
+            projectName = this.buildProjectCache.get(buildId);
+        }
+        if (!projectName) {
+            // Alternative: try to fetch build directly to find project
+            const projects = await this.getProjects();
+            for (const p of projects) {
+                const url = `${this.baseUrl}/${p.name}/_apis/build/builds/${buildId}?api-version=7.0`;
+                const res = await fetch(url, { headers: this.headers });
+                if (res.ok) {
+                    this.buildProjectCache.set(buildId, p.name);
+                    return p.name;
+                }
+            }
+        }
+        if (!projectName) throw new Error(`Project for build ${buildId} not found`);
+        return projectName;
     }
 
     async runPipeline(pipelineId: number, branch: string) {
@@ -758,7 +860,8 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/pipelines/${pipelineId}/runs?api-version=7.0`;
+        const projectName = await this.getProjectForPipeline(pipelineId);
+        const url = `${this.baseUrl}/${projectName}/_apis/pipelines/${pipelineId}/runs?api-version=7.0`;
         const res = await fetch(url, {
             method: "POST",
             headers: this.headers,
@@ -786,7 +889,8 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/build/builds/${buildId}?api-version=7.0`;
+        const projectName = await this.getProjectForBuild(buildId);
+        const url = `${this.baseUrl}/${projectName}/_apis/build/builds/${buildId}?api-version=7.0`;
         const res = await fetch(url, {
             method: "PATCH",
             headers: this.headers,
@@ -805,7 +909,8 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/build/builds/${buildId}/timeline?api-version=7.0`;
+        const projectName = await this.getProjectForBuild(buildId);
+        const url = `${this.baseUrl}/${projectName}/_apis/build/builds/${buildId}/timeline?api-version=7.0`;
         const res = await fetch(url, { headers: this.headers });
 
         if (!res.ok) {
@@ -815,12 +920,33 @@ export class AzureDevOpsClient {
         return await res.json();
     }
 
+    async getRun(buildId: number) {
+        if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
+            throw new Error("Missing configuration");
+        }
+
+        const projectName = await this.getProjectForBuild(buildId);
+        const url = `${this.baseUrl}/${projectName}/_apis/build/builds/${buildId}?api-version=7.0`;
+        const res = await fetch(url, { headers: this.headers });
+
+        if (!res.ok) {
+            throw new Error(`Failed to fetch run: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return {
+            ...data,
+            project: { name: projectName }
+        };
+    }
+
     async getLogContent(buildId: number, logId: number) {
         if (!this.baseUrl || !process.env.AZURE_DEVOPS_PAT) {
             throw new Error("Missing configuration");
         }
 
-        const url = `${this.baseUrl}/_apis/build/builds/${buildId}/logs/${logId}?api-version=7.0`;
+        const projectName = await this.getProjectForBuild(buildId);
+        const url = `${this.baseUrl}/${projectName}/_apis/build/builds/${buildId}/logs/${logId}?api-version=7.0`;
         const res = await fetch(url, { headers: this.headers });
 
         if (!res.ok) {

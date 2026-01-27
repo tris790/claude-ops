@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getRunTimeline, getLogContent } from "../api/pipelines";
+import { getRun, getRunTimeline, getLogContent } from "../api/pipelines";
 import { usePolling } from "../hooks/usePolling";
 import {
     ArrowLeft,
@@ -10,13 +10,15 @@ import {
     Loader2,
     Terminal,
     ChevronRight,
-    Play
+    Play,
+    GitBranch,
+    User
 } from "lucide-react";
-import Ansi from "ansi-to-react";
 
 export function PipelineRunDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [run, setRun] = useState<any>(null);
     const [timeline, setTimeline] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
@@ -25,27 +27,23 @@ export function PipelineRunDetail() {
     const logEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (id) loadTimeline();
+        if (id) {
+            loadData();
+        }
     }, [id]);
 
-    const isRunning = timeline?.records?.some((r: any) => r.state === "inProgress") || timeline?.status === "inProgress";
-
-    usePolling(async () => {
-        await loadTimeline(true);
-    }, {
-        enabled: !!id && (isRunning || !timeline),
-        activeInterval: 5000,
-        backgroundInterval: 30000,
-    });
-
-    async function loadTimeline(silent = false) {
+    async function loadData(silent = false) {
         if (!silent) setLoading(true);
         try {
-            const data = await getRunTimeline(parseInt(id!));
-            setTimeline(data);
+            const [runData, timelineData] = await Promise.all([
+                getRun(parseInt(id!)),
+                getRunTimeline(parseInt(id!))
+            ]);
+            setRun(runData);
+            setTimeline(timelineData);
             // Select first job by default if none selected
             if (!selectedRecordId) {
-                const firstJob = data.records.find((r: any) => r.type === "Job");
+                const firstJob = timelineData.records.find((r: any) => r.type === "Job");
                 if (firstJob) setSelectedRecordId(firstJob.id);
             }
         } catch (err) {
@@ -54,6 +52,16 @@ export function PipelineRunDetail() {
             if (!silent) setLoading(false);
         }
     }
+
+    const isRunning = timeline?.records?.some((r: any) => r.state === "inProgress") || timeline?.status === "inProgress";
+
+    usePolling(async () => {
+        await loadData(true);
+    }, {
+        enabled: !!id && (isRunning || !timeline),
+        activeInterval: 5000,
+        backgroundInterval: 30000,
+    });
 
     useEffect(() => {
         if (selectedRecordId && timeline) {
@@ -104,9 +112,33 @@ export function PipelineRunDetail() {
                         <ArrowLeft className="h-5 w-5" />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-                            Run #{id}
-                        </h1>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
+                                Run #{id}
+                            </h1>
+                            {run && (
+                                <div className="flex items-center gap-2 px-2 py-0.5 bg-zinc-800 rounded text-xs text-zinc-400 font-medium">
+                                    <span>{run.project?.name}</span>
+                                    <span>•</span>
+                                    <span>{run.definition?.name}</span>
+                                </div>
+                            )}
+                        </div>
+                        {run && (
+                            <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
+                                <span className="flex items-center gap-1">
+                                    <GitBranch className="h-3 w-3" />
+                                    {run.sourceBranch?.split('/').pop()}
+                                </span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {run.requestedFor?.displayName}
+                                </span>
+                                <span>•</span>
+                                <span>{new Date(run.queueTime).toLocaleString()}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>
@@ -152,7 +184,7 @@ export function PipelineRunDetail() {
                     </div>
                     <div className="flex-1 overflow-auto p-4 font-mono text-sm leading-relaxed scrollbar-thin scrollbar-thumb-zinc-800">
                         <pre className="text-zinc-300 whitespace-pre-wrap break-all">
-                            <Ansi>{logs}</Ansi>
+                            {logs}
                         </pre>
                         <div ref={logEndRef} />
                     </div>
