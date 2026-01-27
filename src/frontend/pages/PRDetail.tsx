@@ -832,7 +832,7 @@ export function PRDetail() {
                 )}
 
                 {activeTab === "files" && (
-                    <div className="flex flex-col h-full bg-zinc-950">
+                    <div className="flex flex-col h-full bg-zinc-950 relative">
                         <div className="flex h-[calc(100vh-120px)] border-zinc-800 overflow-hidden relative">
                             {/* Sidebar Expand Button (visible only when collapsed) */}
                             {isTreeCollapsed && (
@@ -944,7 +944,7 @@ export function PRDetail() {
 
                         {/* References Panel */}
                         {showReferences && (
-                            <div className="absolute bottom-0 left-0 right-0 z-40">
+                            <div className="absolute bottom-0 left-0 right-0 z-[110]">
                                 <ReferencesPanel
                                     references={references}
                                     repoId={pr.repository.id}
