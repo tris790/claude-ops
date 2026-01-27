@@ -6,6 +6,7 @@ import { workItemRoutes } from "./routes/work-items";
 import { prRoutes } from "./routes/prs";
 import { pipelineRoutes } from "./routes/pipelines";
 import { automationRoutes } from "./routes/automation";
+import { settingsRoutes } from "./routes/settings";
 import { lspService } from "./services/lsp";
 import { gitService } from "./services/git";
 
@@ -28,6 +29,8 @@ const server = serve<WebSocketData>({
     ...pipelineRoutes,
     // Automation Routes
     ...automationRoutes,
+    // Settings Routes
+    ...settingsRoutes,
 
 
     "/api/hello": {
@@ -49,19 +52,6 @@ const server = serve<WebSocketData>({
         if (!projectName || !repoName || !language) {
           return new Response("Missing project, repo, or language", { status: 400 });
         }
-
-        // Resolve absolute path using GitService
-        // We need to import gitService at the top of file or use it here
-        // Since it's imported later in the file, we might need to move the import up
-        // But for now let's assume we can move it or it's hoisted. 
-        // Actually, let's fix the import in a separate step or assume it is available. 
-        // The previous view_file showed it at line 86. 
-        // I will rely on moving the import if needed, but for now I will just reference it.
-        // Wait, if it's let/const it's not hoisted. It was `import ...` which are hoisted.
-        // But it was imported mid-file? No, top-level imports are usually at top.
-        // The previous view_file showed it at line 86. That's weird for a standard file.
-        // Ah, line 86: `import { gitService } from "./services/git";` 
-        // This is valid ES module syntax but usually discouraged.
 
         const rootPath = gitService.getRepoPath(projectName, repoName);
 

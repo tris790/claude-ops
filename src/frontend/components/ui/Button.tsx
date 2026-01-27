@@ -19,8 +19,8 @@ export function Button({
 
     const variants = {
         primary: "bg-sapphire-600 hover:bg-sapphire-500 text-white focus:ring-sapphire-600",
-        secondary: "border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 focus:ring-zinc-600",
-        ghost: "text-zinc-400 hover:text-white hover:bg-zinc-800/50 focus:ring-zinc-600 shadow-none",
+        secondary: "border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 focus:ring-zinc-600",
+        ghost: "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/50 focus:ring-zinc-600 shadow-none",
         danger: "bg-red-600 hover:bg-red-500 text-white focus:ring-red-600",
     };
 

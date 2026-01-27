@@ -128,32 +128,32 @@ export function RepoList() {
                             onClick={() => handleRepoClick(repo)}
                             className="block h-full"
                         >
-                            <Card hoverable className="h-full flex flex-col justify-between group relative overflow-hidden border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/80 transition-all duration-200">
+                            <Card hoverable className="h-full flex flex-col justify-between group relative overflow-hidden border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/80 transition-all duration-200">
                                 <div>
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold px-1.5 py-0.5 rounded border border-zinc-800 bg-zinc-900/50 truncate max-w-[120px]">
+                                                <span className="text-[10px] uppercase tracking-wider text-zinc-600 dark:text-zinc-500 font-semibold px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/50 truncate max-w-[120px]">
                                                     {repo.project.name}
                                                 </span>
                                                 {repo.isCloned && (
-                                                    <span className="text-[10px] text-green-400 flex items-center gap-0.5">
+                                                    <span className="text-[10px] text-green-600 dark:text-green-400 flex items-center gap-0.5">
                                                         <Check className="w-3 h-3" /> Local
                                                     </span>
                                                 )}
                                             </div>
-                                            <h3 className="font-medium text-zinc-100 text-lg group-hover:text-blue-400 transition-colors truncate pr-2" title={repo.name}>
+                                            <h3 className="font-medium text-zinc-900 dark:text-zinc-100 text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate pr-2" title={repo.name}>
                                                 {repo.name}
                                             </h3>
                                         </div>
                                     </div>
                                     {repo.project.description && (
-                                        <p className="text-sm text-zinc-400 line-clamp-2 leading-relaxed">
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
                                             {repo.project.description}
                                         </p>
                                     )}
                                 </div>
-                                <div className="mt-4 pt-4 border-t border-zinc-800/50 flex items-center justify-between text-xs text-zinc-500">
+                                <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800/50 flex items-center justify-between text-xs text-zinc-500">
                                     <div className="flex items-center">
                                         <GitBranch className="w-3.5 h-3.5 mr-1.5" />
                                         <span className="font-mono">{repo.defaultBranch?.replace('refs/heads/', '') || 'main'}</span>
@@ -201,8 +201,8 @@ export function RepoList() {
             <header className="flex-none mb-6">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Repositories</h1>
-                        <p className="text-zinc-400">
+                        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Repositories</h1>
+                        <p className="text-zinc-500 dark:text-zinc-400">
                             {displayRepos.length} repositories across {projects.length} projects
                         </p>
                     </div>
@@ -220,10 +220,10 @@ export function RepoList() {
                 </div>
 
                 <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-5 w-5 text-zinc-500" />
+                    <Search className="absolute left-3 top-2.5 h-5 w-5 text-zinc-400 dark:text-zinc-500" />
                     <Input
                         placeholder="Search repositories (fuzzy) or projects..."
-                        className="pl-10 h-10 text-lg bg-zinc-900/50 border-zinc-800 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all font-mono"
+                        className="pl-10 h-10 text-lg bg-white dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all font-mono"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         autoFocus

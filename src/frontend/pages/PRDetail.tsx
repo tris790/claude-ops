@@ -449,7 +449,7 @@ export function PRDetail() {
     const canComplete = !hasRejections && !hasConflicts && pr.status === 'active';
 
     return (
-        <div className="flex flex-col h-full bg-zinc-950">
+        <div className="flex flex-col h-full bg-zinc-50 dark:bg-zinc-950">
             <CompleteDialog
                 isOpen={completeDialogOpen}
                 onClose={() => setCompleteDialogOpen(false)}
@@ -460,23 +460,23 @@ export function PRDetail() {
             />
 
             {/* Header Section - Compact */}
-            <header className="w-full border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-md sticky top-0 z-20">
+            <header className="w-full border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-md sticky top-0 z-20">
                 <div className="max-w-7xl mx-auto px-4 py-2 flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
                             <button
                                 onClick={() => navigate("/prs")}
-                                className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+                                className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
                                 title="Back to list"
                             >
                                 <ArrowLeft className="h-4 w-4" />
                             </button>
                             <div className="flex items-center gap-2 min-w-0">
                                 <span className="text-zinc-500 font-mono text-xs shrink-0">#{pr.pullRequestId}</span>
-                                <h1 className="text-base font-bold text-zinc-100 truncate">
+                                <h1 className="text-base font-bold text-zinc-900 dark:text-zinc-100 truncate">
                                     {pr.title}
                                 </h1>
-                                <span className={`px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] font-bold uppercase tracking-wider ${statusColors[pr.status] || "text-zinc-400"}`}>
+                                <span className={`px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[10px] font-bold uppercase tracking-wider ${statusColors[pr.status] || "text-zinc-400"}`}>
                                     {pr.status}
                                 </span>
                             </div>
@@ -509,25 +509,25 @@ export function PRDetail() {
                                                 className="fixed inset-0 z-40"
                                                 onClick={() => setReviewMenuOpen(false)}
                                             />
-                                            <div className="absolute right-0 mt-1 w-56 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50 overflow-hidden py-1">
-                                                <button onClick={() => handleVote(10)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-200 flex items-center gap-2">
+                                            <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl z-50 overflow-hidden py-1">
+                                                <button onClick={() => handleVote(10)} className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
                                                     <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                                                     <span>Approve</span>
                                                 </button>
-                                                <button onClick={() => handleVote(5)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-200 flex items-center gap-2">
+                                                <button onClick={() => handleVote(5)} className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
                                                     <CheckCircle2 className="h-3.5 w-3.5 text-zinc-400" />
                                                     <span>Approve with suggestions</span>
                                                 </button>
-                                                <button onClick={() => handleVote(-5)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-200 flex items-center gap-2">
+                                                <button onClick={() => handleVote(-5)} className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-200 flex items-center gap-2">
                                                     <Clock className="h-3.5 w-3.5 text-amber-500" />
                                                     <span>Wait for author</span>
                                                 </button>
-                                                <button onClick={() => handleVote(-10)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-200 flex items-center gap-2 text-red-400">
+                                                <button onClick={() => handleVote(-10)} className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-200 flex items-center gap-2 text-red-400">
                                                     <XCircle className="h-3.5 w-3.5 text-red-500" />
                                                     <span>Reject</span>
                                                 </button>
-                                                <div className="h-px bg-zinc-800 my-1"></div>
-                                                <button onClick={() => handleVote(0)} className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-400 flex items-center gap-2">
+                                                <div className="h-px bg-zinc-200 dark:bg-zinc-800 my-1"></div>
+                                                <button onClick={() => handleVote(0)} className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
                                                     <Minus className="h-3.5 w-3.5" />
                                                     <span>Reset feedback</span>
                                                 </button>
@@ -547,15 +547,15 @@ export function PRDetail() {
                         </div>
 
                         <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                            <div className="flex items-center gap-1 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-800">
-                                <span className="text-zinc-400 font-medium mr-1">{pr.repository.name}</span>
-                                <span className="font-mono text-zinc-300">{pr.sourceRefName.split('/').pop()}</span>
-                                <ArrowLeft className="h-3 w-3 rotate-180 text-zinc-600" />
-                                <span className="font-mono text-zinc-300">{pr.targetRefName.split('/').pop()}</span>
+                            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-800">
+                                <span className="text-zinc-500 dark:text-zinc-400 font-medium mr-1">{pr.repository.name}</span>
+                                <span className="font-mono text-zinc-600 dark:text-zinc-300">{pr.sourceRefName.split('/').pop()}</span>
+                                <ArrowLeft className="h-3 w-3 rotate-180 text-zinc-400 dark:text-zinc-600" />
+                                <span className="font-mono text-zinc-600 dark:text-zinc-300">{pr.targetRefName.split('/').pop()}</span>
                             </div>
-                            <span className="text-zinc-700">•</span>
-                            <span>Created by <span className="text-zinc-300 font-medium">{pr.createdBy.displayName}</span></span>
-                            <span className="text-zinc-700">•</span>
+                            <span className="text-zinc-400 dark:text-zinc-700">•</span>
+                            <span>Created by <span className="text-zinc-700 dark:text-zinc-300 font-medium">{pr.createdBy.displayName}</span></span>
+                            <span className="text-zinc-400 dark:text-zinc-700">•</span>
                             <span>{new Date(pr.creationDate).toLocaleDateString()}</span>
                         </div>
                     </div>
@@ -568,9 +568,9 @@ export function PRDetail() {
                     <div className="max-w-6xl mx-auto w-full px-6 py-6">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div className="lg:col-span-2 space-y-8">
-                                <section className="bg-zinc-900/20 rounded-xl border border-zinc-800 overflow-hidden">
-                                    <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/40 flex items-center justify-between">
-                                        <h3 className="text-sm font-semibold text-zinc-200">Description</h3>
+                                <section className="bg-white dark:bg-zinc-900/20 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                                    <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800/50 bg-zinc-50 dark:bg-zinc-900/40 flex items-center justify-between">
+                                        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">Description</h3>
                                         {!isEditingDescription && (
                                             <button
                                                 onClick={() => {
@@ -584,13 +584,13 @@ export function PRDetail() {
                                             </button>
                                         )}
                                     </div>
-                                    <div className="p-6 text-zinc-300 prose prose-invert max-w-none">
+                                    <div className="p-6 text-zinc-700 dark:text-zinc-300 prose prose-zinc dark:prose-invert max-w-none">
                                         {isEditingDescription ? (
                                             <div className="space-y-4">
                                                 <textarea
                                                     value={descriptionDraft}
                                                     onChange={(e) => setDescriptionDraft(e.target.value)}
-                                                    className="w-full h-64 bg-zinc-950 border border-zinc-800 rounded-lg p-4 text-sm text-zinc-300 focus:border-sapphire-500 focus:ring-1 focus:ring-sapphire-500 outline-none resize-y font-mono"
+                                                    className="w-full h-64 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 text-sm text-zinc-900 dark:text-zinc-300 focus:border-sapphire-500 focus:ring-1 focus:ring-sapphire-500 outline-none resize-y font-mono"
                                                     placeholder="Add a description..."
                                                     autoFocus
                                                 />
@@ -638,12 +638,12 @@ export function PRDetail() {
                                             <MessageSquare className="h-5 w-5 text-sapphire-500" />
                                             <h3>Activity</h3>
                                         </div>
-                                        <div className="flex items-center gap-1 p-0.5 bg-zinc-900 rounded-md border border-zinc-800">
+                                        <div className="flex items-center gap-1 p-0.5 bg-zinc-100 dark:bg-zinc-900 rounded-md border border-zinc-200 dark:border-zinc-800">
                                             {["all", "active", "resolved", "closed", "pending"].map((status) => (
                                                 <button
                                                     key={status}
                                                     onClick={() => updateQueryParams({ commentStatus: status === "all" ? null : status })}
-                                                    className={`px-2 py-1 text-[10px] font-medium rounded transition-all capitalize ${commentStatusFilter === status ? "bg-zinc-800 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"}`}
+                                                    className={`px-2 py-1 text-[10px] font-medium rounded transition-all capitalize ${commentStatusFilter === status ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800/50"}`}
                                                 >
                                                     {status}
                                                 </button>
@@ -653,12 +653,12 @@ export function PRDetail() {
 
                                     <div className="space-y-4">
                                         {/* New Comment Input */}
-                                        <div className="bg-zinc-900/30 rounded-xl border border-zinc-800 p-4 space-y-3">
+                                        <div className="bg-white dark:bg-zinc-900/30 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
                                             <textarea
                                                 value={newComment}
                                                 onChange={(e) => setNewComment(e.target.value)}
                                                 placeholder="Leave a comment..."
-                                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-300 focus:border-sapphire-500 focus:ring-1 focus:ring-sapphire-500 outline-none min-h-[100px] resize-y placeholder-zinc-600"
+                                                className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 text-sm text-zinc-900 dark:text-zinc-300 focus:border-sapphire-500 focus:ring-1 focus:ring-sapphire-500 outline-none min-h-[100px] resize-y placeholder-zinc-400 dark:placeholder-zinc-600"
                                             />
                                             <div className="flex justify-end">
                                                 <button
@@ -672,17 +672,17 @@ export function PRDetail() {
                                             </div>
                                         </div>
                                         {filteredThreads.map((thread: any) => (
-                                            <div key={thread.id} className="bg-zinc-900/30 rounded-xl border border-zinc-800 overflow-hidden">
+                                            <div key={thread.id} className="bg-white dark:bg-zinc-900/30 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                                                 {thread.threadContext && (
                                                     <div
-                                                        className="w-full bg-zinc-800/40 border-b border-zinc-800 flex items-center gap-2 hover:bg-zinc-800/60 transition-colors group"
+                                                        className="w-full bg-zinc-50 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors group"
                                                     >
                                                         <button
                                                             onClick={() => jumpToContext(thread)}
                                                             className="flex-1 px-4 py-2 flex items-center gap-2 text-left"
                                                         >
-                                                            <FileCode className="h-3.5 w-3.5 text-zinc-500 group-hover:text-sapphire-400 transition-colors" />
-                                                            <span className="text-xs font-mono text-zinc-400 group-hover:text-zinc-200 truncate flex-1">
+                                                            <FileCode className="h-3.5 w-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-sapphire-500 dark:group-hover:text-sapphire-400 transition-colors" />
+                                                            <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 truncate flex-1">
                                                                 {thread.threadContext.filePath}
                                                                 <span className="text-zinc-600 ml-2 group-hover:text-zinc-500">
                                                                     L{thread.threadContext.rightFileStart?.line || thread.threadContext.leftFileStart?.line}
@@ -699,7 +699,7 @@ export function PRDetail() {
                                                     </div>
                                                 )}
                                                 {!thread.threadContext && (
-                                                    <div className="px-4 py-2 bg-zinc-800/20 border-b border-zinc-800 flex items-center justify-between">
+                                                    <div className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800/20 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                                                         <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold">General Thread</span>
                                                         <ThreadStatusPicker
                                                             status={thread.status}
@@ -729,13 +729,13 @@ export function PRDetail() {
 
                                                         return (
                                                             <div key={comment.id} className="flex gap-4 group/comment">
-                                                                <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs text-zinc-400 shrink-0 uppercase font-bold border border-zinc-700">
+                                                                <div className="h-8 w-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-xs text-zinc-500 dark:text-zinc-400 shrink-0 uppercase font-bold border border-zinc-200 dark:border-zinc-700">
                                                                     {comment.author.displayName?.[0] || "?"}
                                                                 </div>
                                                                 <div className="space-y-1 min-w-0 flex-1">
                                                                     <div className="flex items-baseline justify-between">
                                                                         <div className="flex items-baseline gap-2">
-                                                                            <span className="font-medium text-sm text-zinc-200">{comment.author.displayName}</span>
+                                                                            <span className="font-medium text-sm text-zinc-900 dark:text-zinc-200">{comment.author.displayName}</span>
                                                                             <span className="text-[10px] text-zinc-500">{new Date(comment.publishedDate).toLocaleString()}</span>
                                                                         </div>
                                                                         <div className="flex items-center space-x-1 opacity-100 sm:opacity-0 sm:group-hover/comment:opacity-100 transition-opacity">
@@ -744,7 +744,7 @@ export function PRDetail() {
                                                                                 <button
                                                                                     onClick={() => handleApplyFix(thread, comment)}
                                                                                     disabled={applyingFixId === commentKey}
-                                                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-purple-400"
+                                                                                    className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-500 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
                                                                                     title="Apply Fix with AI"
                                                                                 >
                                                                                     {applyingFixId === commentKey ?
@@ -758,14 +758,14 @@ export function PRDetail() {
                                                                                 <>
                                                                                     <button
                                                                                         onClick={() => setEditingCommentId(commentKey)}
-                                                                                        className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
+                                                                                        className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                                                                         title="Edit comment"
                                                                                     >
                                                                                         <Edit2 className="w-3 h-3" />
                                                                                     </button>
                                                                                     <button
                                                                                         onClick={() => handleDeleteComment(thread.id, comment.id)}
-                                                                                        className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
+                                                                                        className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                                                                                         title="Delete comment"
                                                                                     >
                                                                                         <Trash2 className="w-3 h-3" />
@@ -774,7 +774,7 @@ export function PRDetail() {
                                                                             )}
                                                                         </div>
                                                                     </div>
-                                                                    <div className="text-sm text-zinc-400 break-words prose prose-invert max-w-none">
+                                                                    <div className="text-sm text-zinc-600 dark:text-zinc-400 break-words prose prose-zinc dark:prose-invert max-w-none">
                                                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
                                                                     </div>
                                                                 </div>
@@ -789,14 +789,14 @@ export function PRDetail() {
                             </div>
 
                             <div className="space-y-6">
-                                <div className="p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 space-y-6">
+                                <div className="p-5 bg-white dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-6">
                                     <section className="space-y-4">
                                         <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Reviewers</h4>
                                         <div className="space-y-3">
                                             {pr.reviewers.map((reviewer: any) => (
                                                 <div key={reviewer.id} className="flex items-center justify-between gap-3">
                                                     <div className="flex items-center gap-2 min-w-0">
-                                                        <div className="h-6 w-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-400 shrink-0">
+                                                        <div className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-500 dark:text-zinc-400 shrink-0">
                                                             {reviewer.displayName[0]}
                                                         </div>
                                                         <span className="text-sm text-zinc-300 truncate">{reviewer.displayName}</span>
@@ -832,14 +832,14 @@ export function PRDetail() {
                 )}
 
                 {activeTab === "files" && (
-                    <div className="flex flex-col h-full bg-zinc-950 relative">
-                        <div className="flex h-[calc(100vh-120px)] border-zinc-800 overflow-hidden relative">
+                    <div className="flex flex-col h-full bg-white dark:bg-zinc-950 relative">
+                        <div className="flex h-[calc(100vh-120px)] border-zinc-200 dark:border-zinc-800 overflow-hidden relative">
                             {/* Sidebar Expand Button (visible only when collapsed) */}
                             {isTreeCollapsed && (
-                                <div className="absolute left-0 top-0 bottom-0 w-10 flex flex-col items-center py-4 bg-zinc-900 border-r border-zinc-800 z-30 shadow-xl">
+                                <div className="absolute left-0 top-0 bottom-0 w-10 flex flex-col items-center py-4 bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 z-30 shadow-xl">
                                     <button
                                         onClick={() => setIsTreeCollapsed(false)}
-                                        className="p-1.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+                                        className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
                                         title="Expand Sidebar"
                                     >
                                         <PanelLeftOpen className="h-4 w-4" />
@@ -849,10 +849,10 @@ export function PRDetail() {
 
                             {!isTreeCollapsed && (
                                 <div
-                                    className="flex-shrink-0 border-r border-zinc-800 bg-zinc-900/30 flex flex-col"
+                                    className="flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 flex flex-col"
                                     style={{ width: treeWidth }}
                                 >
-                                    <div className="p-2 border-b border-zinc-800 flex items-center justify-between gap-2 overflow-hidden">
+                                    <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 overflow-hidden">
                                         <div className="flex-1 min-w-0">
                                             <IterationSelector
                                                 iterations={iterations}
@@ -864,7 +864,7 @@ export function PRDetail() {
                                         </div>
                                         <button
                                             onClick={() => setIsTreeCollapsed(true)}
-                                            className="p-1.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
+                                            className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors shrink-0"
                                             title="Collapse Sidebar"
                                         >
                                             <PanelLeftClose className="h-4 w-4" />
@@ -884,7 +884,7 @@ export function PRDetail() {
 
                             {!isTreeCollapsed && (
                                 <div
-                                    className="w-1 cursor-col-resize hover:bg-sapphire-500/50 transition-colors active:bg-sapphire-500 z-10 shrink-0"
+                                    className="w-1 cursor-col-resize hover:bg-sapphire-500/50 transition-colors active:bg-sapphire-500 z-10 shrink-0 bg-transparent"
                                     onMouseDown={(e) => {
                                         const startX = e.pageX;
                                         const startWidth = treeWidth;
@@ -908,7 +908,7 @@ export function PRDetail() {
                                     }}
                                 />
                             )}
-                            <div className={`flex-1 min-w-0 bg-zinc-950 ${isTreeCollapsed ? 'ml-10' : ''}`}>
+                            <div className={`flex-1 min-w-0 bg-white dark:bg-zinc-950 ${isTreeCollapsed ? 'ml-10' : ''}`}>
                                 {selectedFilePath ? (
                                     <DiffViewer
                                         repoId={pr.repository.id}
@@ -968,20 +968,20 @@ export function PRDetail() {
 
                 {activeTab === "commits" && (
                     <div className="max-w-6xl mx-auto w-full px-6 py-6">
-                        <div className="bg-zinc-900/20 rounded-xl border border-zinc-800 overflow-hidden">
+                        <div className="bg-white dark:bg-zinc-900/20 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                             <div className="flex flex-col">
                                 {commits.map((commit: any) => (
-                                    <div key={commit.commitId} className="flex gap-4 p-4 border-b border-zinc-800 last:border-0 hover:bg-white/5 transition-colors">
+                                    <div key={commit.commitId} className="flex gap-4 p-4 border-b border-zinc-200 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
                                         <div className="mt-1">
                                             <GitCommit className="h-5 w-5 text-sapphire-500" />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between gap-4">
-                                                <h4 className="text-zinc-200 font-medium truncate">{commit.comment}</h4>
+                                                <h4 className="text-zinc-700 dark:text-zinc-200 font-medium truncate">{commit.comment}</h4>
                                                 <span className="text-xs font-mono text-zinc-500 shrink-0">{commit.commitId.substring(0, 8)}</span>
                                             </div>
-                                            <div className="mt-1 flex items-center gap-2 text-xs text-zinc-400">
-                                                <span className="font-medium text-zinc-300">{commit.author.name}</span>
+                                            <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                                <span className="font-medium text-zinc-700 dark:text-zinc-300">{commit.author.name}</span>
                                                 <span>committed on {new Date(commit.author.date).toLocaleString()}</span>
                                             </div>
                                         </div>
@@ -1005,7 +1005,7 @@ function TabButton({ children, active, onClick }: { children: React.ReactNode, a
     return (
         <button
             onClick={onClick}
-            className={`py-2 px-1 text-xs font-medium border-b-2 transition-all ${active ? "border-sapphire-500 text-sapphire-500" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}
+            className={`py-2 px-1 text-xs font-medium border-b-2 transition-all ${active ? "border-sapphire-500 text-sapphire-500" : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"}`}
         >
             {children}
         </button>

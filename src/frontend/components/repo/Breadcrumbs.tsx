@@ -12,18 +12,17 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ project, repo, path })
     const parts = path ? path.split("/").filter(Boolean) : [];
 
     return (
-        <div className="flex items-center text-sm text-zinc-400 px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
-            <Link to="/repos" className="hover:text-blue-400 transition-colors flex items-center">
+        <div className="flex items-center text-sm text-zinc-600 dark:text-zinc-400 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+            <Link to="/repos" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center">
                 <Home size={14} />
             </Link>
-            <ChevronRight size={14} className="mx-2 text-zinc-600" />
+            <ChevronRight size={14} className="mx-2 text-zinc-400 dark:text-zinc-600" />
 
-            <span className="text-zinc-400">
+            <span className="text-zinc-600 dark:text-zinc-400">
                 {project}
             </span>
-            <ChevronRight size={14} className="mx-2 text-zinc-600" />
-
-            <Link to={`/repos`} className="hover:text-blue-400 transition-colors font-medium text-zinc-200">
+            <ChevronRight size={14} className="mx-2 text-zinc-400 dark:text-zinc-600" />
+            <Link to={`/repos`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium text-zinc-900 dark:text-zinc-200">
                 {repo}
             </Link>
 
@@ -31,8 +30,8 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ project, repo, path })
                 const isLast = index === parts.length - 1;
                 return (
                     <React.Fragment key={index}>
-                        <ChevronRight size={14} className="mx-2 text-zinc-600" />
-                        <span className={isLast ? "text-zinc-100 font-medium" : ""}>
+                        <ChevronRight size={14} className="mx-2 text-zinc-400 dark:text-zinc-600" />
+                        <span className={isLast ? "text-zinc-900 dark:text-zinc-100 font-medium" : ""}>
                             {part}
                         </span>
                     </React.Fragment>

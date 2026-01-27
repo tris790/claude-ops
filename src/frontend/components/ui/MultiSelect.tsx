@@ -108,8 +108,8 @@ export function MultiSelect({
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
-                    "flex items-center justify-between w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-md shadow-sm transition-colors text-sm",
-                    "hover:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-blue-500",
+                    "flex items-center justify-between w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-sm transition-colors text-sm",
+                    "hover:border-zinc-300 dark:hover:border-zinc-700 focus:outline-none focus:ring-1 focus:ring-blue-500",
                     isOpen && "border-blue-500 ring-1 ring-blue-500"
                 )}
             >
@@ -120,24 +120,24 @@ export function MultiSelect({
                                 {(selected as string[]).slice(0, 2).map(val => {
                                     const opt = options.find(o => o.value === val);
                                     return (
-                                        <span key={val} className="text-xs bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                        <span key={val} className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-1.5 py-0.5 rounded flex items-center gap-1">
                                             <span className="truncate max-w-[80px]">{opt?.label || val}</span>
                                             <X
-                                                className="h-3 w-3 hover:text-white cursor-pointer"
+                                                className="h-3 w-3 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
                                                 onClick={(e) => removeOption(val, e)}
                                             />
                                         </span>
                                     )
                                 })}
                                 {(selected as string[]).length > 2 && (
-                                    <span className="text-xs text-zinc-400 py-0.5">+{(selected as string[]).length - 2}</span>
+                                    <span className="text-xs text-zinc-500 dark:text-zinc-400 py-0.5">+{(selected as string[]).length - 2}</span>
                                 )}
                             </div>
                         ) : (
-                            <span className="text-zinc-500 truncate">{placeholder}</span>
+                            <span className="text-zinc-500 disabled:text-zinc-400 truncate">{placeholder}</span>
                         )
                     ) : (
-                        <span className={cn("truncate", !selected ? "text-zinc-500" : "text-zinc-200")}>
+                        <span className={cn("truncate", !selected ? "text-zinc-500" : "text-zinc-900 dark:text-zinc-200")}>
                             {getDisplayLabel()}
                         </span>
                     )}
@@ -147,7 +147,7 @@ export function MultiSelect({
                     {((multiple && (selected as string[]).length > 0) || (!multiple && selected)) && (
                         <div
                             onClick={clearSelection}
-                            className="p-0.5 rounded-full hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition-colors"
+                            className="p-0.5 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
                         >
                             <X className="h-3 w-3" />
                         </div>
@@ -157,8 +157,8 @@ export function MultiSelect({
             </button>
 
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg max-h-80 flex flex-col overflow-hidden">
-                    <div className="p-2 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur-sm sticky top-0 z-10">
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md shadow-lg max-h-80 flex flex-col overflow-hidden">
+                    <div className="p-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/95 dark:bg-zinc-900/95 backdrop-blur-sm sticky top-0 z-10">
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-500" />
                             <input
@@ -166,7 +166,7 @@ export function MultiSelect({
                                 placeholder={searchPlaceholder}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-8 pr-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                                className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded text-sm text-zinc-900 dark:text-zinc-200 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                                 autoFocus
                             />
                         </div>
@@ -187,14 +187,14 @@ export function MultiSelect({
                                             onClick={() => toggleOption(option.value)}
                                             className={cn(
                                                 "flex items-center justify-between px-2 py-2 cursor-pointer rounded text-sm group transition-colors",
-                                                active ? "bg-blue-600/10 text-blue-400" : "text-zinc-300 hover:bg-zinc-800"
+                                                active ? "bg-blue-600/10 text-blue-600 dark:text-blue-400" : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                                             )}
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
                                                 {multiple && (
                                                     <div className={cn(
                                                         "h-4 w-4 border rounded flex items-center justify-center transition-colors shrink-0",
-                                                        active ? "bg-blue-500 border-blue-500" : "border-zinc-600 group-hover:border-zinc-500"
+                                                        active ? "bg-blue-500 border-blue-500" : "border-zinc-300 dark:border-zinc-600 group-hover:border-zinc-400 dark:group-hover:border-zinc-500"
                                                     )}>
                                                         {active && <Check className="h-3 w-3 text-white" />}
                                                     </div>
@@ -216,7 +216,7 @@ export function MultiSelect({
 
                     {/* Footer showing count for multi selection */}
                     {multiple && (selected as string[]).length > 0 && (
-                        <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-900/50 text-xs text-zinc-500 flex justify-between items-center">
+                        <div className="px-3 py-2 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-xs text-zinc-500 flex justify-between items-center">
                             <span>{(selected as string[]).length} selected</span>
                             <button
                                 onClick={() => onChange([])}

@@ -152,40 +152,40 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
         }
 
         return (
-            <div className="divide-y divide-zinc-800/50">
+            <div className="divide-y divide-zinc-200 dark:divide-zinc-800/50">
                 {Array.from(groupedRefs.entries()).map(([path, items]) => (
                     <div key={path} className="flex flex-col">
                         <button
                             onClick={() => toggleFile(path)}
-                            className="flex items-center gap-2 px-3 py-2 hover:bg-zinc-800/50 text-left transition-colors group"
+                            className="flex items-center gap-2 px-3 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-left transition-colors group"
                         >
                             <ChevronRight className={`h-3 w-3 text-zinc-500 transition-transform ${expandedFiles.has(path) ? 'rotate-90' : ''}`} />
-                            <FileCode className="h-3.5 w-3.5 text-blue-400" />
-                            <span className="text-xs font-medium text-zinc-200 truncate">{path.split('/').pop()}</span>
-                            <span className="text-[10px] text-zinc-500 font-mono truncate ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                            <FileCode className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                            <span className="text-xs font-medium text-zinc-800 dark:text-zinc-200 truncate">{path.split('/').pop()}</span>
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono truncate ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                                 {path}
                             </span>
-                            <span className="bg-zinc-800 text-zinc-500 text-[9px] px-1.5 py-0.5 rounded-full min-w-[1.5rem] text-center ml-2 border border-zinc-700">
+                            <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[9px] px-1.5 py-0.5 rounded-full min-w-[1.5rem] text-center ml-2 border border-zinc-200 dark:border-zinc-700">
                                 {items.length}
                             </span>
                         </button>
 
                         {expandedFiles.has(path) && (
-                            <div className="bg-black/20">
+                            <div className="bg-zinc-50 dark:bg-black/20">
                                 {items.map((item, idx) => (
                                     <button
                                         key={idx}
                                         onClick={() => onSelect(item.location)}
-                                        className="w-full flex flex-col gap-1 px-8 py-2 hover:bg-blue-600/10 text-left border-l-2 border-transparent hover:border-blue-500 transition-all group"
+                                        className="w-full flex flex-col gap-1 px-8 py-2 hover:bg-blue-50 dark:hover:bg-blue-600/10 text-left border-l-2 border-transparent hover:border-blue-500 transition-all group"
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-[10px] text-zinc-500 font-mono">
                                                 Line {item.location.range.start.line + 1}
                                             </span>
                                         </div>
-                                        <div className="text-xs text-zinc-300 font-mono truncate bg-zinc-950/50 px-2 py-1 rounded border border-zinc-800 group-hover:border-zinc-700">
+                                        <div className="text-xs text-zinc-600 dark:text-zinc-300 font-mono truncate bg-white dark:bg-zinc-950/50 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-800 group-hover:border-zinc-300 dark:group-hover:border-zinc-700">
                                             {loadingContexts && !item.context ? (
-                                                <div className="h-4 w-24 bg-zinc-800 animate-pulse rounded" />
+                                                <div className="h-4 w-24 bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded" />
                                             ) : (
                                                 item.context || <span className="italic opacity-50">...</span>
                                             )}
@@ -204,7 +204,7 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
 
     return (
         <div
-            className={`flex flex-col bg-zinc-900 border-t border-zinc-800 shadow-2xl relative ${isResizing ? '' : 'animate-in slide-in-from-bottom duration-300'}`}
+            className={`flex flex-col bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 shadow-2xl relative ${isResizing ? '' : 'animate-in slide-in-from-bottom duration-300'}`}
             style={{ height: `${height}px`, transition: isResizing ? 'none' : undefined }}
         >
             {/* Resize Handle */}
@@ -215,16 +215,16 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
                 <div className={`w-full h-1 transition-colors ${isResizing ? 'bg-blue-500' : 'bg-transparent group-hover:bg-blue-500/50'}`} />
             </div>
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-zinc-800 border-b border-zinc-700">
+            <div className="flex items-center justify-between px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
                 <div className="flex items-center gap-2">
-                    <Search className="h-4 w-4 text-blue-400" />
-                    <h3 className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
+                    <Search className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                    <h3 className="text-xs font-bold text-zinc-700 dark:text-zinc-100 uppercase tracking-wider">
                         References ({references.length})
                     </h3>
                 </div>
                 <button
                     onClick={onClose}
-                    className="p-1 hover:bg-zinc-700 rounded text-zinc-400 hover:text-white transition-colors"
+                    className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                     <X className="h-4 w-4" />
                 </button>

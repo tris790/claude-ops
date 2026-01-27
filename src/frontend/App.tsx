@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { MainLayout } from "./layouts/MainLayout";
 import { SetupPage } from "./pages/SetupPage";
 
 import { RepoList } from "./pages/RepoList";
+import { SettingsPage } from "./pages/Settings";
 import { RepoBrowser } from "./pages/RepoBrowser";
 import { WorkItems } from "./pages/WorkItems";
 import { WorkItemDetail } from "./pages/WorkItemDetail";
@@ -34,6 +36,7 @@ function AppRoutes() {
           <Route path="/prs/:id" element={<PRDetail />} />
           <Route path="/pipelines" element={<PipelineList />} />
           <Route path="/pipelines/:id" element={<PipelineRunDetail />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/" element={<Navigate to="/repos" replace />} />
         </Route>
       </Route>
@@ -45,7 +48,9 @@ export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <ThemeProvider>
+          <AppRoutes />
+        </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   );

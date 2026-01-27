@@ -73,7 +73,7 @@ export function WorkItemDetail() {
         <div className="max-w-5xl mx-auto p-6 space-y-6">
             <button
                 onClick={() => navigate("/workitems")}
-                className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
+                className="flex items-center gap-2 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors text-sm"
             >
                 <ArrowLeft className="h-4 w-4" />
                 Back to list
@@ -82,15 +82,15 @@ export function WorkItemDetail() {
             <header className="space-y-4">
                 <div className="flex items-center gap-3">
                     <span className="text-zinc-500 font-mono text-lg">#{item.id}</span>
-                    <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-xs font-medium uppercase tracking-wider">
+                    <span className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs font-medium uppercase tracking-wider">
                         {item.fields["System.WorkItemType"]}
                     </span>
                 </div>
-                <h1 className="text-3xl font-bold text-zinc-100 leading-tight">
+                <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
                     {item.fields["System.Title"]}
                 </h1>
 
-                <div className="flex flex-wrap items-center gap-6 py-4 border-y border-zinc-800/50">
+                <div className="flex flex-wrap items-center gap-6 py-4 border-y border-zinc-200 dark:border-zinc-800/50">
                     <div className="space-y-1">
                         <span className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">State</span>
                         <MultiSelect
@@ -111,8 +111,8 @@ export function WorkItemDetail() {
 
                     <div className="space-y-1">
                         <span className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Assigned To</span>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 rounded-md text-sm text-zinc-300 border border-zinc-800">
-                            <User className="h-4 w-4 text-zinc-500" />
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-zinc-900 rounded-md text-sm text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800">
+                            <User className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                             <span>{item.fields["System.AssignedTo"]?.displayName || "Unassigned"}</span>
                         </div>
                     </div>
@@ -130,15 +130,15 @@ export function WorkItemDetail() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
                     <section className="space-y-3">
-                        <h3 className="text-lg font-semibold text-zinc-200">Description</h3>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-200">Description</h3>
                         <div
-                            className="p-4 bg-zinc-900/30 rounded-xl border border-zinc-800 text-zinc-300 leading-relaxed prose prose-invert max-w-none"
-                            dangerouslySetInnerHTML={{ __html: item.fields["System.Description"] || "<p class='italic text-zinc-600'>No description provided.</p>" }}
+                            className="p-4 bg-white dark:bg-zinc-900/30 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-300 leading-relaxed prose prose-zinc dark:prose-invert max-w-none"
+                            dangerouslySetInnerHTML={{ __html: item.fields["System.Description"] || "<p class='italic text-zinc-500 dark:text-zinc-600'>No description provided.</p>" }}
                         />
                     </section>
 
                     <section className="space-y-4">
-                        <div className="flex items-center gap-2 text-zinc-200 font-semibold">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-zinc-200 font-semibold">
                             <MessageSquare className="h-5 w-5 text-blue-500" />
                             <h3>Discussion</h3>
                         </div>
@@ -148,7 +148,7 @@ export function WorkItemDetail() {
                                 value={comment}
                                 onChange={(e) => setComment(e.target.value)}
                                 placeholder="Add a comment..."
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-sm text-zinc-200 focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-all min-h-[100px] resize-none"
+                                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 text-sm text-zinc-900 dark:text-zinc-200 focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-all min-h-[100px] resize-none"
                             />
                             <div className="flex justify-end">
                                 <button
@@ -165,7 +165,7 @@ export function WorkItemDetail() {
                 </div>
 
                 <div className="space-y-6">
-                    <div className="p-5 bg-zinc-900/50 rounded-xl border border-zinc-800 space-y-4">
+                    <div className="p-5 bg-white dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-4">
                         <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Details</h4>
 
                         <div className="space-y-4">
@@ -184,8 +184,8 @@ export function WorkItemDetail() {
 function DetailItem({ label, value }: { label: string, value: any }) {
     return (
         <div className="space-y-1">
-            <div className="text-[10px] text-zinc-600 uppercase font-bold tracking-tight">{label}</div>
-            <div className="text-sm text-zinc-300 truncate font-medium">{value ?? "—"}</div>
+            <div className="text-[10px] text-zinc-500 dark:text-zinc-600 uppercase font-bold tracking-tight">{label}</div>
+            <div className="text-sm text-zinc-800 dark:text-zinc-300 truncate font-medium">{value ?? "—"}</div>
         </div>
     );
 }

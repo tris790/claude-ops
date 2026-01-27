@@ -132,7 +132,7 @@ export function CommandPalette() {
                     setSearchResults(data.map((item: any, i: number) => ({
                         id: `search-${i}-${item.file}-${item.line}`,
                         label: item.file,
-                        icon: <FileCode className="w-4 h-4 text-sapphire-400" />,
+                        icon: <FileCode className="w-4 h-4 text-sapphire-600 dark:text-sapphire-400" />,
                         category: "Code Search",
                         description: item.line > 0 ? `${item.line}: ${item.content.trim()}` : item.file,
                         project: currentProject,
@@ -168,7 +168,7 @@ export function CommandPalette() {
         const repoCommands: CommandItem[] = repos.map(r => ({
             id: `repo:${r.id}`,
             label: r.name,
-            icon: <LayoutGrid className="w-4 h-4 text-zinc-400" />,
+            icon: <LayoutGrid className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />,
             category: "Repositories",
             project: r.project.name,
             repo: r.name,
@@ -305,9 +305,9 @@ export function CommandPalette() {
                 onClick={() => setIsOpen(false)}
             />
 
-            <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 ring-1 ring-white/10">
-                <div className="flex items-center border-b border-zinc-800 px-4 h-14">
-                    <Search className="w-5 h-5 text-zinc-500 mr-3" />
+            <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 ring-1 ring-zinc-900/5 dark:ring-white/10">
+                <div className="flex items-center border-b border-zinc-200 dark:border-zinc-800 px-4 h-14">
+                    <Search className="w-5 h-5 text-zinc-400 dark:text-zinc-500 mr-3" />
                     <div className="relative flex-1">
                         {isFileSearch && (
                             <div className="absolute left-0 top-1/2 -translate-y-1/2 bg-sapphire-500/20 text-sapphire-400 border border-sapphire-500/30 px-1.5 py-0.5 rounded text-xs font-mono font-bold flex items-center shadow-sm z-10 select-none pointer-events-none">
@@ -317,7 +317,7 @@ export function CommandPalette() {
                         <input
                             ref={inputRef}
                             className={cn(
-                                "w-full bg-transparent border-none outline-none text-zinc-100 placeholder-zinc-500 text-lg focus:ring-0",
+                                "w-full bg-transparent border-none outline-none text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 text-lg focus:ring-0",
                                 isFileSearch && "pl-8"
                             )}
                             placeholder={isFileSearch ? "Search files..." : "Type a command or search code..."}
@@ -347,14 +347,14 @@ export function CommandPalette() {
                                 "p-1 rounded text-xs font-mono border transition-colors",
                                 isRegex
                                     ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                                    : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-zinc-300"
+                                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-300"
                             )}
                             title="Toggle Regex"
                         >
                             .*
                         </button>
                         {isSearching && <span className="text-zinc-500 text-xs animate-pulse">Searching...</span>}
-                        <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 font-mono text-[10px] font-medium text-zinc-400">
+                        <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-1.5 font-mono text-[10px] font-medium text-zinc-500 dark:text-zinc-400">
                             <span className="text-xs">ESC</span>
                         </kbd>
                     </div>
@@ -363,7 +363,7 @@ export function CommandPalette() {
                 <div className="max-h-[60vh] overflow-y-auto py-2 p-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                     {isSearching && filteredCommands.length === 0 ? (
                         <div className="py-8 flex flex-col items-center justify-center text-zinc-500 gap-2">
-                            <div className="w-5 h-5 border-2 border-zinc-600 border-t-zinc-400 rounded-full animate-spin" />
+                            <div className="w-5 h-5 border-2 border-zinc-400 dark:border-zinc-600 border-t-zinc-600 dark:border-t-zinc-400 rounded-full animate-spin" />
                             <span className="text-sm">Searching...</span>
                         </div>
                     ) : filteredCommands.length === 0 ? (
@@ -376,8 +376,8 @@ export function CommandPalette() {
                                     className={cn(
                                         "w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-colors text-left group",
                                         index === selectedIndex
-                                            ? "bg-sapphire-500/10 text-sapphire-400"
-                                            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
+                                            ? "bg-sapphire-50 dark:bg-sapphire-500/10 text-sapphire-600 dark:text-sapphire-400"
+                                            : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100"
                                     )}
                                     onClick={() => handleSelect(cmd)}
                                     onMouseEnter={() => setSelectedIndex(index)}
@@ -385,8 +385,8 @@ export function CommandPalette() {
                                     <div className={cn(
                                         "flex items-center justify-center w-8 h-8 rounded-md border transition-colors",
                                         index === selectedIndex
-                                            ? "bg-sapphire-500/20 border-sapphire-500/30 text-sapphire-400"
-                                            : "bg-zinc-800/50 border-zinc-700/50 text-zinc-500 group-hover:bg-zinc-800 group-hover:text-zinc-300"
+                                            ? "bg-sapphire-100 dark:bg-sapphire-500/20 border-sapphire-200 dark:border-sapphire-500/30 text-sapphire-600 dark:text-sapphire-400"
+                                            : "bg-zinc-100 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700/50 text-zinc-500 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-800 group-hover:text-zinc-700 dark:group-hover:text-zinc-300"
                                     )}>
                                         {cmd.icon}
                                     </div>
@@ -397,7 +397,7 @@ export function CommandPalette() {
                                                 {cmd.label}
                                             </span>
                                             {cmd.project && cmd.category !== "Code Search" && (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-800 text-zinc-500">
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-500">
                                                     {cmd.project}{cmd.repo ? `/${cmd.repo}` : ''}
                                                 </span>
                                             )}
@@ -423,14 +423,14 @@ export function CommandPalette() {
                     )}
                 </div>
 
-                <div className="h-9 bg-zinc-900 border-t border-zinc-800 flex items-center justify-between px-4 text-[11px] text-zinc-500">
+                <div className="h-9 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-4 text-[11px] text-zinc-500">
                     <div className="flex gap-3">
                         <span className="flex items-center gap-1">
-                            <kbd className="font-mono bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 text-xs">↵</kbd>
+                            <kbd className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 text-xs">↵</kbd>
                             to select
                         </span>
                         <span className="flex items-center gap-1">
-                            <kbd className="font-mono bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700 text-xs">↑↓</kbd>
+                            <kbd className="font-mono bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 text-xs">↑↓</kbd>
                             to navigate
                         </span>
                     </div>
@@ -439,6 +439,6 @@ export function CommandPalette() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

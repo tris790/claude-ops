@@ -89,6 +89,29 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
     const [contents, setContents] = useState<{ original: string; modified: string } | null>(null);
 
+    const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains("dark"));
+
+    // Listen for dark mode changes
+    useEffect(() => {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (
+                    mutation.type === "attributes" &&
+                    mutation.attributeName === "class"
+                ) {
+                    setIsDarkMode(document.documentElement.classList.contains("dark"));
+                }
+            });
+        });
+
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ["class"],
+        });
+
+        return () => observer.disconnect();
+    }, []);
+
     // Global keyboard listener for F12
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -251,17 +274,18 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                         end: pos,
                         create(view) {
                             const dom = document.createElement("div");
-                            dom.className = "cm-lsp-tooltip-container group p-0 max-w-2xl bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95";
+                            dom.className = "cm-lsp-tooltip-container group p-0 max-w-2xl bg-white dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-700/50 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95";
                             const root = createRoot(dom);
 
                             const TooltipContent = () => {
                                 const [highlighter, setHighlighter] = useState<any>(null);
+                                const isDark = document.documentElement.classList.contains("dark");
                                 useEffect(() => { getHighlighter().then(setHighlighter); }, []);
 
                                 return (
                                     <div className="max-h-[400px] overflow-y-auto">
                                         {signatureMarkdown && (
-                                            <div className="bg-zinc-800/50 px-4 py-2 border-b border-zinc-700/30">
+                                            <div className="bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2 border-b border-zinc-200 dark:border-zinc-700/30">
                                                 <ReactMarkdown
                                                     remarkPlugins={[remarkGfm]}
                                                     components={{
@@ -269,10 +293,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                                                             const lang = /language-(\w+)/.exec(className || "")?.[1] || "typescript";
                                                             const code = String(children).replace(/\n$/, "");
                                                             if (!inline && highlighter) {
-                                                                const html = highlighter.codeToHtml(code, { lang, theme: 'github-dark' });
+                                                                const html = highlighter.codeToHtml(code, { lang, theme: isDark ? 'github-dark' : 'github-light' });
                                                                 return <div dangerouslySetInnerHTML={{ __html: html }} className="text-xs font-mono" />;
                                                             }
-                                                            return <code className="text-xs font-mono text-blue-300 font-bold">{children}</code>;
+                                                            return <code className="text-xs font-mono text-blue-600 dark:text-blue-300 font-bold">{children}</code>;
                                                         }
                                                     }}
                                                 >
@@ -280,7 +304,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                                                 </ReactMarkdown>
                                             </div>
                                         )}
-                                        <div className="p-4 prose prose-sm prose-invert max-w-none">
+                                        <div className="p-4 prose prose-sm prose-zinc dark:prose-invert max-w-none">
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
@@ -289,12 +313,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                                                         const lang = match ? match[1] : "";
                                                         const code = String(children).replace(/\n$/, "");
                                                         if (!inline && lang && highlighter) {
-                                                            const html = highlighter.codeToHtml(code, { lang, theme: 'github-dark' });
-                                                            return <div className="shiki-tooltip-code rounded overflow-hidden shadow-inner bg-black/20" dangerouslySetInnerHTML={{ __html: html }} />;
+                                                            const html = highlighter.codeToHtml(code, { lang, theme: isDark ? 'github-dark' : 'github-light' });
+                                                            return <div className="shiki-tooltip-code rounded overflow-hidden shadow-inner bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800/50" dangerouslySetInnerHTML={{ __html: html }} />;
                                                         }
                                                         return inline ?
-                                                            <code className="bg-zinc-800/80 px-1 py-0.5 rounded text-blue-300 font-mono text-[0.9em]" {...props}>{children}</code> :
-                                                            <pre className="bg-zinc-950/50 p-3 rounded-md overflow-x-auto border border-zinc-800/50" {...props}><code className={className}>{children}</code></pre>;
+                                                            <code className="bg-zinc-100 dark:bg-zinc-800/80 px-1 py-0.5 rounded text-blue-600 dark:text-blue-300 font-mono text-[0.9em]" {...props}>{children}</code> :
+                                                            <pre className="bg-zinc-50 dark:bg-zinc-950/50 p-3 rounded-md overflow-x-auto border border-zinc-200 dark:border-zinc-800/50" {...props}><code className={className}>{children}</code></pre>;
                                                     },
                                                     a({ href, children }: any) {
                                                         const handleClick = (e: React.MouseEvent) => {
@@ -312,7 +336,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                                                             }
                                                         };
                                                         return (
-                                                            <a href={href} onClick={handleClick} className="text-blue-400 hover:underline">
+                                                            <a href={href} onClick={handleClick} className="text-blue-500 dark:text-blue-400 hover:underline">
                                                                 {children}
                                                             </a>
                                                         );
@@ -411,9 +435,12 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
         const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
 
+        // Detect if dark mode is active
+        // const isDark = document.documentElement.classList.contains("dark"); // Removed in favor of state in dependency
+
         const baseExtensions = [
             lineNumbers(),
-            ...getEditorTheme(true),
+            ...getEditorTheme(isDarkMode),
             getLang(),
             bracketMatching(),
             drawSelection(),
@@ -575,7 +602,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 viewRef.current = null;
             }
         };
-    }, [loading, contents, filePath, lspStatus, diffMode, threads]);
+    }, [loading, contents, filePath, lspStatus, diffMode, threads, isDarkMode]);
 
     // Handle Scrolling
     useEffect(() => {
@@ -644,13 +671,13 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
 
     return (
-        <div className="flex flex-col h-full bg-zinc-950 overflow-hidden relative">
-            <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-900 border-b border-zinc-800 shrink-0">
+        <div className="flex flex-col h-full bg-white dark:bg-zinc-950 overflow-hidden relative">
+            <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
                 <div className="flex items-center space-x-3 text-xs">
                     <span className="text-zinc-500 font-mono truncate max-w-[300px]">{filePath}</span>
-                    <div className={`flex items-center space-x-1 text-[10px] px-2 py-0.5 rounded border ${lspStatus === 'connected' ? 'border-green-800 bg-green-900/20 text-green-400' :
-                        lspStatus === 'connecting' ? 'border-yellow-800 bg-yellow-900/20 text-yellow-400' :
-                            'border-zinc-700 bg-zinc-800 text-zinc-500'
+                    <div className={`flex items-center space-x-1 text-[10px] px-2 py-0.5 rounded border ${lspStatus === 'connected' ? 'border-green-200 dark:border-green-800 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' :
+                        lspStatus === 'connecting' ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400' :
+                            'border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
                         }`}>
                         <div className={`w-1 h-1 rounded-full ${lspStatus === 'connected' ? 'bg-green-500' :
                             lspStatus === 'connecting' ? 'bg-yellow-500' : 'bg-zinc-500'
@@ -660,22 +687,22 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                         </span>
                     </div>
                 </div>
-                <div className="flex items-center space-x-1 p-0.5 bg-zinc-950 rounded-md border border-zinc-800">
+                <div className="flex items-center space-x-1 p-0.5 bg-zinc-100 dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800">
                     <button
                         onClick={() => setDiffMode("side-by-side")}
-                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "side-by-side" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}
+                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "side-by-side" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800"}`}
                     >
                         Side-by-Side
                     </button>
                     <button
                         onClick={() => setDiffMode("unified")}
-                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "unified" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}
+                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "unified" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800"}`}
                     >
                         Unified
                     </button>
                     <button
                         onClick={() => setDiffMode("new-only")}
-                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "new-only" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"}`}
+                        className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${diffMode === "new-only" ? "bg-blue-600 text-white shadow-sm" : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800"}`}
                     >
                         New Code
                     </button>
@@ -760,42 +787,67 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 /* Scrolling for editors */
                 .cm-scroller { overflow: auto !important; }
 
-                /* Diff highlighting - Side-by-side mode */
+                /* Diff highlighting - Light Mode Defaults */
                 .cm-merge-a .cm-changedLine {
-                    background-color: rgba(239, 68, 68, 0.15) !important;
+                    background-color: rgba(239, 68, 68, 0.1) !important;
                 }
                 .cm-merge-b .cm-changedLine {
-                    background-color: rgba(34, 197, 94, 0.15) !important;
+                    background-color: rgba(34, 197, 94, 0.1) !important;
                 }
                 .cm-merge-a .cm-changedText {
-                    background-color: rgba(239, 68, 68, 0.4) !important;
-                    color: #fca5a5 !important;
+                    background-color: rgba(239, 68, 68, 0.3) !important;
+                    color: #b91c1c !important;
                 }
                 .cm-merge-b .cm-changedText {
-                    background-color: rgba(34, 197, 94, 0.4) !important;
-                    color: #86efac !important;
+                    background-color: rgba(34, 197, 94, 0.3) !important;
+                    color: #15803d !important;
                 }
 
-                /* Gutter markers for changes */
+                /* Gutter markers */
                 .cm-changeGutter .cm-changedLineGutter {
                     background-color: #ef4444 !important;
                 }
                 .cm-merge-b .cm-changeGutter .cm-changedLineGutter {
                     background-color: #22c55e !important;
                 }
-
-                /* Unified mode diff highlighting */
+                
+                /* Unified mode */
                 .cm-deletedChunk {
-                    background-color: rgba(239, 68, 68, 0.1) !important;
+                    background-color: rgba(239, 68, 68, 0.05) !important;
                 }
                 .cm-deletedChunk .cm-deletedLine {
-                    background-color: rgba(239, 68, 68, 0.2) !important;
+                    background-color: rgba(239, 68, 68, 0.15) !important;
                 }
                 .cm-deletedChunk .cm-deletedText {
-                    background-color: rgba(239, 68, 68, 0.4) !important;
+                    background-color: rgba(239, 68, 68, 0.3) !important;
                 }
                 .cm-insertedLine {
                     background-color: rgba(34, 197, 94, 0.15) !important;
+                }
+
+                /* Dark Mode Overrides */
+                .dark .cm-merge-a .cm-changedLine {
+                    background-color: rgba(239, 68, 68, 0.15) !important;
+                }
+                .dark .cm-merge-b .cm-changedLine {
+                    background-color: rgba(34, 197, 94, 0.15) !important;
+                }
+                .dark .cm-merge-a .cm-changedText {
+                    background-color: rgba(239, 68, 68, 0.4) !important;
+                    color: #fca5a5 !important;
+                }
+                .dark .cm-merge-b .cm-changedText {
+                    background-color: rgba(34, 197, 94, 0.4) !important;
+                    color: #86efac !important;
+                }
+                .dark .cm-deletedChunk {
+                    background-color: rgba(239, 68, 68, 0.1) !important;
+                }
+                .dark .cm-deletedChunk .cm-deletedLine {
+                    background-color: rgba(239, 68, 68, 0.2) !important;
+                }
+                .dark .cm-deletedChunk .cm-deletedText {
+                    background-color: rgba(239, 68, 68, 0.4) !important;
                 }
             `}</style>
         </div>

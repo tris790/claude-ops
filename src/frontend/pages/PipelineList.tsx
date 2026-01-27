@@ -46,7 +46,7 @@ function useWindowDimensions() {
     return dimensions;
 }
 
-const PipelineRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: any }) => {
+const PipelineRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data?: any }) => {
     const {
         pipelines,
         latestRuns,
@@ -78,7 +78,7 @@ const PipelineRow = React.memo(({ index, style, data }: { index: number, style: 
     return (
         <div style={style} className="px-6 py-1">
             <div
-                className={`h-full bg-zinc-900 border ${isExpanded ? 'border-zinc-700 ring-1 ring-sapphire-600/30' : 'border-zinc-800 hover:border-zinc-700'} rounded-lg transition-all flex flex-col overflow-hidden cursor-pointer`}
+                className={`h-full bg-white dark:bg-zinc-900 border ${isExpanded ? 'border-zinc-300 dark:border-zinc-700 ring-1 ring-sapphire-600/30' : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'} rounded-lg transition-all flex flex-col overflow-hidden cursor-pointer`}
                 onClick={() => toggleExpand(pipeline.id)}
             >
                 <div className="flex items-center justify-between px-4 h-[46px] shrink-0">
@@ -86,7 +86,7 @@ const PipelineRow = React.memo(({ index, style, data }: { index: number, style: 
                         <StatusIcon status={latestRun?.result || latestRun?.status} size="sm" />
                         <div className="flex items-baseline gap-3 min-w-0">
                             <h3
-                                className="text-sm font-semibold text-zinc-100 truncate cursor-pointer hover:text-sapphire-500 transition-colors"
+                                className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate cursor-pointer hover:text-sapphire-500 transition-colors"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     latestRun && navigate(`/pipelines/${latestRun.id}`);
@@ -151,10 +151,10 @@ const PipelineRow = React.memo(({ index, style, data }: { index: number, style: 
                 </div>
 
                 {isExpanded && (
-                    <div className="flex-1 flex flex-col bg-zinc-950/50 border-t border-zinc-800 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                        <div className="px-4 py-2 flex items-center justify-between border-b border-zinc-800/50 bg-zinc-900/30">
+                    <div className="flex-1 flex flex-col bg-zinc-50 dark:bg-zinc-950/50 border-t border-zinc-200 dark:border-zinc-800 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="px-4 py-2 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/50 bg-zinc-100/50 dark:bg-zinc-900/30">
                             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Recent Runs</span>
-                            <span className="text-[10px] text-zinc-600 font-mono">{history.length} runs</span>
+                            <span className="text-[10px] text-zinc-500 dark:text-zinc-600 font-mono">{history.length} runs</span>
                         </div>
                         <div className="flex-1 overflow-y-auto">
                             {history.length > 0 ? (
@@ -165,12 +165,12 @@ const PipelineRow = React.memo(({ index, style, data }: { index: number, style: 
                                             e.stopPropagation();
                                             navigate(`/pipelines/${run.id}`);
                                         }}
-                                        className="px-4 py-2.5 flex items-center justify-between border-b border-zinc-800/20 hover:bg-white/5 cursor-pointer transition-colors"
+                                        className="px-4 py-2.5 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/20 hover:bg-zinc-100 dark:hover:bg-white/5 cursor-pointer transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
                                             <StatusIcon status={run.result || run.status} size="xs" />
                                             <div>
-                                                <div className="text-xs font-medium text-zinc-300">#{run.id}</div>
+                                                <div className="text-xs font-medium text-zinc-700 dark:text-zinc-300">#{run.id}</div>
                                                 <div className="flex items-center gap-2 text-[10px] text-zinc-500">
                                                     <span>{run.name}</span>
                                                     <span>•</span>
@@ -319,17 +319,17 @@ export function PipelineList() {
     }), [filteredPipelines, latestRuns, expandedPipelines, runs, toggleExpand, handleRun, handleCancel, navigate]);
 
     if (loading && pipelines.length === 0) return (
-        <div className="flex items-center justify-center h-screen bg-zinc-950">
+        <div className="flex items-center justify-center h-screen bg-zinc-50 dark:bg-zinc-950">
             <Spinner />
         </div>
     );
 
     return (
-        <div className="flex flex-col h-screen bg-zinc-950 overflow-hidden font-sans">
-            <div className="flex-none max-w-7xl w-full mx-auto px-6 py-6 border-b border-zinc-800/50">
+        <div className="flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950 overflow-hidden font-sans">
+            <div className="flex-none max-w-7xl w-full mx-auto px-6 py-6 border-b border-zinc-200 dark:border-zinc-800/50">
                 <header className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-zinc-100">Pipelines</h1>
+                        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Pipelines</h1>
                         <p className="text-zinc-500 text-sm mt-1">Monitor and trigger CI/CD workflows.</p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -340,7 +340,7 @@ export function PipelineList() {
                             variant="ghost"
                             size="sm"
                             onClick={() => loadData()}
-                            className="text-zinc-400 hover:text-white"
+                            className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
                         >
                             <RefreshCw className="h-4 w-4" />
                         </Button>
@@ -348,12 +348,12 @@ export function PipelineList() {
                 </header>
 
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                     <Input
                         placeholder="Search pipelines..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 h-10 bg-zinc-950"
+                        className="pl-10 h-10 bg-white dark:bg-zinc-950"
                     />
                 </div>
             </div>
@@ -373,7 +373,7 @@ export function PipelineList() {
                         {PipelineRow}
                     </VariableSizeList>
                 ) : !loading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-600 bg-zinc-950/20">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-600 bg-zinc-100 dark:bg-zinc-950/20">
                         <Terminal className="h-10 w-10 mb-4 opacity-10" />
                         <p className="text-sm font-medium">No pipelines found.</p>
                         {searchTerm && (
@@ -422,13 +422,13 @@ function StatusIcon({ status, size = "md" }: { status?: string, size?: "xs" | "s
 
     switch (status) {
         case "succeeded":
-            return <div className={`${d} rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-500/20`}><CheckCircle2 className={i} /></div>;
+            return <div className={`${d} rounded-full bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-500 border border-emerald-200 dark:border-emerald-500/20`}><CheckCircle2 className={i} /></div>;
         case "failed":
-            return <div className={`${d} rounded-full bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20`}><XCircle className={i} /></div>;
+            return <div className={`${d} rounded-full bg-red-100 dark:bg-red-500/10 flex items-center justify-center text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20`}><XCircle className={i} /></div>;
         case "inProgress":
         case "cancelling":
-            return <div className={`${d} rounded-full bg-sapphire-600/10 flex items-center justify-center text-sapphire-500 animate-pulse border border-sapphire-600/20`}><Clock className={i} /></div>;
+            return <div className={`${d} rounded-full bg-sapphire-100 dark:bg-sapphire-600/10 flex items-center justify-center text-sapphire-600 dark:text-sapphire-500 animate-pulse border border-sapphire-200 dark:border-sapphire-600/20`}><Clock className={i} /></div>;
         default:
-            return <div className={`${d} rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500 border border-zinc-700`}><Clock className={i} /></div>;
+            return <div className={`${d} rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 border border-zinc-200 dark:border-zinc-700`}><Clock className={i} /></div>;
     }
 }

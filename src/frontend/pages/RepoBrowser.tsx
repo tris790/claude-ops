@@ -115,11 +115,11 @@ export function RepoBrowser() {
     if (!gitRepo) return null;
 
     return (
-        <div className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800 w-full ml-0">
+        <div className="flex flex-col h-full bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 w-full ml-0">
             <Breadcrumbs project={project!} repo={repo!} path={selectedFile?.path} />
             <div className="flex-1 flex overflow-hidden">
-                <div className="w-[300px] border-r border-zinc-800 bg-zinc-900/30 flex flex-col shrink-0">
-                    <div className="p-3 border-b border-zinc-800 space-y-2">
+                <div className="w-[300px] border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 flex flex-col shrink-0">
+                    <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 space-y-2">
                         <MultiSelect
                             multiple={false}
                             options={allRepos.map(r => ({ label: r.name, value: r.id, count: r.project.name === project ? undefined : 0 }))}
@@ -146,7 +146,7 @@ export function RepoBrowser() {
                         branch={currentBranch}
                     />
                 </div>
-                <div className="flex-1 bg-zinc-950/50 flex flex-col overflow-hidden">
+                <div className="flex-1 bg-white dark:bg-zinc-950/50 flex flex-col overflow-hidden">
                     {selectedFile ? (
                         <div className="flex-1 flex flex-col h-full overflow-hidden">
                             <FileViewer
@@ -165,9 +165,9 @@ export function RepoBrowser() {
                             />
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-zinc-600">
-                            <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mb-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-700"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>
+                        <div className="flex flex-col items-center justify-center h-full text-zinc-500 dark:text-zinc-600">
+                            <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400 dark:text-zinc-700"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /></svg>
                             </div>
                             <p>Select a file to view its contents in {currentBranch}</p>
                         </div>

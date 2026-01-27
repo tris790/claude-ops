@@ -80,17 +80,17 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ repoId, item, depth = 0, on
         <div>
             <div
                 ref={rowRef}
-                className={`flex items-center py-1 px-2 hover:bg-zinc-800 cursor-pointer text-sm select-none transition-colors ${isActive ? "bg-zinc-800" : ""}`}
+                className={`flex items-center py-1 px-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer text-sm select-none transition-colors ${isActive ? "bg-zinc-200 dark:bg-zinc-800" : ""}`}
                 style={{ paddingLeft: `${depth * 16 + 8}px` }}
                 onClick={handleToggle}
             >
-                <div className="mr-1 text-zinc-500 w-4 flex justify-center">
+                <div className="mr-1 text-zinc-400 dark:text-zinc-500 w-4 flex justify-center">
                     {isFolder && (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                 </div>
                 <div className="mr-2">
-                    {isFolder ? <Folder size={14} className="text-blue-400" /> : <File size={14} className="text-zinc-500" />}
+                    {isFolder ? <Folder size={14} className="text-blue-500 dark:text-blue-400" /> : <File size={14} className="text-zinc-400 dark:text-zinc-500" />}
                 </div>
-                <span className={isFolder ? "text-zinc-200" : "text-zinc-300"}>
+                <span className={isFolder ? "text-zinc-900 dark:text-zinc-200" : "text-zinc-700 dark:text-zinc-300"}>
                     {name}
                 </span>
             </div>

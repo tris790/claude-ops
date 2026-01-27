@@ -139,15 +139,15 @@ export function WorkItems() {
     const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
         const item = displayItems[index];
         return (
-            <div style={style} className="border-b border-zinc-800/30">
+            <div style={style} className="border-b border-zinc-200 dark:border-zinc-800/30">
                 <div
                     onClick={() => navigate(`/workitems/${item.id}`)}
-                    className="group flex items-center h-full hover:bg-white/5 transition-colors cursor-pointer px-4"
+                    className="group flex items-center h-full hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors cursor-pointer px-4"
                 >
                     <div className="w-20 text-sm text-zinc-500 font-mono shrink-0">#{item.id}</div>
                     <div className="flex-1 min-w-0 pr-4">
                         <div className="flex flex-col">
-                            <span className="text-zinc-200 font-medium group-hover:text-blue-400 transition-colors truncate">
+                            <span className="text-zinc-700 dark:text-zinc-200 font-medium group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                                 {item.fields["System.Title"]}
                             </span>
                             <span className="text-xs text-zinc-500 mt-0.5 truncate">{item.fields["System.WorkItemType"]}</span>
@@ -156,22 +156,22 @@ export function WorkItems() {
                     <div className="w-32 shrink-0">
                         <div className="flex items-center gap-2">
                             {getStatusIcon(item.fields["System.State"])}
-                            <span className="text-sm text-zinc-300 truncate">{item.fields["System.State"]}</span>
+                            <span className="text-sm text-zinc-600 dark:text-zinc-300 truncate">{item.fields["System.State"]}</span>
                         </div>
                     </div>
                     <div className="w-40 shrink-0">
                         {item.fields["System.AssignedTo"] ? (
                             <div className="flex items-center gap-2">
-                                <div className="h-6 w-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] text-zinc-400 lowercase shrink-0">
+                                <div className="h-6 w-6 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-[10px] text-zinc-500 dark:text-zinc-400 lowercase shrink-0">
                                     {item.fields["System.AssignedTo"].displayName[0]}
                                 </div>
-                                <span className="text-sm text-zinc-400 truncate">{item.fields["System.AssignedTo"].displayName}</span>
+                                <span className="text-sm text-zinc-500 dark:text-zinc-400 truncate">{item.fields["System.AssignedTo"].displayName}</span>
                             </div>
                         ) : (
-                            <span className="text-xs text-zinc-600 italic">Unassigned</span>
+                            <span className="text-xs text-zinc-500 dark:text-zinc-600 italic">Unassigned</span>
                         )}
                     </div>
-                    <div className="w-10 flex justify-end shrink-0 text-zinc-600">
+                    <div className="w-10 flex justify-end shrink-0 text-zinc-400 dark:text-zinc-600">
                         <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                 </div>
@@ -183,16 +183,16 @@ export function WorkItems() {
         <div className="max-w-7xl mx-auto p-6 h-[calc(100vh-60px)] flex flex-col space-y-6">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-none">
                 <div>
-                    <h1 className="text-2xl font-bold text-zinc-100">Work Items</h1>
+                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Work Items</h1>
                     <p className="text-zinc-500 text-sm mt-1">Track and manage your tasks across projects.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 md:gap-4">
                     {/* Search */}
                     <div className="relative w-full md:w-64">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                         <Input
                             placeholder="Search Work Items..."
-                            className="pl-9 h-9 bg-zinc-900 border-zinc-800 text-sm"
+                            className="pl-9 h-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-sm"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -235,9 +235,9 @@ export function WorkItems() {
                 </div>
             </header>
 
-            <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden backdrop-blur-sm flex flex-col">
+            <div className="flex-1 bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden backdrop-blur-sm flex flex-col">
                 {/* Header */}
-                <div className="flex items-center px-4 py-3 border-b border-zinc-800/50 bg-zinc-900/80 text-xs font-semibold text-zinc-500 uppercase tracking-wider flex-none">
+                <div className="flex items-center px-4 py-3 border-b border-zinc-200 dark:border-zinc-800/50 bg-zinc-50/80 dark:bg-zinc-900/80 text-xs font-semibold text-zinc-500 uppercase tracking-wider flex-none">
                     <div className="w-20">ID</div>
                     <div className="flex-1">Title</div>
                     <div className="w-32">State</div>
@@ -250,11 +250,11 @@ export function WorkItems() {
                     {loading && !items.length ? (
                         <div className="space-y-4 p-4">
                             {Array.from({ length: 5 }).map((_, i) => (
-                                <div key={i} className="animate-pulse flex items-center h-16 border-b border-zinc-800/30">
-                                    <div className="w-20 px-4"><div className="h-4 bg-zinc-800 rounded w-12" /></div>
-                                    <div className="flex-1 px-4"><div className="h-4 bg-zinc-800 rounded w-3/4" /></div>
-                                    <div className="w-32 px-4"><div className="h-4 bg-zinc-800 rounded w-20" /></div>
-                                    <div className="w-40 px-4"><div className="h-4 bg-zinc-800 rounded w-24" /></div>
+                                <div key={i} className="animate-pulse flex items-center h-16 border-b border-zinc-200 dark:border-zinc-800/30">
+                                    <div className="w-20 px-4"><div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-12" /></div>
+                                    <div className="flex-1 px-4"><div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4" /></div>
+                                    <div className="w-32 px-4"><div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-20" /></div>
+                                    <div className="w-40 px-4"><div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-24" /></div>
                                 </div>
                             ))}
                         </div>
@@ -270,7 +270,7 @@ export function WorkItems() {
                         </List>
                     ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                            <Tag className="h-8 w-8 text-zinc-800 mb-2" />
+                            <Tag className="h-8 w-8 text-zinc-300 dark:text-zinc-800 mb-2" />
                             <p className="text-zinc-500">No work items found.</p>
                             {(selectedStates.length > 0 || selectedTypes.length > 0 || selectedUsers.length > 0) && (
                                 <button

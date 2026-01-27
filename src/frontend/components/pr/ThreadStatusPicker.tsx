@@ -9,12 +9,12 @@ export interface ThreadStatus {
 }
 
 export const THREAD_STATUSES = [
-    { id: 1, value: "active", label: "Active", color: "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30" },
-    { id: 2, value: "fixed", label: "Resolved", color: "bg-green-500/20 text-green-400 hover:bg-green-500/30" },
-    { id: 3, value: "wontFix", label: "Won't Fix", color: "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700/70" },
-    { id: 4, value: "closed", label: "Closed", color: "bg-zinc-700/50 text-zinc-400 hover:bg-zinc-700/70" },
-    { id: 5, value: "byDesign", label: "By Design", color: "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30" },
-    { id: 6, value: "pending", label: "Pending", color: "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30" },
+    { id: 1, value: "active", label: "Active", color: "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-500/30" },
+    { id: 2, value: "fixed", label: "Resolved", color: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-500/30" },
+    { id: 3, value: "wontFix", label: "Won't Fix", color: "bg-zinc-100 dark:bg-zinc-700/50 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700/70" },
+    { id: 4, value: "closed", label: "Closed", color: "bg-zinc-100 dark:bg-zinc-700/50 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700/70" },
+    { id: 5, value: "byDesign", label: "By Design", color: "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-500/30" },
+    { id: 6, value: "pending", label: "Pending", color: "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/30" },
 ] as const;
 
 export function isThreadActive(status: number | string) {
@@ -93,7 +93,7 @@ export function ThreadStatusPicker({ status, onStatusChange, compact = false }: 
                         }}
                     />
                     <div
-                        className="absolute z-[9999] w-32 bg-zinc-900 border border-zinc-800 rounded shadow-xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-100"
+                        className="absolute z-[9999] w-32 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded shadow-xl overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-100"
                         style={{ top: position.top, left: position.left }}
                     >
                         {THREAD_STATUSES.map(s => (
@@ -105,8 +105,8 @@ export function ThreadStatusPicker({ status, onStatusChange, compact = false }: 
                                     setIsOpen(false);
                                 }}
                                 className={`w-full text-left px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${s.id === status || s.value === status
-                                    ? 'bg-white/10 ' + s.color
-                                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+                                    ? 'bg-zinc-100 dark:bg-white/10 ' + s.color
+                                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5'
                                     }`}
                             >
                                 {s.label}

@@ -31,17 +31,17 @@ export function SetupPage() {
     }
 
     return (
-        <div className="min-h-screen grid place-items-center bg-zinc-950 p-4 font-sans">
+        <div className="min-h-screen grid place-items-center bg-zinc-50 dark:bg-zinc-950 p-4 font-sans">
             <div className="w-full max-w-md space-y-8">
                 <div className="text-center">
                     <div className="inline-flex p-3 rounded-xl bg-sapphire-500/10 mb-4">
                         <Command className="h-10 w-10 text-sapphire-500" />
                     </div>
-                    <h2 className="text-2xl font-bold tracking-tight text-white">Welcome to ClaudeOps</h2>
-                    <p className="mt-2 text-zinc-400">Connect to your Azure DevOps organization to get started.</p>
+                    <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Welcome to ClaudeOps</h2>
+                    <p className="mt-2 text-zinc-500 dark:text-zinc-400">Connect to your Azure DevOps organization to get started.</p>
                 </div>
 
-                <Card className="bg-zinc-900/50 backdrop-blur-sm border-zinc-800">
+                <Card className="bg-white dark:bg-zinc-900/50 backdrop-blur-sm border-zinc-200 dark:border-zinc-800">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-4">
                             <Input

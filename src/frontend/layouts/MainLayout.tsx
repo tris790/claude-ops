@@ -22,31 +22,31 @@ export function MainLayout({ children }: MainLayoutProps) {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     return (
-        <div className="flex h-screen w-full bg-zinc-950 text-zinc-100 overflow-hidden font-sans">
+        <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
             <CommandPalette />
             {/* Sidebar */}
             <aside
                 className={cn(
-                    "relative flex flex-col border-r border-zinc-800 bg-zinc-900/50 transition-all duration-300 ease-in-out",
+                    "relative flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-zinc-100/50 dark:bg-zinc-900/50 transition-all duration-300 ease-in-out",
                     isSidebarCollapsed ? "w-16" : "w-[260px]"
                 )}
             >
                 {/* Sidebar Header */}
                 <div className={cn(
-                    "flex h-12 items-center border-b border-zinc-800/50",
+                    "flex h-12 items-center border-b border-zinc-200/50 dark:border-zinc-800/50",
                     isSidebarCollapsed ? "justify-center px-0" : "px-4"
                 )}>
                     <div className="flex items-center gap-2 text-sapphire-500 font-bold">
                         <div className="p-1 bg-sapphire-500/10 rounded">
                             <Command className="h-5 w-5" />
                         </div>
-                        {!isSidebarCollapsed && <span className="text-zinc-100 tracking-tight">ClaudeOps</span>}
+                        {!isSidebarCollapsed && <span className="text-zinc-900 dark:text-zinc-100 tracking-tight">ClaudeOps</span>}
                     </div>
 
                     {!isSidebarCollapsed && (
                         <button
                             onClick={() => setIsSidebarCollapsed(true)}
-                            className="ml-auto p-1 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+                            className="ml-auto p-1 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
                             aria-label="Collapse Sidebar"
                         >
                             <ChevronLeft className="h-4 w-4" />
@@ -66,10 +66,10 @@ export function MainLayout({ children }: MainLayoutProps) {
 
                 {/* Bottom Toggle (if collapsed) */}
                 {isSidebarCollapsed && (
-                    <div className="p-2 border-t border-zinc-800/50 flex justify-center">
+                    <div className="p-2 border-t border-zinc-200/50 dark:border-zinc-800/50 flex justify-center">
                         <button
                             onClick={() => setIsSidebarCollapsed(false)}
-                            className="p-1 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+                            className="p-1 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
                             aria-label="Expand Sidebar"
                         >
                             <ChevronRight className="h-4 w-4" />
@@ -88,13 +88,13 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </main>
 
                 {/* Status Bar */}
-                <footer className="h-6 bg-zinc-900 border-t border-zinc-800 flex items-center px-3 text-xs text-zinc-500 select-none justify-between">
+                <footer className="h-6 bg-zinc-100 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center px-3 text-xs text-zinc-500 select-none justify-between">
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1.5">
                             <div className="w-2 h-2 rounded-full bg-emerald-500" />
                             <span>Connected</span>
                         </span>
-                        <span className="hover:text-zinc-300 cursor-pointer flex items-center gap-1 transition-colors">
+                        <span className="hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer flex items-center gap-1 transition-colors">
                             <GitBranch className="h-3 w-3" />
                             <span>main</span>
                         </span>
@@ -118,7 +118,7 @@ function NavItem({ to, icon, label, collapsed }: { to: string, icon: React.React
                 "w-full flex items-center gap-3 px-2 py-2 rounded-md transition-all text-sm font-medium group relative",
                 isActive
                     ? "bg-sapphire-500/10 text-sapphire-400"
-                    : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100",
+                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-100",
                 collapsed && "justify-center px-0"
             )}
             title={collapsed ? label : undefined}
@@ -126,7 +126,7 @@ function NavItem({ to, icon, label, collapsed }: { to: string, icon: React.React
             {({ isActive }) => (
                 <>
                     {React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<any>, {
-                        className: cn("h-5 w-5 flex-shrink-0", isActive ? "text-sapphire-500" : "group-hover:text-zinc-100")
+                        className: cn("h-5 w-5 flex-shrink-0", isActive ? "text-sapphire-500" : "group-hover:text-zinc-900 dark:group-hover:text-zinc-100")
                     })}
                     {!collapsed && <span className="truncate">{label}</span>}
                 </>

@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-sapphire-500: #3B82F6;
@@ -25,12 +26,12 @@
 
 @layer base {
   :root {
-    @apply bg-zinc-950 text-zinc-100 font-sans;
-    color-scheme: dark;
+    @apply font-sans;
   }
 
   body {
-    @apply m-0 min-h-screen antialiased;
+    @apply m-0 min-h-screen antialiased transition-colors duration-300;
+    @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100;
   }
 }
 
@@ -41,13 +42,13 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-zinc-900;
+  @apply bg-zinc-50 dark:bg-zinc-900;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-zinc-700/50 rounded-full border-2 border-zinc-900;
+  @apply bg-zinc-300 dark:bg-zinc-700/50 rounded-full border-2 border-zinc-50 dark:border-zinc-900;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-zinc-600;
+  @apply bg-zinc-400 dark:bg-zinc-600;
 }

@@ -82,25 +82,25 @@ export function QueuePipelineModal({ isOpen, onClose, pipeline, onQueued }: Queu
 
     return (
         <>
-            <div className="fixed inset-0 bg-zinc-950/80 z-[60] backdrop-blur-sm" onClick={onClose} />
+            <div className="fixed inset-0 bg-white/80 dark:bg-zinc-950/80 z-[60] backdrop-blur-sm" onClick={onClose} />
             <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" onClick={onClose}>
                 <div
-                    className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200"
+                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl w-full max-w-lg animate-in fade-in zoom-in duration-200"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/50 rounded-t-xl">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-t-xl">
                         <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                            <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-500">
                                 <Play className="h-4 w-4 fill-current" />
                             </div>
                             <div>
-                                <h3 className="text-lg font-semibold text-zinc-100">Run Pipeline</h3>
+                                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Run Pipeline</h3>
                                 <p className="text-xs text-zinc-500 truncate max-w-[250px]">{pipeline.name}</p>
                             </div>
                         </div>
                         <button
                             onClick={onClose}
-                            className="text-zinc-500 hover:text-zinc-300 transition-colors p-1"
+                            className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors p-1"
                             title="Close"
                         >
                             <X className="h-5 w-5" />
@@ -110,19 +110,19 @@ export function QueuePipelineModal({ isOpen, onClose, pipeline, onQueued }: Queu
                     <div className="p-6 space-y-6 min-h-[300px] flex flex-col justify-between">
                         <div className="space-y-6">
                             {error && (
-                                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400 flex items-start gap-2">
+                                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
                                     <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                     <span>{error}</span>
                                 </div>
                             )}
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+                                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-400 flex items-center gap-2">
                                     <GitBranch className="h-3.5 w-3.5" />
                                     Branch
                                 </label>
                                 {fetchingBranches ? (
-                                    <div className="h-10 w-full bg-zinc-800/50 animate-pulse rounded-md border border-zinc-800" />
+                                    <div className="h-10 w-full bg-zinc-100 dark:bg-zinc-800/50 animate-pulse rounded-md border border-zinc-200 dark:border-zinc-800" />
                                 ) : (
                                     <MultiSelect
                                         multiple={false}
@@ -133,22 +133,22 @@ export function QueuePipelineModal({ isOpen, onClose, pipeline, onQueued }: Queu
                                         className="w-full"
                                     />
                                 )}
-                                <p className="text-[10px] text-zinc-600">The branch to use for this run.</p>
+                                <p className="text-[10px] text-zinc-500 dark:text-zinc-600">The branch to use for this run.</p>
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-6 border-t border-zinc-800/50 mt-auto">
+                        <div className="flex justify-end gap-3 pt-6 border-t border-zinc-200 dark:border-zinc-800/50 mt-auto">
                             <button
                                 onClick={onClose}
                                 disabled={loading}
-                                className="px-4 py-2 text-zinc-400 hover:text-zinc-200 text-sm font-medium transition-colors"
+                                className="px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 text-sm font-medium transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleQueue}
                                 disabled={loading || !selectedBranch || fetchingBranches}
-                                className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-semibold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-semibold transition-all shadow-lg shadow-blue-500/20 dark:shadow-blue-900/20 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                             >
                                 {loading ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />

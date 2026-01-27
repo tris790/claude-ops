@@ -1,5 +1,6 @@
 
 import { gitService } from "../services/git";
+import { getSettings, DEFAULT_SETTINGS } from "../services/settings";
 
 export const automationRoutes = {
     "/api/automation/run": {
@@ -20,12 +21,15 @@ export const automationRoutes = {
 
                 let commandTemplate = "";
 
-                if (task === "generate_pr_description") {
-                    commandTemplate = 'claude "Write a PR description for changes between {{target_branch}} and {{source_branch}}."';
-                } else if (task === "apply_fix") {
-                    commandTemplate = 'claude "Apply the following change to file {{file_path}} on branch {{branch}}: \'{{comment}}\'. Code context: {{code_context}}"';
+                const settings = await getSettings();
+                // Find prompt in settings, or fallback to default settings
+                const promptSetting = settings.aiCommandPrompts.find(p => p.name === task || p.id === task)
+                    || DEFAULT_SETTINGS.aiCommandPrompts.find(p => p.name === task || p.id === task);
+
+                if (promptSetting) {
+                    commandTemplate = promptSetting.prompt;
                 } else {
-                    return Response.json({ error: "Unknown task" }, { status: 400 });
+                    return Response.json({ error: "Unknown task: " + task }, { status: 400 });
                 }
 
                 // Replace variables

@@ -72,14 +72,14 @@ export function IterationSelector({ iterations, selectedIteration, selectedBaseI
         <div className="relative" ref={containerRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:border-zinc-600 rounded-md text-sm text-zinc-300 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 rounded-md text-sm text-zinc-700 dark:text-zinc-300 transition-colors shadow-sm"
                 title="Select Iteration"
             >
                 <History className="h-4 w-4 text-zinc-500" />
                 <span className="font-medium">
                     {currentBaseId === 0 ? "Base" : `Iter ${currentBaseId}`}
                 </span>
-                <ArrowRight className="h-3 w-3 text-zinc-600" />
+                <ArrowRight className="h-3 w-3 text-zinc-400 dark:text-zinc-600" />
                 <span className="font-medium">
                     {currentId === latestId ? `Iter ${currentId} (Latest)` : `Iter ${currentId}`}
                 </span>
@@ -87,20 +87,20 @@ export function IterationSelector({ iterations, selectedIteration, selectedBaseI
             </button>
 
             {isOpen && (
-                <div className="absolute left-0 mt-2 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-[400px]">
-                    <div className="p-3 border-b border-zinc-800 bg-zinc-900/50">
+                <div className="absolute left-0 mt-2 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-[400px]">
+                    <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
                         <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Select Update</h4>
-                        <p className="text-xs text-zinc-400">Compare specific push against previous version</p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">Compare specific push against previous version</p>
                     </div>
 
                     <div className="overflow-y-auto py-1">
                         {/* Option to view All Changes (Latest vs Base) */}
                         <button
                             onClick={() => handleSelect(latestId, 0)}
-                            className={`w-full text-left px-4 py-2 hover:bg-zinc-800 flex items-center justify-between group ${currentId === latestId && currentBaseId === 0 ? "bg-zinc-800/50" : ""}`}
+                            className={`w-full text-left px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between group ${currentId === latestId && currentBaseId === 0 ? "bg-zinc-100 dark:bg-zinc-800/50" : ""}`}
                         >
                             <div className="flex flex-col">
-                                <span className={`text-sm ${currentId === latestId && currentBaseId === 0 ? "text-blue-400 font-medium" : "text-zinc-200"}`}>
+                                <span className={`text-sm ${currentId === latestId && currentBaseId === 0 ? "text-blue-600 dark:text-blue-400 font-medium" : "text-zinc-700 dark:text-zinc-200"}`}>
                                     All Changes
                                 </span>
                                 <span className="text-xs text-zinc-500">Base &rarr; Iteration {latestId} (Latest)</span>
@@ -108,23 +108,23 @@ export function IterationSelector({ iterations, selectedIteration, selectedBaseI
                             {(currentId === latestId && currentBaseId === 0) && <div className="h-2 w-2 rounded-full bg-blue-500" />}
                         </button>
 
-                        <div className="h-px bg-zinc-800 my-1 mx-4" />
+                        <div className="h-px bg-zinc-200 dark:bg-zinc-800 my-1 mx-4" />
 
                         {lastReviewedIterationId && lastReviewedIterationId < latestId && (
                             <>
                                 <button
                                     onClick={() => handleSelect(latestId, lastReviewedIterationId)}
-                                    className={`w-full text-left px-4 py-2 hover:bg-zinc-800 flex items-center justify-between group ${currentId === latestId && currentBaseId === lastReviewedIterationId ? "bg-zinc-800/50" : ""}`}
+                                    className={`w-full text-left px-4 py-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between group ${currentId === latestId && currentBaseId === lastReviewedIterationId ? "bg-zinc-100 dark:bg-zinc-800/50" : ""}`}
                                 >
                                     <div className="flex flex-col">
-                                        <span className={`text-sm ${currentId === latestId && currentBaseId === lastReviewedIterationId ? "text-blue-400 font-medium" : "text-zinc-200"}`}>
+                                        <span className={`text-sm ${currentId === latestId && currentBaseId === lastReviewedIterationId ? "text-blue-600 dark:text-blue-400 font-medium" : "text-zinc-700 dark:text-zinc-200"}`}>
                                             Since My Last Review
                                         </span>
                                         <span className="text-xs text-zinc-500">Iter {lastReviewedIterationId} &rarr; Iteration {latestId} (Latest)</span>
                                     </div>
                                     {(currentId === latestId && currentBaseId === lastReviewedIterationId) && <div className="h-2 w-2 rounded-full bg-blue-500" />}
                                 </button>
-                                <div className="h-px bg-zinc-800 my-1 mx-4" />
+                                <div className="h-px bg-zinc-200 dark:bg-zinc-800 my-1 mx-4" />
                             </>
                         )}
 
@@ -139,21 +139,21 @@ export function IterationSelector({ iterations, selectedIteration, selectedBaseI
                                 <button
                                     key={iter.id}
                                     onClick={() => handleSelect(iter.id, prevIterId)}
-                                    className={`w-full text-left px-4 py-3 hover:bg-zinc-800 flex items-center justify-between group border-b border-zinc-800/50 last:border-0 ${isSelected ? "bg-zinc-800/50" : ""}`}
+                                    className={`w-full text-left px-4 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between group border-b border-zinc-100 dark:border-zinc-800/50 last:border-0 ${isSelected ? "bg-zinc-50 dark:bg-zinc-800/50" : ""}`}
                                 >
                                     <div className="flex flex-col gap-1">
                                         <div className="flex items-center gap-2">
-                                            <span className={`text-sm font-medium ${isSelected ? "text-blue-400" : "text-zinc-200"}`}>
+                                            <span className={`text-sm font-medium ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-zinc-700 dark:text-zinc-200"}`}>
                                                 Iteration {iter.id}
                                             </span>
                                             <span className="text-xs text-zinc-500">
                                                 {new Date(iter.createdDate).toLocaleDateString()} {new Date(iter.createdDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
-                                        <div className="text-xs text-zinc-400 truncate max-w-[260px]">
+                                        <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-[260px]">
                                             {iter.description || `Updated by ${iter.author.displayName}`}
                                         </div>
-                                        <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                                        <div className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono mt-0.5">
                                             {prevIterId === 0 ? "Base" : `Iter ${prevIterId}`} &rarr; Iter {iter.id}
                                         </div>
                                     </div>
