@@ -492,12 +492,68 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 ]
             },
             parent: containerRef.current,
+            highlightChanges: true,
+            gutter: true,
         });
 
+        // Setup synchronized scrolling between the two editors
+        const setupScrollSync = () => {
+            const mergeView = viewRef.current;
+            if (!mergeView) return () => {};
+
+            const scrollA = mergeView.a.scrollDOM;
+            const scrollB = mergeView.b.scrollDOM;
+
+            // Track which editor is being actively scrolled to prevent infinite loops
+            let isScrollingFrom: "a" | "b" | null = null;
+            let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+
+            const syncScroll = (source: "a" | "b") => {
+                // Prevent recursive scroll events
+                if (isScrollingFrom && isScrollingFrom !== source) return;
+
+                isScrollingFrom = source;
+
+                const sourceDOM = source === "a" ? scrollA : scrollB;
+                const targetDOM = source === "a" ? scrollB : scrollA;
+
+                // Calculate scroll percentage for vertical scroll
+                const maxScrollTop = sourceDOM.scrollHeight - sourceDOM.clientHeight;
+                const scrollPercentage = maxScrollTop > 0 ? sourceDOM.scrollTop / maxScrollTop : 0;
+
+                // Apply the same percentage to the target
+                const targetMaxScrollTop = targetDOM.scrollHeight - targetDOM.clientHeight;
+                targetDOM.scrollTop = scrollPercentage * targetMaxScrollTop;
+
+                // Sync horizontal scroll directly (same content width expected)
+                targetDOM.scrollLeft = sourceDOM.scrollLeft;
+
+                // Clear the scrolling lock after a short delay
+                if (scrollTimeout) clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    isScrollingFrom = null;
+                }, 50);
+            };
+
+            const handleScrollA = () => syncScroll("a");
+            const handleScrollB = () => syncScroll("b");
+
+            scrollA.addEventListener("scroll", handleScrollA, { passive: true });
+            scrollB.addEventListener("scroll", handleScrollB, { passive: true });
+
+            return () => {
+                scrollA.removeEventListener("scroll", handleScrollA);
+                scrollB.removeEventListener("scroll", handleScrollB);
+                if (scrollTimeout) clearTimeout(scrollTimeout);
+            };
+        };
+
+        const cleanupScrollSync = setupScrollSync();
         const unbindA = setupDiagnostics("a", `file:///original${normalizedPath}`);
         const unbindB = setupDiagnostics("b", `file://${normalizedPath}`);
 
         return () => {
+            cleanupScrollSync();
             unbindA?.();
             unbindB?.();
             if (viewRef.current) {
@@ -687,8 +743,46 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     z-index: 9999 !important;
                 }
 
-                /* Fix for vertical scrolling in MergeView */
+                /* Scrolling for editors */
                 .cm-scroller { overflow: auto !important; }
+
+                /* Diff highlighting - Side-by-side mode */
+                .cm-merge-a .cm-changedLine {
+                    background-color: rgba(239, 68, 68, 0.15) !important;
+                }
+                .cm-merge-b .cm-changedLine {
+                    background-color: rgba(34, 197, 94, 0.15) !important;
+                }
+                .cm-merge-a .cm-changedText {
+                    background-color: rgba(239, 68, 68, 0.4) !important;
+                    color: #fca5a5 !important;
+                }
+                .cm-merge-b .cm-changedText {
+                    background-color: rgba(34, 197, 94, 0.4) !important;
+                    color: #86efac !important;
+                }
+
+                /* Gutter markers for changes */
+                .cm-changeGutter .cm-changedLineGutter {
+                    background-color: #ef4444 !important;
+                }
+                .cm-merge-b .cm-changeGutter .cm-changedLineGutter {
+                    background-color: #22c55e !important;
+                }
+
+                /* Unified mode diff highlighting */
+                .cm-deletedChunk {
+                    background-color: rgba(239, 68, 68, 0.1) !important;
+                }
+                .cm-deletedChunk .cm-deletedLine {
+                    background-color: rgba(239, 68, 68, 0.2) !important;
+                }
+                .cm-deletedChunk .cm-deletedText {
+                    background-color: rgba(239, 68, 68, 0.4) !important;
+                }
+                .cm-insertedLine {
+                    background-color: rgba(34, 197, 94, 0.15) !important;
+                }
             `}</style>
         </div>
     );

@@ -334,8 +334,8 @@ export function PRDetail() {
     }
 
     // Determine commit IDs for DiffViewer
-    let originalVersion = pr?.lastMergeTargetCommitId;
-    let modifiedVersion = pr?.lastMergeSourceCommitId;
+    let originalVersion = pr?.lastMergeTargetCommit?.commitId;
+    let modifiedVersion = pr?.lastMergeSourceCommit?.commitId;
 
     if (iterations.length > 0 && selectedIteration !== null) {
         const iter = iterations.find(i => i.id === selectedIteration);
