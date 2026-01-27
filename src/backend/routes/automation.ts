@@ -54,7 +54,7 @@ export const automationRoutes = {
                 // If we have repo info in context, use it
                 let cwd = process.cwd();
                 if (context.projectName && context.repoName) {
-                    cwd = gitService.getRepoPath(context.projectName, context.repoName);
+                    cwd = await gitService.getRepoPath(context.projectName, context.repoName);
                     // Check if exists
                     const isCloned = await gitService.isCloned(context.projectName, context.repoName);
                     if (!isCloned && task === "apply_fix") {

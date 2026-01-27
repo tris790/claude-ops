@@ -53,7 +53,7 @@ const server = serve<WebSocketData>({
           return new Response("Missing project, repo, or language", { status: 400 });
         }
 
-        const rootPath = gitService.getRepoPath(projectName, repoName);
+        const rootPath = await gitService.getRepoPath(projectName, repoName);
 
         const success = server.upgrade(req, {
           data: { rootPath, language }

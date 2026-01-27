@@ -1,35 +1,38 @@
 import { join } from "path";
-import { homedir } from "os";
 import { mkdir, readdir, stat } from "fs/promises";
+import { getSettings } from "./settings";
 
 export interface ClonedRepo {
     project: string;
     repo: string;
 }
 
-const REPOS_DIR = join(homedir(), ".claude-ops", "repos");
-
 export class GitService {
-    private baseDir: string;
+    private manualBaseDir?: string;
 
     constructor(baseDir?: string) {
-        this.baseDir = baseDir || REPOS_DIR;
+        this.manualBaseDir = baseDir;
     }
 
-    getBaseDir() {
-        return this.baseDir;
+    async getBaseDir() {
+        if (this.manualBaseDir) return this.manualBaseDir;
+        const settings = await getSettings();
+        return settings.repoCloneDirectory;
     }
 
-    getRepoPath(projectName: string, repoName: string) {
-        return join(this.baseDir, projectName, repoName);
+    async getRepoPath(projectName: string, repoName: string) {
+        const baseDir = await this.getBaseDir();
+        return join(baseDir, projectName, repoName);
     }
 
     async ensureBaseDir() {
-        await mkdir(this.baseDir, { recursive: true });
+        const baseDir = await this.getBaseDir();
+        await mkdir(baseDir, { recursive: true });
     }
 
     async isCloned(projectName: string, repoName: string) {
-        const gitDir = join(this.getRepoPath(projectName, repoName), ".git");
+        const repoPath = await this.getRepoPath(projectName, repoName);
+        const gitDir = join(repoPath, ".git");
         try {
             await stat(gitDir);
             return true;
@@ -39,8 +42,9 @@ export class GitService {
     }
 
     async listClonedRepos(): Promise<ClonedRepo[]> {
+        const baseDir = await this.getBaseDir();
         try {
-            await stat(this.baseDir);
+            await stat(baseDir);
         } catch {
             return [];
         }
@@ -48,9 +52,9 @@ export class GitService {
         const repos: ClonedRepo[] = [];
 
         try {
-            const projects = await readdir(this.baseDir);
+            const projects = await readdir(baseDir);
             for (const project of projects) {
-                const projectPath = join(this.baseDir, project);
+                const projectPath = join(baseDir, project);
                 try {
                     if ((await stat(projectPath)).isDirectory()) {
                         const repoDirs = await readdir(projectPath);
@@ -81,10 +85,11 @@ export class GitService {
     async clone(projectName: string, repoName: string, cloneUrl: string) {
         await this.ensureBaseDir();
 
-        const projectDir = join(this.baseDir, projectName);
+        const baseDir = await this.getBaseDir();
+        const projectDir = join(baseDir, projectName);
         await mkdir(projectDir, { recursive: true });
 
-        const targetPath = this.getRepoPath(projectName, repoName);
+        const targetPath = await this.getRepoPath(projectName, repoName);
 
         const proc = Bun.spawn(["git", "clone", "--depth", "1", cloneUrl, targetPath], {
             stdout: "pipe",
@@ -99,7 +104,7 @@ export class GitService {
     }
 
     async fetch(projectName: string, repoName: string) {
-        const path = this.getRepoPath(projectName, repoName);
+        const path = await this.getRepoPath(projectName, repoName);
 
         if (!(await this.isCloned(projectName, repoName))) {
             return;
@@ -124,7 +129,7 @@ export class GitService {
     }
 
     async getStatus(projectName: string, repoName: string) {
-        const path = this.getRepoPath(projectName, repoName);
+        const path = await this.getRepoPath(projectName, repoName);
         if (!(await this.isCloned(projectName, repoName))) {
             return null;
         }
@@ -151,7 +156,7 @@ export class GitService {
         return { ahead: 0, behind: 0 };
     }
     async pull(projectName: string, repoName: string) {
-        const path = this.getRepoPath(projectName, repoName);
+        const path = await this.getRepoPath(projectName, repoName);
 
         if (!(await this.isCloned(projectName, repoName))) {
             throw new Error("Repository is not cloned locally");
@@ -171,7 +176,7 @@ export class GitService {
     }
 
     async listFiles(projectName: string, repoName: string, path: string = "/"): Promise<any[]> {
-        const repoPath = this.getRepoPath(projectName, repoName);
+        const repoPath = await this.getRepoPath(projectName, repoName);
         if (!(await this.isCloned(projectName, repoName))) {
             throw new Error("Repository not cloned");
         }
@@ -216,7 +221,7 @@ export class GitService {
     }
 
     async getFileContent(projectName: string, repoName: string, path: string, version?: string): Promise<string> {
-        const repoPath = this.getRepoPath(projectName, repoName);
+        const repoPath = await this.getRepoPath(projectName, repoName);
         if (!(await this.isCloned(projectName, repoName))) {
             throw new Error("Repository not cloned");
         }
@@ -240,7 +245,7 @@ export class GitService {
     }
 
     async search(projectName: string, repoName: string, query: string, options: { isRegex?: boolean, filePatterns?: string[], contextLines?: number, isPathSearch?: boolean } = {}): Promise<any[]> {
-        const repoPath = this.getRepoPath(projectName, repoName);
+        const repoPath = await this.getRepoPath(projectName, repoName);
         if (!(await this.isCloned(projectName, repoName))) {
             return [];
         }
@@ -399,6 +404,7 @@ export class GitService {
             // Let's try to improve this if we have time. For now, basic search matches.
             // But wait, "Contextual Results: Show 2 lines of context". 
             // I should try to parse it.
+            // TODO: Actually parse context events.
 
             return results;
 

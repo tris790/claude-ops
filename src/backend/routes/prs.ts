@@ -117,7 +117,7 @@ export const prRoutes = {
                                 const result = await gitContextManager.ensureCommit(projectName, repoName, commitHash);
 
                                 if (result.success) {
-                                    const repoPath = gitService.getRepoPath(projectName, repoName);
+                                    const repoPath = await gitService.getRepoPath(projectName, repoName);
                                     await lspService.warmup(repoPath);
                                 } else {
                                     console.warn(`[PR-Hook] Context switch failed: ${result.error}`);

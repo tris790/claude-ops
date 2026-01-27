@@ -13,7 +13,7 @@ export class GitContextManager {
             return { success: false, error: "Repository is not cloned locally." };
         }
 
-        const repoPath = gitService.getRepoPath(projectName, repoName);
+        const repoPath = await gitService.getRepoPath(projectName, repoName);
 
         // 2. Check Dirty State
         const dirty = await this.isDirty(repoPath);
