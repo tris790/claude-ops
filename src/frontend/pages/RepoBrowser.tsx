@@ -6,6 +6,7 @@ import { FileViewer } from "../components/repo/FileViewer";
 import { getRepositories, getBranches, type GitItem, type GitRepository } from "../api/repos";
 import { ReferencesPanel, type LSPLocation } from "../components/lsp/ReferencesPanel";
 import { handleLSPDefinition } from "../features/lsp/navigation";
+import { MultiSelect } from "../components/ui/MultiSelect";
 
 export function RepoBrowser() {
     const { project, repo, "*": splat } = useParams<{ project: string; repo: string; "*": string }>();
@@ -16,6 +17,7 @@ export function RepoBrowser() {
 
     const [selectedFile, setSelectedFile] = useState<GitItem | null>(null);
     const [gitRepo, setGitRepo] = useState<GitRepository | null>(null);
+    const [allRepos, setAllRepos] = useState<GitRepository[]>([]);
     const [branches, setBranches] = useState<{ name: string; objectId: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export function RepoBrowser() {
 
         getRepositories()
             .then(repos => {
+                setAllRepos(repos);
                 const found = repos.find(r => r.project.name === project && r.name === repo);
                 if (found) {
                     setGitRepo(found);
@@ -39,7 +42,7 @@ export function RepoBrowser() {
                 }
             })
             .then(b => {
-                setBranches(b);
+                if (b) setBranches(b);
             })
             .catch(err => {
                 console.error(err);
@@ -96,6 +99,17 @@ export function RepoBrowser() {
         navigate(`/repos/${project}/${repo}/blob/${currentBranch}/${item.path}`);
     };
 
+    const handleBranchChange = (newBranch: string) => {
+        navigate(`/repos/${project}/${repo}/blob/${newBranch}/${filePath}`);
+    };
+
+    const handleRepoChange = (repoId: string) => {
+        const found = allRepos.find(r => r.id === repoId);
+        if (found) {
+            navigate(`/repos/${found.project.name}/${found.name}`);
+        }
+    };
+
     if (loading) return <div className="h-full flex items-center justify-center text-zinc-500">Loading...</div>;
     if (error) return <div className="h-full flex items-center justify-center text-red-500">{error}</div>;
     if (!gitRepo) return null;
@@ -105,6 +119,26 @@ export function RepoBrowser() {
             <Breadcrumbs project={project!} repo={repo!} path={selectedFile?.path} />
             <div className="flex-1 flex overflow-hidden">
                 <div className="w-[300px] border-r border-zinc-800 bg-zinc-900/30 flex flex-col shrink-0">
+                    <div className="p-3 border-b border-zinc-800 space-y-2">
+                        <MultiSelect
+                            multiple={false}
+                            options={allRepos.map(r => ({ label: r.name, value: r.id, count: r.project.name === project ? undefined : 0 }))}
+                            selected={gitRepo.id}
+                            onChange={(val) => handleRepoChange(val)}
+                            placeholder="Select Repository"
+                            className="w-full"
+                            searchPlaceholder="Search repositories..."
+                        />
+                        <MultiSelect
+                            multiple={false}
+                            options={branches.map(b => ({ label: b.name, value: b.name }))}
+                            selected={currentBranch}
+                            onChange={(val) => handleBranchChange(val)}
+                            placeholder="Select Branch"
+                            className="w-full"
+                            searchPlaceholder="Search branches..."
+                        />
+                    </div>
                     <FileTree
                         repoId={gitRepo.id}
                         onSelect={handleFileSelect}

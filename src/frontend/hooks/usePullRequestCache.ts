@@ -8,35 +8,48 @@ const cache: Record<string, { data: any[], timestamp: number }> = {};
 
 export interface PrFilterOptions {
     query: string;
-    repository?: string;
-    author?: string;
+    repositoryIds?: string[];
+    authorIds?: string[];
+    projectNames?: string[];
 }
 
-export function usePullRequestCache(status: string = 'active') {
-    const [prs, setPrs] = useState<any[]>(cache[status]?.data || []);
-    const [loading, setLoading] = useState(!cache[status]);
+export function usePullRequestCache(statuses: string[] = ['active']) {
+    const statusKey = statuses.slice().sort().join(',');
+    const [prs, setPrs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const cached = cache[status];
-        const isStale = cached ? Date.now() - cached.timestamp > CACHE_TTL : true;
-
-        if (!cached || isStale) {
-            fetchData();
-        } else {
-            setLoading(false);
-        }
-    }, [status]);
+        fetchData();
+    }, [statusKey]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const data = await getPullRequests(status);
-            cache[status] = {
-                data,
-                timestamp: Date.now()
-            };
-            setPrs(data);
+            const results = await Promise.all(statuses.map(async (status) => {
+                const cached = cache[status];
+                const isStale = cached ? Date.now() - cached.timestamp > CACHE_TTL : true;
+
+                if (cached && !isStale) {
+                    return cached.data;
+                }
+
+                const data = await getPullRequests(status);
+                cache[status] = {
+                    data,
+                    timestamp: Date.now()
+                };
+                return data;
+            }));
+
+            // Flatten and remove duplicates (by pullRequestId)
+            const flattened = results.flat();
+            const unique = Array.from(new Map(flattened.map(item => [item.pullRequestId, item])).values());
+
+            // Sort by creationDate descending
+            unique.sort((a, b) => new Date(b.creationDate).getTime() - new Date(a.creationDate).getTime());
+
+            setPrs(unique);
             setError(null);
         } catch (err: any) {
             setError(err.message);
@@ -67,12 +80,15 @@ export function usePullRequestCache(status: string = 'active') {
             result = fuseResults.map(r => r.item);
         }
 
-        // 2. Exact Filters (if any)
-        if (options.repository) {
-            result = result.filter(pr => pr.repository.name === options.repository);
+        // 2. Exact Filters
+        if (options.repositoryIds && options.repositoryIds.length > 0) {
+            result = result.filter(pr => options.repositoryIds?.includes(pr.repository.id));
         }
-        if (options.author) {
-            result = result.filter(pr => pr.createdBy.displayName === options.author);
+        if (options.authorIds && options.authorIds.length > 0) {
+            result = result.filter(pr => options.authorIds?.includes(pr.createdBy.uniqueName || pr.createdBy.displayName));
+        }
+        if (options.projectNames && options.projectNames.length > 0) {
+            result = result.filter(pr => options.projectNames?.includes(pr.repository.project.name));
         }
 
         return result;

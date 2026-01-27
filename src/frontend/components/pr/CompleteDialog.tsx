@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Loader2, GitMerge, Trash2, CheckSquare } from "lucide-react";
 import { updatePullRequest } from "../../api/prs";
+import { MultiSelect } from "../ui/MultiSelect";
 
 interface CompleteDialogProps {
     isOpen: boolean;
@@ -100,16 +101,18 @@ export function CompleteDialog({ isOpen, onClose, pr, onComplete }: CompleteDial
 
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-zinc-400">Merge Strategy</label>
-                                <select
-                                    value={mergeStrategy}
-                                    onChange={(e) => setMergeStrategy(e.target.value)}
-                                    className="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 text-sm rounded-lg p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                >
-                                    <option value="squash">Squash commit</option>
-                                    <option value="merge">Merge (no fast-forward)</option>
-                                    <option value="rebase">Rebase and fast-forward</option>
-                                    <option value="rebaseMerge">Rebase with merge commit</option>
-                                </select>
+                                <MultiSelect
+                                    multiple={false}
+                                    options={[
+                                        { label: "Squash commit", value: "squash" },
+                                        { label: "Merge (no fast-forward)", value: "merge" },
+                                        { label: "Rebase and fast-forward", value: "rebase" },
+                                        { label: "Rebase with merge commit", value: "rebaseMerge" }
+                                    ]}
+                                    selected={mergeStrategy}
+                                    onChange={(val) => setMergeStrategy(val)}
+                                    className="w-full"
+                                />
                             </div>
                         </div>
 

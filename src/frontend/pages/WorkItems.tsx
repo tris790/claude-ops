@@ -10,10 +10,11 @@ import {
     ChevronRight,
     Search,
     X,
-    LayoutList
 } from "lucide-react";
 import { cn } from "../utils/cn";
 import { Input } from "../components/ui/Input";
+import { MultiSelect } from "../components/ui/MultiSelect";
+import type { MultiSelectOption } from "../components/ui/MultiSelect";
 
 // Helper for window size
 function useWindowWidth() {
@@ -28,11 +29,89 @@ function useWindowWidth() {
 
 export function WorkItems() {
     const navigate = useNavigate();
-    const [filter, setFilter] = useState("my");
     const [searchQuery, setSearchQuery] = useState("");
 
     // Cache Hook
-    const { items, loading, filterItems, refresh } = useWorkItemCache();
+    const { items, loading, filterItems } = useWorkItemCache();
+
+    // -- Filering State with Persistence --
+    const [selectedStates, setSelectedStates] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('claude-ops.workitems.filter.states');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+
+    const [selectedTypes, setSelectedTypes] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('claude-ops.workitems.filter.types');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+
+    const [selectedUsers, setSelectedUsers] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('claude-ops.workitems.filter.users');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+
+    // Save filters
+    useEffect(() => { localStorage.setItem('claude-ops.workitems.filter.states', JSON.stringify(selectedStates)); }, [selectedStates]);
+    useEffect(() => { localStorage.setItem('claude-ops.workitems.filter.types', JSON.stringify(selectedTypes)); }, [selectedTypes]);
+    useEffect(() => { localStorage.setItem('claude-ops.workitems.filter.users', JSON.stringify(selectedUsers)); }, [selectedUsers]);
+
+    // -- Options Derivation --
+    const options = useMemo(() => {
+        const states = new Map<string, number>();
+        const types = new Map<string, number>();
+        const users = new Map<string, { label: string, count: number }>();
+
+        items.forEach(item => {
+            // State
+            const state = item.fields["System.State"];
+            if (state) states.set(state, (states.get(state) || 0) + 1);
+
+            // Type (Feature)
+            const type = item.fields["System.WorkItemType"];
+            if (type) types.set(type, (types.get(type) || 0) + 1);
+
+            // User
+            const user = item.fields["System.AssignedTo"];
+            if (user) {
+                const key = user.uniqueName || user.displayName;
+                const existing = users.get(key);
+                users.set(key, {
+                    label: user.displayName,
+                    count: (existing?.count || 0) + 1
+                });
+            } else {
+                const key = "unassigned";
+                const existing = users.get(key);
+                users.set(key, {
+                    label: "Unassigned",
+                    count: (existing?.count || 0) + 1
+                });
+            }
+        });
+
+        return {
+            states: Array.from(states.entries()).map(([val, count]): MultiSelectOption => ({ label: val, value: val, count })).sort((a, b) => a.label.localeCompare(b.label)),
+            types: Array.from(types.entries()).map(([val, count]): MultiSelectOption => ({ label: val, value: val, count })).sort((a, b) => a.label.localeCompare(b.label)),
+            users: Array.from(users.entries()).map(([val, { label, count }]): MultiSelectOption => ({ label, value: val, count })).sort((a, b) => a.label.localeCompare(b.label))
+        };
+    }, [items]);
+
+    // -- Filter Implementation --
+    const displayItems = useMemo(() => {
+        return filterItems({
+            query: searchQuery,
+            states: selectedStates,
+            types: selectedTypes,
+            assignedToIds: selectedUsers
+        });
+    }, [searchQuery, items, filterItems, selectedStates, selectedTypes, selectedUsers]);
+
 
     // Virtualization
     const windowWidth = useWindowWidth();
@@ -46,14 +125,6 @@ export function WorkItems() {
             setContainerHeight(containerRef.current.clientHeight);
         }
     }, [windowWidth, loading]);
-
-    // Filtered Data
-    const displayItems = useMemo(() => {
-        // We simulate the "Recent" vs "My" by just sorting differently if we wanted, 
-        // but for now we follow original logic which returns same items.
-        // We apply the search query.
-        return filterItems({ query: searchQuery });
-    }, [searchQuery, items, filterItems]);
 
     const getStatusIcon = (state: string) => {
         switch (state?.toLowerCase()) {
@@ -115,9 +186,9 @@ export function WorkItems() {
                     <h1 className="text-2xl font-bold text-zinc-100">Work Items</h1>
                     <p className="text-zinc-500 text-sm mt-1">Track and manage your tasks across projects.</p>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2 md:gap-4">
                     {/* Search */}
-                    <div className="relative w-64">
+                    <div className="relative w-full md:w-64">
                         <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
                         <Input
                             placeholder="Search Work Items..."
@@ -135,25 +206,31 @@ export function WorkItems() {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
-                        <button
-                            onClick={() => setFilter("my")}
-                            className={cn(
-                                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                                filter === "my" ? "bg-blue-600 text-white" : "text-zinc-500 hover:text-zinc-300"
-                            )}
-                        >
-                            Assigned to Me
-                        </button>
-                        <button
-                            onClick={() => setFilter("recent")}
-                            className={cn(
-                                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                                filter === "recent" ? "bg-blue-600 text-white" : "text-zinc-500 hover:text-zinc-300"
-                            )}
-                        >
-                            Recently Updated
-                        </button>
+                    <div className="flex items-center gap-2">
+                        <MultiSelect
+                            options={options.users}
+                            selected={selectedUsers}
+                            onChange={setSelectedUsers}
+                            placeholder="User"
+                            className="w-36 md:w-48"
+                            searchPlaceholder="Search users..."
+                        />
+                        <MultiSelect
+                            options={options.types}
+                            selected={selectedTypes}
+                            onChange={setSelectedTypes}
+                            placeholder="Feature"
+                            className="w-32 md:w-40"
+                            searchPlaceholder="Search types..."
+                        />
+                        <MultiSelect
+                            options={options.states}
+                            selected={selectedStates}
+                            onChange={setSelectedStates}
+                            placeholder="State"
+                            className="w-32 md:w-40"
+                            searchPlaceholder="Search states..."
+                        />
                     </div>
                 </div>
             </header>
@@ -183,11 +260,7 @@ export function WorkItems() {
                         </div>
                     ) : displayItems.length > 0 ? (
                         <List
-                            height={containerHeight - 40} // Subtract header height approximation if needed, or just containerHeight since header is outside ref? 
-                            // Actually containerRef is on the div wrapping the list, below header. So containerHeight should be full height of that div.
-                            // But wait, containerHeight is reduced by header? 
-                            // Flex layout: flex-1 will make that div take remaining space.
-                            // So containerRef.current.clientHeight will be correct!
+                            height={containerHeight} // Use direct container height
                             itemCount={displayItems.length}
                             itemSize={72}
                             width={containerWidth}
@@ -199,6 +272,19 @@ export function WorkItems() {
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                             <Tag className="h-8 w-8 text-zinc-800 mb-2" />
                             <p className="text-zinc-500">No work items found.</p>
+                            {(selectedStates.length > 0 || selectedTypes.length > 0 || selectedUsers.length > 0) && (
+                                <button
+                                    onClick={() => {
+                                        setSelectedStates([]);
+                                        setSelectedTypes([]);
+                                        setSelectedUsers([]);
+                                        setSearchQuery("");
+                                    }}
+                                    className="mt-4 text-xs text-blue-500 hover:underline"
+                                >
+                                    Clear all filters
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -206,3 +292,4 @@ export function WorkItems() {
         </div>
     );
 }
+

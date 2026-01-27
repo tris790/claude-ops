@@ -8,8 +8,9 @@ let cachedItems: { data: any[], timestamp: number } | null = null;
 
 export interface WorkItemFilterOptions {
     query: string;
-    state?: string;
-    assignedTo?: string;
+    states?: string[];
+    assignedToIds?: string[];
+    types?: string[];
 }
 
 export function useWorkItemCache() {
@@ -69,8 +70,18 @@ export function useWorkItemCache() {
         }
 
         // 2. Exact Filters
-        if (options.state) {
-            result = result.filter(item => item.fields['System.State'] === options.state);
+        if (options.states && options.states.length > 0) {
+            result = result.filter(item => options.states?.includes(item.fields['System.State']));
+        }
+        if (options.types && options.types.length > 0) {
+            result = result.filter(item => options.types?.includes(item.fields['System.WorkItemType']));
+        }
+        if (options.assignedToIds && options.assignedToIds.length > 0) {
+            result = result.filter(item => {
+                const user = item.fields['System.AssignedTo'];
+                const key = user ? (user.uniqueName || user.displayName) : "unassigned";
+                return options.assignedToIds?.includes(key);
+            });
         }
 
         return result;

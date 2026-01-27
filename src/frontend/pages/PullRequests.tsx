@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { cn } from "../utils/cn";
 import { Input } from "../components/ui/Input";
+import { MultiSelect } from "../components/ui/MultiSelect";
+import type { MultiSelectOption } from "../components/ui/MultiSelect";
 
 // Helper for window size
 function useWindowWidth() {
@@ -30,20 +32,106 @@ function useWindowWidth() {
 
 export function PullRequests() {
     const navigate = useNavigate();
-    const [statusFilter, setStatusFilter] = useState("active");
     const [searchQuery, setSearchQuery] = useState("");
 
+    // -- Filtering State with Persistence --
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('claude-ops.prs.filter.statuses');
+            return saved ? JSON.parse(saved) : ["active"];
+        } catch { return ["active"]; }
+    });
+
+    const [selectedProjects, setSelectedProjects] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('claude-ops.prs.filter.projects');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+
+    const [selectedRepos, setSelectedRepos] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('claude-ops.prs.filter.repos');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+
+    const [selectedUsers, setSelectedUsers] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('claude-ops.prs.filter.users');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+
+    // Save filters
+    useEffect(() => { localStorage.setItem('claude-ops.prs.filter.statuses', JSON.stringify(selectedStatuses)); }, [selectedStatuses]);
+    useEffect(() => { localStorage.setItem('claude-ops.prs.filter.projects', JSON.stringify(selectedProjects)); }, [selectedProjects]);
+    useEffect(() => { localStorage.setItem('claude-ops.prs.filter.repos', JSON.stringify(selectedRepos)); }, [selectedRepos]);
+    useEffect(() => { localStorage.setItem('claude-ops.prs.filter.users', JSON.stringify(selectedUsers)); }, [selectedUsers]);
+
     // Use the cache hook
-    const { prs, loading, filterPrs, refresh } = usePullRequestCache(statusFilter);
+    const { prs, loading, filterPrs, refresh } = usePullRequestCache(selectedStatuses.length > 0 ? selectedStatuses : ['active']);
 
     // Polling
     usePolling(async () => {
         await refresh();
     }, {
-        enabled: statusFilter === "active",
+        enabled: selectedStatuses.includes("active") || selectedStatuses.length === 0,
         activeInterval: 5000,
         backgroundInterval: 30000,
     });
+
+    // -- Options Derivation --
+    const options = useMemo(() => {
+        const projects = new Map<string, number>();
+        const repos = new Map<string, { label: string, count: number }>();
+        const users = new Map<string, { label: string, count: number }>();
+
+        prs.forEach(pr => {
+            // Project
+            const projName = pr.repository.project.name;
+            if (projName) projects.set(projName, (projects.get(projName) || 0) + 1);
+
+            // Repo
+            const repoId = pr.repository.id;
+            const repoName = pr.repository.name;
+            const existingRepo = repos.get(repoId);
+            repos.set(repoId, { label: repoName, count: (existingRepo?.count || 0) + 1 });
+
+            // User
+            const user = pr.createdBy;
+            const userKey = user.uniqueName || user.displayName;
+            const existingUser = users.get(userKey);
+            users.set(userKey, { label: user.displayName, count: (existingUser?.count || 0) + 1 });
+        });
+
+        return {
+            statuses: [
+                { label: "Active", value: "active" },
+                { label: "Completed", value: "completed" },
+                { label: "Abandoned", value: "abandoned" }
+            ],
+            projects: Array.from(projects.entries()).map(([val, count]): MultiSelectOption => ({ label: val, value: val, count })).sort((a, b) => a.label.localeCompare(b.label)),
+            repos: Array.from(repos.entries()).map(([val, { label, count }]): MultiSelectOption => ({ label, value: val, count })).sort((a, b) => a.label.localeCompare(b.label)),
+            users: Array.from(users.entries()).map(([val, { label, count }]): MultiSelectOption => ({ label, value: val, count })).sort((a, b) => a.label.localeCompare(b.label))
+        };
+    }, [prs]);
+
+    // Filtered Data
+    const displayPrs = useMemo(() => {
+        return filterPrs({
+            query: searchQuery,
+            repositoryIds: selectedRepos,
+            authorIds: selectedUsers,
+            projectNames: selectedProjects
+        });
+    }, [searchQuery, prs, filterPrs, selectedRepos, selectedUsers, selectedProjects]);
+
+    const getVoteIcon = (vote: number) => {
+        if (vote > 0) return <CheckCircle2 className="h-3 w-3 text-emerald-500 fill-zinc-950" />;
+        if (vote < 0) return <XCircle className="h-3 w-3 text-rose-500 fill-zinc-950" />;
+        return <Clock className="h-3 w-3 text-zinc-500 fill-zinc-950" />;
+    };
 
     // Virtualization setup
     const windowWidth = useWindowWidth();
@@ -57,17 +145,6 @@ export function PullRequests() {
             setContainerHeight(containerRef.current.clientHeight);
         }
     }, [windowWidth, loading]);
-
-    // Filtered Data
-    const displayPrs = useMemo(() => {
-        return filterPrs({ query: searchQuery });
-    }, [searchQuery, prs, filterPrs]);
-
-    const getVoteIcon = (vote: number) => {
-        if (vote > 0) return <CheckCircle2 className="h-3 w-3 text-emerald-500 fill-zinc-950" />;
-        if (vote < 0) return <XCircle className="h-3 w-3 text-rose-500 fill-zinc-950" />;
-        return <Clock className="h-3 w-3 text-zinc-500 fill-zinc-950" />;
-    };
 
     // Row Component
     const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
@@ -88,6 +165,8 @@ export function PullRequests() {
                                     {pr.title}
                                 </h3>
                                 <span className="text-xs text-zinc-500 font-mono shrink-0">!{pr.pullRequestId}</span>
+                                {pr.status === "completed" && <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px] font-medium uppercase tracking-wider">Merged</span>}
+                                {pr.status === "abandoned" && <span className="px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 text-[10px] font-medium uppercase tracking-wider">Abandoned</span>}
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500 truncate">
                                 <span className="flex items-center gap-1">
@@ -136,9 +215,9 @@ export function PullRequests() {
                     <p className="text-zinc-500 text-sm mt-1">Review and manage code changes across repositories.</p>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2 md:gap-4">
                     {/* Search */}
-                    <div className="relative w-64">
+                    <div className="relative w-full md:w-64">
                         <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
                         <Input
                             placeholder="Search PRs..."
@@ -156,19 +235,38 @@ export function PullRequests() {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800">
-                        {["active", "completed", "abandoned"].map((f) => (
-                            <button
-                                key={f}
-                                onClick={() => setStatusFilter(f)}
-                                className={cn(
-                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-all capitalize",
-                                    statusFilter === f ? "bg-blue-600 text-white" : "text-zinc-500 hover:text-zinc-300"
-                                )}
-                            >
-                                {f}
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-2">
+                        <MultiSelect
+                            options={options.users}
+                            selected={selectedUsers}
+                            onChange={setSelectedUsers}
+                            placeholder="User"
+                            className="w-36 md:w-48"
+                            searchPlaceholder="Search authors..."
+                        />
+                        <MultiSelect
+                            options={options.projects}
+                            selected={selectedProjects}
+                            onChange={setSelectedProjects}
+                            placeholder="Project"
+                            className="w-32 md:w-40"
+                            searchPlaceholder="Search projects..."
+                        />
+                        <MultiSelect
+                            options={options.repos}
+                            selected={selectedRepos}
+                            onChange={setSelectedRepos}
+                            placeholder="Repo"
+                            className="w-32 md:w-40"
+                            searchPlaceholder="Search repositories..."
+                        />
+                        <MultiSelect
+                            options={options.statuses}
+                            selected={selectedStatuses}
+                            onChange={setSelectedStatuses}
+                            placeholder="Status"
+                            className="w-32 md:w-40"
+                        />
                     </div>
                 </div>
             </header>
@@ -197,12 +295,27 @@ export function PullRequests() {
                         {Row}
                     </List>
                 ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 text-center">
                         <GitPullRequest className="h-12 w-12 mb-4 text-zinc-800" />
                         <p>No pull requests found.</p>
+                        {(selectedStatuses.length > 0 || selectedProjects.length > 0 || selectedRepos.length > 0 || selectedUsers.length > 0) && (
+                            <button
+                                onClick={() => {
+                                    setSelectedStatuses(["active"]);
+                                    setSelectedProjects([]);
+                                    setSelectedRepos([]);
+                                    setSelectedUsers([]);
+                                    setSearchQuery("");
+                                }}
+                                className="mt-4 text-xs text-blue-500 hover:underline"
+                            >
+                                Reset all filters
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
         </div>
     );
 }
+

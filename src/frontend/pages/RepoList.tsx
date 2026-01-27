@@ -8,6 +8,7 @@ import { Card } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { Spinner } from "../components/ui/Spinner";
 import { Button } from "../components/ui/Button";
+import { MultiSelect, type MultiSelectOption } from "../components/ui/MultiSelect";
 import { RecencyService } from "../services/recency";
 import { cn } from "../utils/cn";
 
@@ -207,58 +208,14 @@ export function RepoList() {
                     </div>
                     {/* Controls */}
                     <div className="flex gap-2">
-                        {/* Project Filter */}
-                        <div className="relative">
-                            <Button
-                                variant="secondary"
-                                className={cn("flex items-center gap-2", selectedProjects.length > 0 && "border-blue-500/50 text-blue-400 bg-blue-500/10")}
-                                onClick={() => setIsProjectFilterOpen(!isProjectFilterOpen)}
-                            >
-                                <Filter className="w-4 h-4" />
-                                Project
-                                {selectedProjects.length > 0 && (
-                                    <span className="ml-1 w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center">
-                                        {selectedProjects.length}
-                                    </span>
-                                )}
-                                <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
-                            </Button>
-
-                            {isProjectFilterOpen && (
-                                <>
-                                    <div className="fixed inset-0 z-10" onClick={() => setIsProjectFilterOpen(false)} />
-                                    <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-20 max-h-80 flex flex-col">
-                                        <div className="p-2 border-b border-zinc-800 flex justify-between items-center">
-                                            <span className="text-xs font-semibold text-zinc-400 px-2">Filter by Project</span>
-                                            {selectedProjects.length > 0 && (
-                                                <button
-                                                    onClick={() => setSelectedProjects([])}
-                                                    className="text-[10px] text-blue-400 hover:underline px-2"
-                                                >
-                                                    Clear all
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div className="overflow-y-auto p-1 flex-1">
-                                            {projects.map(p => (
-                                                <label key={p} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-800 rounded cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        className="rounded border-zinc-700 bg-zinc-800 text-blue-500 focus:ring-blue-500/20"
-                                                        checked={selectedProjects.includes(p)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) setSelectedProjects([...selectedProjects, p]);
-                                                            else setSelectedProjects(selectedProjects.filter(x => x !== p));
-                                                        }}
-                                                    />
-                                                    <span className="text-sm text-zinc-300 truncate">{p}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </div>
+                        <MultiSelect
+                            options={projects.map(p => ({ label: p, value: p }))}
+                            selected={selectedProjects}
+                            onChange={setSelectedProjects}
+                            placeholder="Project"
+                            className="w-48"
+                            searchPlaceholder="Search projects..."
+                        />
                     </div>
                 </div>
 

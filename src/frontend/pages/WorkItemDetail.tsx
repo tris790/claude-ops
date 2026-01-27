@@ -9,6 +9,7 @@ import {
     Send,
     Loader2
 } from "lucide-react";
+import { MultiSelect } from "../components/ui/MultiSelect";
 
 export function WorkItemDetail() {
     const { id } = useParams();
@@ -92,24 +93,25 @@ export function WorkItemDetail() {
                 <div className="flex flex-wrap items-center gap-6 py-4 border-y border-zinc-800/50">
                     <div className="space-y-1">
                         <span className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">State</span>
-                        <select
-                            value={item.fields["System.State"]}
-                            onChange={(e) => handleUpdateState(e.target.value)}
-                            disabled={saving}
-                            className="block w-full bg-zinc-900 border-none text-sm text-zinc-200 rounded-md focus:ring-1 focus:ring-blue-600 transition-all cursor-pointer"
-                        >
-                            <option value="To Do">To Do</option>
-                            <option value="New">New</option>
-                            <option value="Active">Active</option>
-                            <option value="Resolved">Resolved</option>
-                            <option value="Closed">Closed</option>
-                            <option value="Done">Done</option>
-                        </select>
+                        <MultiSelect
+                            multiple={false}
+                            options={[
+                                { label: "To Do", value: "To Do" },
+                                { label: "New", value: "New" },
+                                { label: "Active", value: "Active" },
+                                { label: "Resolved", value: "Resolved" },
+                                { label: "Closed", value: "Closed" },
+                                { label: "Done", value: "Done" }
+                            ]}
+                            selected={item.fields["System.State"]}
+                            onChange={(val) => handleUpdateState(val)}
+                            className="min-w-[140px]"
+                        />
                     </div>
 
                     <div className="space-y-1">
                         <span className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider">Assigned To</span>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 rounded-md text-sm text-zinc-300">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 rounded-md text-sm text-zinc-300 border border-zinc-800">
                             <User className="h-4 w-4 text-zinc-500" />
                             <span>{item.fields["System.AssignedTo"]?.displayName || "Unassigned"}</span>
                         </div>
