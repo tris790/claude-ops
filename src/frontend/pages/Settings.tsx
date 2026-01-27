@@ -12,8 +12,87 @@ const PROMPT_INFO: Record<string, { title: string; description: string }> = {
     'apply_fix': {
         title: 'Code Fix Application',
         description: 'Instructions for the AI when applying a specific code fix or refactoring to a file.'
+    },
+    'implement_work_item': {
+        title: 'Work Item Implementation',
+        description: 'Instructions for the autonomous agent when implementing a full work item.'
     }
 };
+
+function PromptItem({ name, data, info, onUpdate, onRemove }: {
+    name: string;
+    data: Settings['aiCommandPrompts'][string];
+    info?: { title: string; description: string };
+    onUpdate: (oldName: string, field: 'name' | 'prompt', value: string) => void;
+    onRemove: (name: string) => void;
+}) {
+    const [localName, setLocalName] = useState(name);
+
+    // Keep local name in sync if it changes externally (e.g. from state update)
+    useEffect(() => {
+        setLocalName(name);
+    }, [name]);
+
+    return (
+        <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg group transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                    <div className="flex items-center flex-wrap gap-2">
+                        {info ? (
+                            <div className="flex-1 min-w-0">
+                                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                    {info.title}
+                                    <span className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-[10px] text-zinc-500 rounded font-mono uppercase shrink-0">System</span>
+                                </h3>
+                                <p className="text-xs text-zinc-500 mt-0.5">
+                                    {info.description}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex-1 min-w-0">
+                                <input
+                                    type="text"
+                                    value={localName}
+                                    onChange={(e) => setLocalName(e.target.value)}
+                                    onBlur={() => onUpdate(name, 'name', localName)}
+                                    className="w-full bg-transparent border-none p-0 text-sm font-semibold text-zinc-900 dark:text-zinc-200 focus:ring-0 placeholder-zinc-400 dark:placeholder-zinc-600"
+                                    placeholder="Prompt Name"
+                                />
+                            </div>
+                        )}
+
+                        {data.placeholders.length > 0 && (
+                            <div className="flex flex-wrap gap-1 items-center">
+                                {data.placeholders.map(p => (
+                                    <span key={p} className="px-1.5 py-0.5 bg-sapphire-500/10 border border-sapphire-500/20 rounded-md text-[9px] font-mono text-sapphire-600 dark:text-sapphire-400">
+                                        {`{{${p}}}`}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <textarea
+                        value={data.prompt}
+                        onChange={(e) => onUpdate(name, 'prompt', e.target.value)}
+                        rows={4}
+                        className="w-full bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-900 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-sapphire-600/50 resize-y font-mono leading-relaxed transition-all"
+                        placeholder="Enter system prompt instructions..."
+                    />
+                </div>
+                {!info && (
+                    <button
+                        onClick={() => onRemove(name)}
+                        className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 rounded-md opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                        title="Delete Prompt"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export function SettingsPage() {
     const { settings, isLoading, updateSettings } = useSettings();
@@ -75,26 +154,48 @@ export function SettingsPage() {
 
     const addPrompt = () => {
         if (!localSettings) return;
-        const newPrompts = [
+        const id = crypto.randomUUID().slice(0, 8);
+        const name = `custom_prompt_${id}`;
+        const newPrompts = {
             ...localSettings.aiCommandPrompts,
-            { id: crypto.randomUUID(), name: 'New Prompt', prompt: '' }
-        ];
+            [name]: { prompt: '', placeholders: [] }
+        };
         handleLocalUpdate({ aiCommandPrompts: newPrompts });
     };
 
-    const removePrompt = (id: string) => {
+    const removePrompt = (name: string) => {
         if (!localSettings) return;
-        const newPrompts = localSettings.aiCommandPrompts.filter(p => p.id !== id);
-        // Removing is a significant action, maybe we want it somewhat immediate?
-        // But undo is harder. Let's stick to local update + debounce save.
+        const newPrompts = { ...localSettings.aiCommandPrompts };
+        delete newPrompts[name];
         handleLocalUpdate({ aiCommandPrompts: newPrompts });
     };
 
-    const updatePrompt = (id: string, field: 'name' | 'prompt', value: string) => {
+    const extractPlaceholders = (prompt: string): string[] => {
+        const matches = prompt.match(/\{\{([^}]+)\}\}/g);
+        if (!matches) return [];
+        return Array.from(new Set(matches.map(m => m.slice(2, -2))));
+    };
+
+    const updatePrompt = (oldName: string, field: 'name' | 'prompt', value: string) => {
         if (!localSettings) return;
-        const newPrompts = localSettings.aiCommandPrompts.map(p =>
-            p.id === id ? { ...p, [field]: value } : p
-        );
+        const newPrompts = { ...localSettings.aiCommandPrompts };
+
+        if (field === 'name') {
+            if (oldName === value) return;
+            const data = newPrompts[oldName];
+            if (!data) return;
+            delete newPrompts[oldName];
+            newPrompts[value] = data;
+        } else {
+            const current = newPrompts[oldName];
+            if (!current) return;
+            newPrompts[oldName] = {
+                ...current,
+                prompt: value,
+                placeholders: extractPlaceholders(value)
+            };
+        }
+
         handleLocalUpdate({ aiCommandPrompts: newPrompts });
     };
 
@@ -198,63 +299,29 @@ export function SettingsPage() {
                 </div>
 
                 <div className="space-y-4">
-                    {localSettings.aiCommandPrompts.length === 0 ? (
+                    {Object.entries(localSettings.aiCommandPrompts).length === 0 ? (
                         <div className="p-8 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg border-dashed">
                             <p className="text-zinc-500 text-sm">No custom prompts defined.</p>
                         </div>
                     ) : (
-                        localSettings.aiCommandPrompts.map((prompt) => {
-                            const info = PROMPT_INFO[prompt.name];
-                            return (
-                                <div key={prompt.id} className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg space-y-3 group">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1 space-y-3">
-                                            <div>
-                                                {info ? (
-                                                    <div className="mb-2">
-                                                        <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                                                            {info.title}
-                                                        </h3>
-                                                        <p className="text-xs text-zinc-500 mt-0.5">
-                                                            {info.description}
-                                                        </p>
-                                                        {/* Hidden input to maintain data structure for name */}
-                                                        <input
-                                                            type="hidden"
-                                                            value={prompt.name}
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <input
-                                                        type="text"
-                                                        value={prompt.name}
-                                                        onChange={(e) => updatePrompt(prompt.id, 'name', e.target.value)}
-                                                        className="w-full bg-transparent border-none p-0 text-sm font-semibold text-zinc-900 dark:text-zinc-200 focus:ring-0 placeholder-zinc-400 dark:placeholder-zinc-600 mb-2"
-                                                        placeholder="Prompt Name"
-                                                    />
-                                                )}
-                                            </div>
-                                            <textarea
-                                                value={prompt.prompt}
-                                                onChange={(e) => updatePrompt(prompt.id, 'prompt', e.target.value)}
-                                                rows={4}
-                                                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-900 dark:text-zinc-300 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-sapphire-600/50 resize-y font-mono leading-relaxed"
-                                                placeholder="Enter system prompt instructions..."
-                                            />
-                                        </div>
-                                        {!info && (
-                                            <button
-                                                onClick={() => removePrompt(prompt.id)}
-                                                className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-md opacity-0 group-hover:opacity-100 transition-all custom-delete"
-                                                title="Delete Prompt"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })
+                        Object.entries(localSettings.aiCommandPrompts)
+                            .sort(([nameA], [nameB]) => {
+                                const isSystemA = nameA in PROMPT_INFO;
+                                const isSystemB = nameB in PROMPT_INFO;
+                                if (isSystemA && !isSystemB) return -1;
+                                if (!isSystemA && isSystemB) return 1;
+                                return nameA.localeCompare(nameB);
+                            })
+                            .map(([name, data]) => (
+                                <PromptItem
+                                    key={name}
+                                    name={name}
+                                    data={data}
+                                    info={PROMPT_INFO[name]}
+                                    onUpdate={updatePrompt}
+                                    onRemove={removePrompt}
+                                />
+                            ))
                     )}
                 </div>
             </section>

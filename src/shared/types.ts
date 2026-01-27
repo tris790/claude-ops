@@ -1,11 +1,10 @@
 export interface Settings {
     theme: 'dark' | 'light';
     repoCloneDirectory: string;
-    aiCommandPrompts: {
-        id: string;
-        name: string;
+    aiCommandPrompts: Record<string, {
         prompt: string;
-    }[];
+        placeholders: string[];
+    }>;
 }
 
 export interface EnvConfig {

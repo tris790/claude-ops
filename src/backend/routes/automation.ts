@@ -23,8 +23,7 @@ export const automationRoutes = {
 
                 const settings = await getSettings();
                 // Find prompt in settings, or fallback to default settings
-                const promptSetting = settings.aiCommandPrompts.find(p => p.name === task || p.id === task)
-                    || DEFAULT_SETTINGS.aiCommandPrompts.find(p => p.name === task || p.id === task);
+                const promptSetting = settings.aiCommandPrompts[task] || DEFAULT_SETTINGS.aiCommandPrompts[task];
 
                 if (promptSetting) {
                     commandTemplate = promptSetting.prompt;
@@ -51,9 +50,12 @@ export const automationRoutes = {
                 console.log(`[Automation] Running: ${commandLine}`);
 
                 // Determine CWD
-                // If we have repo info in context, use it
-                let cwd = process.cwd();
-                if (context.projectName && context.repoName) {
+                // Default to the user's configured repo clone directory (so agent sees all repos)
+                let cwd = settings.repoCloneDirectory;
+
+                // For implementation agents, we ALWAYS want to be in the root to access multiple repos
+                // For specific tasks (like PR description, apply fix), we want to be in the specific repo
+                if (task !== 'implement_work_item' && context.projectName && context.repoName) {
                     cwd = await gitService.getRepoPath(context.projectName, context.repoName);
                     // Check if exists
                     const isCloned = await gitService.isCloned(context.projectName, context.repoName);

@@ -345,7 +345,9 @@ export function PRDetail() {
             const contextHooks = {
                 target_branch: pr.targetRefName.replace('refs/heads/', ''),
                 source_branch: pr.sourceRefName.replace('refs/heads/', ''),
-                diff: commits.map(c => `- ${c.comment} (by ${c.author?.name})`).join('\n')
+                diff: commits.map(c => `- ${c.comment} (by ${c.author?.name})`).join('\n'),
+                projectName: pr.repository.project.name,
+                repoName: pr.repository.name
             };
 
             const res = await runAutomation("generate_pr_description", contextHooks);
