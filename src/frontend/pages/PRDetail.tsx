@@ -24,7 +24,8 @@ import {
     Edit2,
     Trash2,
     Save,
-    X
+    X,
+    Sparkles
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -37,6 +38,7 @@ import { ThreadStatusPicker, isThreadActive, isThreadResolved, isThreadClosed, i
 import { CommentDialog } from "../components/pr/CommentDialog";
 import { ReferencesPanel, type LSPLocation } from "../components/lsp/ReferencesPanel";
 import { handleLSPDefinition } from "../features/lsp/navigation";
+import { runAutomation } from "../api/automation";
 
 export function PRDetail() {
     const { id } = useParams();
@@ -64,6 +66,8 @@ export function PRDetail() {
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [descriptionDraft, setDescriptionDraft] = useState("");
+    const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+    const [applyingFixId, setApplyingFixId] = useState<string | null>(null);
 
     // LSP References State
     const [references, setReferences] = useState<LSPLocation[]>([]);
@@ -333,6 +337,66 @@ export function PRDetail() {
         });
     }
 
+    async function handleGenerateDescription() {
+        if (!pr || !commits.length) return;
+        setIsGeneratingDescription(true);
+        try {
+            // Context for the agent
+            const contextHooks = {
+                target_branch: pr.targetRefName.replace('refs/heads/', ''),
+                source_branch: pr.sourceRefName.replace('refs/heads/', ''),
+                diff: commits.map(c => `- ${c.comment} (by ${c.author?.name})`).join('\n')
+            };
+
+            const res = await runAutomation("generate_pr_description", contextHooks);
+            if (res.success && res.output) {
+                setDescriptionDraft(res.output);
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to generate description: " + err.message);
+        } finally {
+            setIsGeneratingDescription(false);
+        }
+    }
+
+    async function handleApplyFix(thread: any, comment: any) {
+        if (!pr || !thread.threadContext) return;
+
+        const commentKey = `${thread.id}-${comment.id}`;
+        setApplyingFixId(commentKey);
+
+        try {
+            const filePath = thread.threadContext.filePath;
+            const startLine = thread.threadContext.rightFileStart?.line || thread.threadContext.leftFileStart?.line || 0;
+            const endLine = thread.threadContext.rightFileEnd?.line || thread.threadContext.leftFileEnd?.line || startLine;
+
+            const contextHooks = {
+                file_path: filePath.startsWith('/') ? filePath.substring(1) : filePath, // Remove leading slash
+                branch: pr.sourceRefName.replace('refs/heads/', ''),
+                comment: comment.content,
+                code_context: `File: ${filePath}, Lines: ${startLine}-${endLine}`,
+                projectName: pr.repository.project.name,
+                repoName: pr.repository.name
+            };
+
+            const res = await runAutomation("apply_fix", contextHooks);
+
+            if (res.success) {
+                // Ideally refresh the PR or show success
+                alert("Fix applied! Synchronizing...");
+                await loadData();
+            } else {
+                alert("Failed to apply fix: " + (res.error || "Unknown error"));
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to apply fix: " + err.message);
+        } finally {
+            setApplyingFixId(null);
+        }
+    }
+
     // Determine commit IDs for DiffViewer
     let originalVersion = pr?.lastMergeTargetCommit?.commitId;
     let modifiedVersion = pr?.lastMergeSourceCommit?.commitId;
@@ -532,6 +596,16 @@ export function PRDetail() {
                                                 />
                                                 <div className="flex justify-end gap-2">
                                                     <button
+                                                        onClick={handleGenerateDescription}
+                                                        disabled={isGeneratingDescription}
+                                                        className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md transition-colors flex items-center gap-1.5 mr-auto"
+                                                        title="Generate description with AI"
+                                                    >
+                                                        {isGeneratingDescription ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
+                                                        Generate with AI
+                                                    </button>
+
+                                                    <button
                                                         onClick={() => setIsEditingDescription(false)}
                                                         className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-md transition-colors"
                                                     >
@@ -664,24 +738,41 @@ export function PRDetail() {
                                                                             <span className="font-medium text-sm text-zinc-200">{comment.author.displayName}</span>
                                                                             <span className="text-[10px] text-zinc-500">{new Date(comment.publishedDate).toLocaleString()}</span>
                                                                         </div>
-                                                                        {isAuthor && (
-                                                                            <div className="flex items-center space-x-1 opacity-100 sm:opacity-0 sm:group-hover/comment:opacity-100 transition-opacity">
+                                                                        <div className="flex items-center space-x-1 opacity-100 sm:opacity-0 sm:group-hover/comment:opacity-100 transition-opacity">
+                                                                            {/* AI Apply Fix Button */}
+                                                                            {thread.threadContext && (
                                                                                 <button
-                                                                                    onClick={() => setEditingCommentId(commentKey)}
-                                                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
-                                                                                    title="Edit comment"
+                                                                                    onClick={() => handleApplyFix(thread, comment)}
+                                                                                    disabled={applyingFixId === commentKey}
+                                                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-purple-400"
+                                                                                    title="Apply Fix with AI"
                                                                                 >
-                                                                                    <Edit2 className="w-3 h-3" />
+                                                                                    {applyingFixId === commentKey ?
+                                                                                        <Loader2 className="w-3 h-3 animate-spin" /> :
+                                                                                        <Sparkles className="w-3 h-3" />
+                                                                                    }
                                                                                 </button>
-                                                                                <button
-                                                                                    onClick={() => handleDeleteComment(thread.id, comment.id)}
-                                                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
-                                                                                    title="Delete comment"
-                                                                                >
-                                                                                    <Trash2 className="w-3 h-3" />
-                                                                                </button>
-                                                                            </div>
-                                                                        )}
+                                                                            )}
+
+                                                                            {isAuthor && (
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={() => setEditingCommentId(commentKey)}
+                                                                                        className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
+                                                                                        title="Edit comment"
+                                                                                    >
+                                                                                        <Edit2 className="w-3 h-3" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteComment(thread.id, comment.id)}
+                                                                                        className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
+                                                                                        title="Delete comment"
+                                                                                    >
+                                                                                        <Trash2 className="w-3 h-3" />
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                     <div className="text-sm text-zinc-400 break-words prose prose-invert max-w-none">
                                                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
@@ -835,6 +926,7 @@ export function PRDetail() {
                                             getPullRequestThreads(id!, pr.repository.id).then(setThreads);
                                         }}
                                         scrollToLine={scrollToLine}
+                                        sourceBranch={pr.sourceRefName.replace("refs/heads/", "")}
                                         modifiedFiles={changes?.changes?.map((c: any) => c.item.path)}
                                         onFindReferences={(refs, loading) => {
                                             setReferences(refs);

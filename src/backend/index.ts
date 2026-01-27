@@ -5,6 +5,7 @@ import { repoRoutes } from "./routes/repos";
 import { workItemRoutes } from "./routes/work-items";
 import { prRoutes } from "./routes/prs";
 import { pipelineRoutes } from "./routes/pipelines";
+import { automationRoutes } from "./routes/automation";
 import { lspService } from "./services/lsp";
 import { gitService } from "./services/git";
 
@@ -25,6 +26,9 @@ const server = serve<WebSocketData>({
     ...prRoutes,
     // Pipeline Routes
     ...pipelineRoutes,
+    // Automation Routes
+    ...automationRoutes,
+
 
     "/api/hello": {
       async GET(req: Request) {

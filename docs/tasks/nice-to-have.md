@@ -1,0 +1,9 @@
+- all multi selects dropdown should have a search
+- we should remember what the user selected in the multi select as much as possible, even on reboots
+- add multi select dropdown for prs (user, project, repo, status) (remove status toggle button )
+- add multi select dropdown for work items (user, feature, state) (remove state toggle button )
+- line number loading is broken in references window
+- tooltip hover should wrap text when line is too long (example const string bla = "very long string here)
+- diff display red/green
+- horizontal separator in pr is rendered ontop of reference window
+- ctrl + p only searches repo currently. when inside a repo it should search the current repo. when outside a repo.

@@ -7,8 +7,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CommentDialog } from "./CommentDialog";
 import { createPullRequestThread, updatePullRequestComment, deletePullRequestComment, updatePullRequestThread, addPullRequestComment } from "../../api/prs";
-import { Edit2, Trash2, CheckCircle2, RotateCcw, Reply, MoreVertical, ChevronDown, ChevronRight } from "lucide-react";
+import { Edit2, Trash2, CheckCircle2, RotateCcw, Reply, MoreVertical, ChevronDown, ChevronRight, Sparkles, Loader2 } from "lucide-react";
 import { ThreadStatusPicker, isThreadResolved, isThreadClosed } from "./ThreadStatusPicker";
+import { runAutomation } from "../../api/automation";
 
 // --- Types ---
 
@@ -31,6 +32,9 @@ interface CommentSystemProps {
     threads?: any[];
     onCommentPosted?: () => void;
     currentUser?: any;
+    projectName?: string;
+    repoName?: string;
+    sourceBranch?: string;
 }
 
 // --- Effects ---
@@ -161,6 +165,46 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
         }
     };
 
+    const [applyingFixId, setApplyingFixId] = React.useState<number | null>(null);
+
+    const handleApplyFix = async (comment: any) => {
+        if (!thread.threadContext || !props.projectName || !props.repoName || !props.sourceBranch) {
+            alert("Missing context for automation (Project, Repo, or Source Branch).");
+            return;
+        }
+
+        setApplyingFixId(comment.id);
+
+        try {
+            const filePath = thread.threadContext.filePath;
+            const startLine = thread.threadContext.rightFileStart?.line || thread.threadContext.leftFileStart?.line || 0;
+            const endLine = thread.threadContext.rightFileEnd?.line || thread.threadContext.leftFileEnd?.line || startLine;
+
+            const contextHooks = {
+                file_path: filePath.startsWith('/') ? filePath.substring(1) : filePath,
+                branch: props.sourceBranch,
+                comment: comment.content,
+                code_context: `File: ${filePath}, Lines: ${startLine}-${endLine}`,
+                projectName: props.projectName,
+                repoName: props.repoName
+            };
+
+            const res = await runAutomation("apply_fix", contextHooks);
+
+            if (res.success) {
+                alert("Fix applied! Refreshing...");
+                props.onCommentPosted?.();
+            } else {
+                alert("Failed to apply fix: " + (res.error || "Unknown error"));
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to apply fix: " + err.message);
+        } finally {
+            setApplyingFixId(null);
+        }
+    };
+
     return (
         <div className="p-2 space-y-2">
             <div className="flex items-center justify-between">
@@ -185,6 +229,39 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
                     )}
                 </div>
                 <div className="flex items-center space-x-1">
+                    {!isCollapsed && thread.comments.length > 0 && (
+                        <>
+                            {user && thread.comments[0].author && user.id === thread.comments[0].author.id && (
+                                <>
+                                    <button
+                                        onClick={() => setEditingCommentId(thread.comments[0].id)}
+                                        className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
+                                    >
+                                        <Edit2 className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteComment(thread.comments[0].id)}
+                                        className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
+                                </>
+                            )}
+                            {thread.threadContext && (
+                                <button
+                                    onClick={() => handleApplyFix(thread.comments[0])}
+                                    disabled={applyingFixId === thread.comments[0].id}
+                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-purple-400"
+                                    title="Apply Fix with AI"
+                                >
+                                    {applyingFixId === thread.comments[0].id ?
+                                        <Loader2 className="w-3 h-3 animate-spin" /> :
+                                        <Sparkles className="w-3 h-3" />
+                                    }
+                                </button>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -218,22 +295,41 @@ const CommentThread: React.FC<{ thread: any, props: CommentSystemProps }> = ({ t
                                             <span className="text-xs font-semibold text-zinc-200">{comment.author?.displayName}</span>
                                             <span className="text-[9px] text-zinc-500 uppercase tracking-tight">{new Date(comment.publishedDate).toLocaleString()}</span>
                                         </div>
-                                        {isAuthor && (
-                                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => setEditingCommentId(comment.id)}
-                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
-                                                >
-                                                    <Edit2 className="w-3 h-3" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteComment(comment.id)}
-                                                    className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        )}
+                                        <div className="flex items-center space-x-1">
+                                            {idx > 0 && (
+                                                <>
+                                                    {isAuthor && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => setEditingCommentId(comment.id)}
+                                                                className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-blue-400"
+                                                            >
+                                                                <Edit2 className="w-3 h-3" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteComment(comment.id)}
+                                                                className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-red-400"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {thread.threadContext && (
+                                                        <button
+                                                            onClick={() => handleApplyFix(comment)}
+                                                            disabled={applyingFixId === comment.id}
+                                                            className="p-1 hover:bg-zinc-800 rounded text-zinc-500 hover:text-purple-400"
+                                                            title="Apply Fix with AI"
+                                                        >
+                                                            {applyingFixId === comment.id ?
+                                                                <Loader2 className="w-3 h-3 animate-spin" /> :
+                                                                <Sparkles className="w-3 h-3" />
+                                                            }
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="text-[13px] text-zinc-300 prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{comment.content}</ReactMarkdown>
@@ -279,7 +375,7 @@ class CommentThreadWidget extends WidgetType {
 
     toDOM(view: EditorView): HTMLElement {
         const dom = document.createElement("div");
-        dom.className = "cm-comment-thread-widget border-l-2 border-blue-500 bg-zinc-900/40 my-2 rounded-r-md overflow-hidden animate-in slide-in-from-left-2 duration-200 shadow-lg";
+        dom.className = "cm-comment-thread-widget border-l-2 border-blue-500 bg-zinc-900/40 my-2 rounded-r-md overflow-hidden animate-in slide-in-from-left-2 duration-200 shadow-lg sticky left-4 max-w-lg";
         const root = createRoot(dom);
         root.render(<CommentThread thread={this.thread} props={this.props} />);
         return dom;

@@ -42,6 +42,7 @@ interface DiffViewerProps {
     scrollToLine?: number | null;
     modifiedFiles?: string[];
     onFindReferences?: (refs: LSPLocation[], isLoading: boolean) => void;
+    sourceBranch?: string;
 }
 
 type DiffMode = "side-by-side" | "unified" | "new-only";
@@ -65,7 +66,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     onCommentPosted,
     scrollToLine,
     modifiedFiles,
-    onFindReferences
+    onFindReferences,
+    sourceBranch
 }) => {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -448,7 +450,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                             gutter: true,
                         }),
                         ...createLSPExtensions(`file://${normalizedPath}`),
-                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
+                        ...createCommentSystem({
+                            repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user,
+                            projectName, repoName, sourceBranch
+                        })
                     ]
                 }),
                 parent: containerRef.current
@@ -464,7 +469,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     extensions: [
                         ...baseExtensions,
                         ...createLSPExtensions(`file://${normalizedPath}`),
-                        ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
+                        ...createCommentSystem({
+                            repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user,
+                            projectName, repoName, sourceBranch
+                        })
                     ]
                 }),
                 parent: containerRef.current
@@ -480,7 +488,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 extensions: [
                     ...baseExtensions,
                     ...createLSPExtensions(`file:///original${normalizedPath}`),
-                    ...createCommentSystem({ repoId, filePath, side: "original", pullRequestId, threads, onCommentPosted, currentUser: user })
+                    ...createCommentSystem({
+                        repoId, filePath, side: "original", pullRequestId, threads, onCommentPosted, currentUser: user,
+                        projectName, repoName, sourceBranch
+                    })
                 ]
             },
             b: {
@@ -488,7 +499,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 extensions: [
                     ...baseExtensions,
                     ...createLSPExtensions(`file://${normalizedPath}`),
-                    ...createCommentSystem({ repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user })
+                    ...createCommentSystem({
+                        repoId, filePath, side: "modified", pullRequestId, threads, onCommentPosted, currentUser: user,
+                        projectName, repoName, sourceBranch
+                    })
                 ]
             },
             parent: containerRef.current,
@@ -499,7 +513,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         // Setup synchronized scrolling between the two editors
         const setupScrollSync = () => {
             const mergeView = viewRef.current;
-            if (!mergeView) return () => {};
+            if (!mergeView) return () => { };
 
             const scrollA = mergeView.a.scrollDOM;
             const scrollB = mergeView.b.scrollDOM;
