@@ -36,12 +36,12 @@ export function MainLayout({ children }: MainLayoutProps) {
                     "flex h-12 items-center border-b border-zinc-200/50 dark:border-zinc-800/50",
                     isSidebarCollapsed ? "justify-center px-0" : "px-4"
                 )}>
-                    <div className="flex items-center gap-2 text-sapphire-500 font-bold">
+                    <NavLink to="/repos" className="flex items-center gap-2 text-sapphire-500 font-bold hover:opacity-80 transition-opacity">
                         <div className="p-1 bg-sapphire-500/10 rounded">
                             <Command className="h-5 w-5" />
                         </div>
                         {!isSidebarCollapsed && <span className="text-zinc-900 dark:text-zinc-100 tracking-tight">ClaudeOps</span>}
-                    </div>
+                    </NavLink>
 
                     {!isSidebarCollapsed && (
                         <button

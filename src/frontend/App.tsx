@@ -13,6 +13,7 @@ import { PullRequests } from "./pages/PullRequests";
 import { PRDetail } from "./pages/PRDetail";
 import { PipelineList } from "./pages/PipelineList";
 import { PipelineRunDetail } from "./pages/PipelineRunDetail";
+import { SearchPage } from "./pages/SearchPage";
 
 function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,6 +37,7 @@ function AppRoutes() {
           <Route path="/prs/:id" element={<PRDetail />} />
           <Route path="/pipelines" element={<PipelineList />} />
           <Route path="/pipelines/:id" element={<PipelineRunDetail />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/" element={<Navigate to="/repos" replace />} />
         </Route>
