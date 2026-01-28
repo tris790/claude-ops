@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import Fuse from 'fuse.js';
-import { getMyWorkItems } from '../api/work-items';
+import { getRecentWorkItems } from '../api/work-items';
 
 // Global memory cache
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -14,7 +14,7 @@ export interface WorkItemFilterOptions {
 }
 
 export function useWorkItemCache() {
-    // Currently only supporting "my" work items as that's what the API supports roughly
+    // Fetching recent items to populate the list and filters
 
     const [items, setItems] = useState<any[]>(cachedItems?.data || []);
     const [loading, setLoading] = useState(!cachedItems);
@@ -33,7 +33,7 @@ export function useWorkItemCache() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const data = await getMyWorkItems();
+            const data = await getRecentWorkItems();
             cachedItems = {
                 data,
                 timestamp: Date.now()

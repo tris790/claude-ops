@@ -13,6 +13,11 @@ export const workItemRoutes = {
                     return Response.json(items);
                 }
 
+                if (filter === "recent") {
+                    const items = await workItemService.getRecentWorkItems();
+                    return Response.json(items);
+                }
+
                 if (query) {
                     const items = await workItemService.getWorkItemsByWiql(query);
                     return Response.json(items);

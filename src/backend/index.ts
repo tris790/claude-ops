@@ -18,13 +18,9 @@ interface WebSocketData {
   language?: string;
 }
 
-// Start background services - REMOVED, now on-demand
-// pipelineMonitor.start();
-
 const server = serve<WebSocketData>({
   routes: {
     // Auth Routes
-
     ...authRoutes,
     // Repo Routes
     ...repoRoutes,

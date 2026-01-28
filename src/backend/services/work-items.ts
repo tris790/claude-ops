@@ -17,6 +17,11 @@ export class WorkItemService {
         return this.getWorkItemsByWiql(wiql);
     }
 
+    async getRecentWorkItems(): Promise<WorkItem[]> {
+        const wiql = `SELECT [System.Id], [System.Title], [System.State] FROM WorkItems WHERE [System.State] <> 'Closed' ORDER BY [System.ChangedDate] DESC`;
+        return this.getWorkItemsByWiql(wiql);
+    }
+
     async getWorkItemDetails(id: number): Promise<WorkItem> {
         const items = await azureClient.getWorkItems([id]);
         if (items.length === 0) throw new Error(`Work item ${id} not found`);

@@ -7,6 +7,15 @@ export async function getMyWorkItems() {
     return res.json();
 }
 
+export async function getRecentWorkItems() {
+    const res = await fetch("/api/work-items?filter=recent");
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to fetch work items");
+    }
+    return res.json();
+}
+
 export async function queryWorkItems(wiql: string) {
     const res = await fetch(`/api/work-items?query=${encodeURIComponent(wiql)}`);
     if (!res.ok) {
