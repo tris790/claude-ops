@@ -97,6 +97,8 @@ export class AzureDevOpsClient {
             return this.projectCache.data;
         }
 
+        const start = performance.now();
+        console.log(`[Azure] Fetching projects...`);
         const url = `${this.baseUrl}/_apis/projects?api-version=7.0`;
         const res = await fetch(url, { headers: this.headers });
 
@@ -111,6 +113,7 @@ export class AzureDevOpsClient {
             data: projects,
             timestamp: Date.now()
         };
+        console.log(`[Azure] Fetched ${projects.length} projects in ${(performance.now() - start).toFixed(2)}ms`);
 
         return projects;
     }
@@ -126,6 +129,8 @@ export class AzureDevOpsClient {
             return this.repoCache.data;
         }
 
+        const start = performance.now();
+        console.log(`[Azure] Fetching repositories...`);
         const url = `${this.baseUrl}/_apis/git/repositories?api-version=7.0`;
         const res = await fetch(url, { headers: this.headers });
 
@@ -140,6 +145,7 @@ export class AzureDevOpsClient {
             data: value,
             timestamp: Date.now()
         };
+        console.log(`[Azure] Fetched ${value.length} repositories in ${(performance.now() - start).toFixed(2)}ms`);
 
         return value;
     }
@@ -784,28 +790,42 @@ export class AzureDevOpsClient {
             throw new Error("Missing configuration");
         }
 
-        const projects = await this.getProjects();
-        const results = await Promise.all(
-            projects.map(async (p: any) => {
-                try {
-                    const url = `${this.baseUrl}/${p.name}/_apis/build/builds?api-version=7.0&maxBuildsPerDefinition=1&queryOrder=queueTimeDescending`;
-                    const res = await fetch(url, { headers: this.headers });
-                    if (!res.ok) return [];
-                    const data = await res.json();
-                    const builds = data.value || [];
-                    builds.forEach((build: any) => {
-                        this.buildProjectCache.set(build.id, p.name);
-                    });
-                    return builds.map((build: any) => ({
-                        ...build,
-                        project: { name: p.name, id: p.id }
-                    }));
-                } catch (e) {
-                    return [];
-                }
-            })
-        );
+        const start = performance.now();
+        console.log(`[Azure] Fetching recent runs...`);
 
+        const projects = await this.getProjects();
+
+        // Simple concurrency limiter (batch of 10)
+        const BATCH_SIZE = 10;
+        const results: any[] = [];
+
+
+        for (let i = 0; i < projects.length; i += BATCH_SIZE) {
+            const batch = projects.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(
+                batch.map(async (p: any) => {
+                    try {
+                        const url = `${this.baseUrl}/${p.name}/_apis/build/builds?api-version=7.0&maxBuildsPerDefinition=1&queryOrder=queueTimeDescending`;
+                        const res = await fetch(url, { headers: this.headers });
+                        if (!res.ok) return [];
+                        const data = await res.json();
+                        const builds = data.value || [];
+                        builds.forEach((build: any) => {
+                            this.buildProjectCache.set(build.id, p.name);
+                        });
+                        return builds.map((build: any) => ({
+                            ...build,
+                            project: { name: p.name, id: p.id }
+                        }));
+                    } catch (e) {
+                        return [];
+                    }
+                })
+            );
+            results.push(...batchResults.flat());
+        }
+
+        console.log(`[Azure] Fetched runs for ${projects.length} projects in ${(performance.now() - start).toFixed(2)}ms`);
         return results.flat();
     }
 

@@ -19,6 +19,9 @@ interface WebSocketData {
   language?: string;
 }
 
+const startTime = performance.now();
+console.log("[Startup] Initializing server...");
+
 const server = serve<WebSocketData>({
   routes: {
     // Auth Routes
@@ -131,4 +134,5 @@ const server = serve<WebSocketData>({
   },
 });
 
-console.log(`🚀 Server running at ${server.url}`);
+const duration = performance.now() - startTime;
+console.log(`🚀 Server running at ${server.url} (Startup: ${duration.toFixed(2)}ms)`);

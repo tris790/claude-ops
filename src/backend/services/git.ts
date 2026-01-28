@@ -42,6 +42,8 @@ export class GitService {
     }
 
     async listClonedRepos(): Promise<ClonedRepo[]> {
+        const start = performance.now();
+        console.log(`[GitService] listing cloned repos...`);
         const baseDir = await this.getBaseDir();
         try {
             await stat(baseDir);
@@ -53,32 +55,41 @@ export class GitService {
 
         try {
             const projects = await readdir(baseDir);
-            for (const project of projects) {
+
+            // Process projects in parallel
+            const results = await Promise.all(projects.map(async (project) => {
                 const projectPath = join(baseDir, project);
                 try {
-                    if ((await stat(projectPath)).isDirectory()) {
-                        const repoDirs = await readdir(projectPath);
-                        for (const repo of repoDirs) {
-                            const repoPath = join(projectPath, repo);
-                            try {
-                                if ((await stat(repoPath)).isDirectory()) {
-                                    // Check for .git
-                                    const gitPath = join(repoPath, ".git");
-                                    await stat(gitPath); // throws if not exists
-                                    repos.push({ project, repo });
-                                }
-                            } catch {
-                                // Not a git repo or not a dir
+                    if (!(await stat(projectPath)).isDirectory()) return [];
+
+                    const repoDirs = await readdir(projectPath);
+                    // Process repos in parallel
+                    const projectRepos = await Promise.all(repoDirs.map(async (repo) => {
+                        const repoPath = join(projectPath, repo);
+                        try {
+                            if ((await stat(repoPath)).isDirectory()) {
+                                const gitPath = join(repoPath, ".git");
+                                await stat(gitPath);
+                                return { project, repo };
                             }
+                        } catch {
+                            return null;
                         }
-                    }
+                        return null;
+                    }));
+
+                    return projectRepos.filter((r): r is ClonedRepo => r !== null);
                 } catch {
-                    // Not a dir
+                    return [];
                 }
-            }
+            }));
+
+            repos.push(...results.flat());
+
         } catch (error) {
             // Directory error
         }
+        console.log(`[GitService] Found ${repos.length} cloned repos in ${(performance.now() - start).toFixed(2)}ms`);
         return repos;
     }
 

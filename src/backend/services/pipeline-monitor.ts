@@ -51,7 +51,9 @@ class PipelineMonitor extends EventEmitter {
         try {
             // We fetch the latest run for every pipeline. 
             // This is efficient enough (1 request per project) and covers all state changes.
+            const start = performance.now();
             const runs = await azureClient.getRecentRuns();
+            console.log(`[PipelineMonitor] Check finished in ${(performance.now() - start).toFixed(2)}ms`);
 
             // Emit the full list. The frontend can merge it.
             // In a more optimized version, we would diff and only send updates,
