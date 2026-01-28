@@ -10,14 +10,21 @@ import { settingsRoutes } from "./routes/settings";
 import { lspService } from "./services/lsp";
 import { gitService } from "./services/git";
 
+import { pipelineMonitor } from "./services/pipeline-monitor";
+
 interface WebSocketData {
-  rootPath: string;
-  language: string;
+  type: "lsp" | "pipelines";
+  rootPath?: string;
+  language?: string;
 }
+
+// Start background services - REMOVED, now on-demand
+// pipelineMonitor.start();
 
 const server = serve<WebSocketData>({
   routes: {
     // Auth Routes
+
     ...authRoutes,
     // Repo Routes
     ...repoRoutes,
@@ -56,7 +63,7 @@ const server = serve<WebSocketData>({
         const rootPath = await gitService.getRepoPath(projectName, repoName);
 
         const success = server.upgrade(req, {
-          data: { rootPath, language }
+          data: { type: "lsp", rootPath, language }
         });
 
         if (success) {
@@ -66,19 +73,53 @@ const server = serve<WebSocketData>({
       },
     },
 
+    "/api/pipelines/ws": {
+      async GET(req: Request, server: Server<WebSocketData>) {
+        const success = server.upgrade(req, {
+          data: { type: "pipelines" }
+        });
+        if (success) return undefined;
+        return new Response("WebSocket upgrade failed", { status: 500 });
+      }
+    },
+
     // Serve index.html for all unmatched routes (SPA Fallback)
     "/*": index,
   },
 
   websocket: {
     open(ws) {
-      lspService.handleConnection(ws, ws.data.rootPath, ws.data.language);
+      if (ws.data.type === "lsp" && ws.data.rootPath && ws.data.language) {
+        lspService.handleConnection(ws, ws.data.rootPath, ws.data.language);
+      } else if (ws.data.type === "pipelines") {
+        const handler = (runs: any) => {
+          ws.send(JSON.stringify({ type: "update", data: runs }));
+        };
+        // Store the handler on the ws object or in a map to remove it later?
+        // Bun's ws object is extensible? 
+        // Better to just subscribe.
+        // But we need to unsubscribe on close.
+        (ws as any).pipelineHandler = handler;
+        pipelineMonitor.addSubscriber(handler);
+        console.log("[WS] Pipeline client connected");
+      }
     },
     message(ws, message) {
-      lspService.handleMessage(ws, ws.data.rootPath, ws.data.language, message);
+      if (ws.data.type === "lsp" && ws.data.rootPath && ws.data.language) {
+        lspService.handleMessage(ws, ws.data.rootPath, ws.data.language, message);
+      }
+      // Pipelines are push-only for now
     },
     close(ws) {
-      lspService.handleClose(ws, ws.data.rootPath, ws.data.language);
+      if (ws.data.type === "lsp" && ws.data.rootPath && ws.data.language) {
+        lspService.handleClose(ws, ws.data.rootPath, ws.data.language);
+      } else if (ws.data.type === "pipelines") {
+        const handler = (ws as any).pipelineHandler;
+        if (handler) {
+          pipelineMonitor.removeSubscriber(handler);
+        }
+        console.log("[WS] Pipeline client disconnected");
+      }
     },
   },
 

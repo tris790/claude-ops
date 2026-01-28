@@ -97,7 +97,7 @@ const PipelineRow = React.memo(({ index, style, data }: { index: number, style: 
                                 <div className="flex items-center gap-2 text-[11px] text-zinc-500">
                                     <span className="flex items-center gap-1">
                                         <GitBranch className="h-3 w-3" />
-                                        {latestRun.sourceBranch.split('/').pop()}
+                                        {latestRun.sourceBranch ? latestRun.sourceBranch.split('/').pop() : 'unknown'}
                                     </span>
                                     <span>•</span>
                                     <span className="capitalize">{latestRun.status}</span>
@@ -229,6 +229,98 @@ export function PipelineList() {
         }
     }, [windowHeight, loading, pipelines.length]);
 
+    // Helper to merge new runs into existing state, preventing stale data overwrites
+    // This updates BOTH the latestRuns (header) and runs (expanded history)
+    const syncRun = useCallback((run: any) => {
+        if (!run || !run.definition) return;
+        const defId = run.definition.id;
+
+        // 1. Update Latest Runs (Header)
+        setLatestRuns((prev: any) => {
+            const existing = prev[defId];
+            if (!existing || run.id >= existing.id) {
+                return { ...prev, [defId]: run };
+            }
+            return prev;
+        });
+
+        // 2. Update Runs History (Expanded List)
+        // Only if we have history loaded for this pipeline
+        setRuns((prev: any) => {
+            if (!prev[defId]) return prev; // History not loaded yet, don't create it
+            // if we are here it means we expanded the row at least once
+
+            const currentHistory = prev[defId];
+            // Check if run already exists in history
+            const exists = currentHistory.find((r: any) => r.id === run.id);
+
+            let newHistory;
+            if (exists) {
+                // Update existing item
+                newHistory = currentHistory.map((r: any) => r.id === run.id ? run : r);
+            } else {
+                // Prepend new item
+                newHistory = [run, ...currentHistory];
+            }
+
+            // Sort just in case
+            newHistory.sort((a: any, b: any) => new Date(b.queueTime).getTime() - new Date(a.queueTime).getTime());
+
+            return { ...prev, [defId]: newHistory };
+        });
+    }, []);
+
+    useEffect(() => {
+        // WebSocket for live updates
+        const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${proto}//${window.location.host}/api/pipelines/ws`;
+        let ws: WebSocket | null = null;
+        let retryInterval: any = null;
+        let isMounted = true;
+
+        function connect() {
+            if (!isMounted) return;
+
+            // Use the globally available WebSocket constructor
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                if (isMounted) console.log("[PipelineList] Connected to event stream");
+            };
+
+            ws.onmessage = (event) => {
+                if (!isMounted) return;
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === "update") {
+                        const runs = msg.data;
+                        // console.log(`[PipelineList] WS received ${runs.length} runs`);
+                        runs.forEach((run: any) => syncRun(run));
+                    }
+                } catch (e) {
+                    console.error("[PipelineList] WS Error:", e);
+                }
+            };
+
+            ws.onclose = () => {
+                if (!isMounted) return;
+                console.log("[PipelineList] Disconnected, retrying...");
+                retryInterval = setTimeout(connect, 3000);
+            };
+        }
+
+        connect();
+
+        return () => {
+            isMounted = false;
+            if (ws) {
+                // Remove listener to ensure no 'onclose' triggers during intentional close
+                ws.onclose = null;
+                ws.close();
+            }
+            if (retryInterval) clearTimeout(retryInterval);
+        };
+    }, [syncRun]);
 
 
     async function loadData(silent = false) {
@@ -389,8 +481,11 @@ export function PipelineList() {
                         setSelectedPipeline(null);
                     }}
                     pipeline={selectedPipeline}
-                    onQueued={() => {
-                        loadData(true);
+                    onQueued={(newRun) => {
+                        if (newRun && newRun.definition) {
+                            // Optimistically update
+                            syncRun(newRun);
+                        }
                     }}
                 />
             )}

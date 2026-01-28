@@ -788,7 +788,7 @@ export class AzureDevOpsClient {
         const results = await Promise.all(
             projects.map(async (p: any) => {
                 try {
-                    const url = `${this.baseUrl}/${p.name}/_apis/build/builds?api-version=7.0&maxBuildsPerDefinition=1`;
+                    const url = `${this.baseUrl}/${p.name}/_apis/build/builds?api-version=7.0&maxBuildsPerDefinition=1&queryOrder=queueTimeDescending`;
                     const res = await fetch(url, { headers: this.headers });
                     if (!res.ok) return [];
                     const data = await res.json();

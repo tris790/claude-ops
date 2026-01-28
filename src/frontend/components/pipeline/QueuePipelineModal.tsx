@@ -8,7 +8,7 @@ interface QueuePipelineModalProps {
     isOpen: boolean;
     onClose: () => void;
     pipeline: any;
-    onQueued: () => void;
+    onQueued: (run?: any) => void;
 }
 
 export function QueuePipelineModal({ isOpen, onClose, pipeline, onQueued }: QueuePipelineModalProps) {
@@ -67,8 +67,22 @@ export function QueuePipelineModal({ isOpen, onClose, pipeline, onQueued }: Queu
         setError(null);
 
         try {
-            await runPipeline(pipeline.id, selectedBranch);
-            onQueued();
+            const run = await runPipeline(pipeline.id, selectedBranch);
+            console.log("[QueuePipelineModal] Raw queued run:", run);
+
+            // Normalize Pipeline API response to match Build API shape expected by UI
+            const normalizedRun = {
+                ...run,
+                definition: run.definition || run.pipeline || { id: pipeline.id, name: pipeline.name },
+                status: run.status || run.state,
+                queueTime: run.queueTime || run.createdDate || new Date().toISOString(),
+                // Ensure sourceBranch is present
+                sourceBranch: run.sourceBranch || selectedBranch,
+                // Ensure project is present if missing (generic fallback)
+                project: run.project || { name: "Unknown" }
+            };
+
+            onQueued(normalizedRun);
             onClose();
         } catch (err: any) {
             console.error(err);
