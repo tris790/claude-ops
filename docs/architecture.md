@@ -8,7 +8,7 @@
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
 │  │  Command    │  │    Views    │  │  Real-time  │             │
 │  │  Palette    │  │  (PR/WI/    │  │  Updates    │             │
-│  │             │  │  Pipeline)  │  │  (Polling)  │             │
+│  │             │  │  Pipeline)  │  │  Updates    │             │
 │  └─────────────┘  └─────────────┘  └─────────────┘             │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -40,7 +40,7 @@
 - **Command Palette**: Global search and navigation hub
 - **Views**: PR, Work Items, Pipelines, Repository Browser
 - **Settings Page**: Dedicated full page for configuration (org URL, PAT, clone directory, etc.)
-- **Real-time Updates**: Polling-based updates for in-view content
+- **Real-time Updates**: Event-driven updates via Webhooks and SignalR
 
 ### Routing
 
@@ -108,11 +108,9 @@ User provides PAT → Stored in .env file → Injected into Azure DevOps API cal
 
 ### Real-time Updates
 ```
-1. Frontend polls backend at intervals (when view is active)
-2. Backend queries Azure DevOps API
-3. Diff compared to cached state
-4. Only changed data sent to frontend
-5. UI updates without full refresh
+1. Azure DevOps events trigger backend webhooks
+2. Backend broadcasts updates to connected clients
+3. UI updates without full refresh
 ```
 
 ## Local Storage Structure
@@ -154,5 +152,5 @@ User provides PAT → Stored in .env file → Injected into Azure DevOps API cal
 3. **Settings Storage**: `config.json` file in app directory
 4. **HTTP Proxy**: Not needed (backend makes direct calls)
 5. **LSP Server Management**: Tiered discovery (System Path -> VS Code Extensions -> Managed Download). No bundling.
-6. **Real-time Updates**: Hybrid approach. WebSocket for LSP (latency critical), HTTP Polling + Streaming for entities/logs.
+6. **Real-time Updates**: Event-driven architecture. Webhooks and SignalR for real-time status updates and notifications.
 7. **State Management**: React Context + Custom Hooks. Avoid external state libraries (Zustand/Redux) to keep bundle small (Goal: <1MB).

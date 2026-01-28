@@ -479,8 +479,8 @@ The final rank = weighted combination of all factors. Items must pass a match qu
 
 1. **Initial Load**: Always serve from cache immediately if available (optimistic)
 2. **Event Invalidation**: User actions (approve PR, update work item) immediately invalidate related cache entries
-3. **Background Status Check**: Periodically check if cached data has changed, invalidate and update UI if stale
-4. **No TTL**: Data does not expire based on time - only invalidated by events or background checks
+3. **Real-time Invalidation**: Incoming webhooks or SignalR events invalidate related cache entries and trigger UI updates.
+4. **No TTL**: Data does not expire based on time - only invalidated by events.
 5. **UI Updates**: When cache is invalidated, UI updates seamlessly (no full refresh)
 
 ### User Preference Persistence
@@ -524,38 +524,34 @@ The app remembers the following user preferences (stored in `config.json`):
 |--------------------|----------|----------|
 | LSP Bridge | WebSocket | LSP requires sub-100ms latency for hover/autocomplete |
 | Pipeline Logs | Streaming Fetch | Large update streams via chunked transfer encoding |
-| PR/Work Item/List Views | HTTP Polling (5-10s) | Infrequent updates, simple, cache-friendly |
+| Real-time Updates | Webhooks / SignalR | Event-driven status updates for PRs, Pipelines, and Work Items |
 | User Actions | Optimistic Updates | Immediate UI feedback with cache invalidation |
 
 **Key decisions:**
 1. **LSP requires WebSocket** - Non-negotiable for responsive code intelligence
-2. **HTTP polling for entity updates** - Azure DevOps has no push API; we poll their REST API regardless
-3. **Streaming fetch for logs** - Simpler than WebSocket for large sequential data
-4. **Pause polling when tab hidden** - Use Page Visibility API to reduce unnecessary requests
-5. **Configurable intervals** - Active views poll faster (5s), background views slower (30s)
+2. **Webhooks/SignalR for entity updates** - Event-driven updates instead of polling.
+3. **Streaming fetch for logs** - Simpler than WebSocket for large sequential data.
 
 **Why not pure WebSocket:**
-- Adds complexity without benefit when data source (Azure DevOps API) is polled anyway
-- HTTP responses integrate with browser caching and React Query patterns
-- Easier debugging in DevTools
-- Graceful handling of backend restarts without reconnection logic
+- Push updates provide superior user experience compared to polling
+- Reduced server load and API usage
+- Immediate feedback for external changes (e.g., pipeline finishing)
 
 ### Clone Sync Strategy
 **Hybrid approach** with background fetch + contextual refresh + manual controls:
 
 | Trigger | Behavior | Operation |
 |---------|----------|----------|
-| Background interval | Every 5 minutes for all cloned repos | `git fetch` only |
+| Event Signal | Triggered by webhook/SignalR event | `git fetch` |
 | Navigation to repo view | When entering PR diff or file browser | `git fetch` (non-blocking) |
 | Manual "Sync" button | User-initiated, always available | `git pull` (fetch + merge) |
 
 **Detailed behavior:**
 
-1. **Background Fetch** (passive)
-   - Interval: 5 minutes (matches GitHub Desktop)
-   - Scope: All cloned repositories
+1. **Event-Driven Fetch** (passive)
+   - Scope: Related cloned repositories
    - Operation: `git fetch` only (no merge/pull to avoid conflicts)
-   - Pauses when tab is hidden (Page Visibility API)
+   - Triggered by incoming ADO events (e.g., push, PR update)
    - User can disable in settings
 
 2. **Contextual Refresh** (navigation-triggered)
@@ -578,10 +574,8 @@ The app remembers the following user preferences (stored in `config.json`):
 ```json
 {
   "sync": {
-    "autoFetchEnabled": true,
-    "autoFetchIntervalMinutes": 5,
-    "fetchOnNavigation": true,
-    "pauseWhenHidden": true
+    "eventFetchEnabled": true,
+    "fetchOnNavigation": true
   }
 }
 ```

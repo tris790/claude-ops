@@ -92,19 +92,3 @@ const server = serve<WebSocketData>({
 });
 
 console.log(`🚀 Server running at ${server.url}`);
-
-// Background Fetch Loop (Every 5 minutes)
-
-
-setInterval(async () => {
-  // Silent in production, maybe log in dev
-  if (process.env.NODE_ENV !== 'production') {
-    console.log("[Background] Starting git fetch...");
-  }
-  try {
-    await gitService.fetchAll();
-  } catch (e) {
-    console.error("[Background] Git fetch failed", e);
-  }
-}, 5 * 60 * 1000); // 5 minutes
-

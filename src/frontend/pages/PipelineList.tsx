@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router-dom";
 import { VariableSizeList } from "react-window";
 import { getPipelines, getRecentRuns, cancelRun, getPipelineRuns } from "../api/pipelines";
-import { usePolling } from "../hooks/usePolling";
 import {
     Play,
     StopCircle,
@@ -230,13 +229,7 @@ export function PipelineList() {
         }
     }, [windowHeight, loading, pipelines.length]);
 
-    usePolling(async () => {
-        await loadData(true);
-    }, {
-        enabled: true,
-        activeInterval: 5000,
-        backgroundInterval: 30000,
-    });
+
 
     async function loadData(silent = false) {
         if (!silent) setLoading(true);

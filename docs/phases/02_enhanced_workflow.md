@@ -66,10 +66,9 @@ This phase unlocks the "Power User" features, specifically bridging the gap betw
     - [x] **CRUD operations on description**: Implement CRUD operations on description.
 
 ## 4. Real-Time Interactions
-- [ ] **Live Updates**:
-  - [x] **Smart Polling**: Implement a `usePolling` hook via `Page Visibility API`. 
-    - Active view: 5s interval.
-    - Background/Hidden: Pause or 30s interval.
+- [ ] **Live Events**:
+  - [ ] **True ADO Eventing**: Implement SignalR/Webhook integration for real-time updates.
+  - [x] **Visibility Management**: Efficiently handle updates based on `Page Visibility API`.
   - [ ] **Optimistic UI**: Implement React Query `onMutate` handlers for:
     - Adding/editing comments.
     - Changing PR status.

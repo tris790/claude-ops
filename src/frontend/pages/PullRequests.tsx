@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
 import { usePullRequestCache } from "../hooks/usePullRequestCache";
-import { usePolling } from "../hooks/usePolling";
 import {
     GitPullRequest,
     CheckCircle2,
@@ -72,14 +71,7 @@ export function PullRequests() {
     // Use the cache hook
     const { prs, loading, filterPrs, refresh } = usePullRequestCache(selectedStatuses.length > 0 ? selectedStatuses : ['active']);
 
-    // Polling
-    usePolling(async () => {
-        await refresh();
-    }, {
-        enabled: selectedStatuses.includes("active") || selectedStatuses.length === 0,
-        activeInterval: 5000,
-        backgroundInterval: 30000,
-    });
+
 
     // -- Options Derivation --
     const options = useMemo(() => {

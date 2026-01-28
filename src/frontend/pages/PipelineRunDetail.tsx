@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getRun, getRunTimeline, getLogContent } from "../api/pipelines";
-import { usePolling } from "../hooks/usePolling";
 import {
     ArrowLeft,
     Clock,
@@ -52,16 +51,6 @@ export function PipelineRunDetail() {
             if (!silent) setLoading(false);
         }
     }
-
-    const isRunning = timeline?.records?.some((r: any) => r.state === "inProgress") || timeline?.status === "inProgress";
-
-    usePolling(async () => {
-        await loadData(true);
-    }, {
-        enabled: !!id && (isRunning || !timeline),
-        activeInterval: 5000,
-        backgroundInterval: 30000,
-    });
 
     useEffect(() => {
         if (selectedRecordId && timeline) {

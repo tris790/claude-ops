@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread, getPullRequestIterations, updatePullRequestThread, updatePullRequestComment, deletePullRequestComment, updatePullRequest } from "../api/prs";
 import { getCurrentUser } from "../api/auth";
-import { usePolling } from "../hooks/usePolling";
 import {
     ArrowLeft,
     GitPullRequest,
@@ -113,15 +112,6 @@ export function PRDetail() {
         }
     }, [id]);
 
-    const isPollingEnabled = pr?.status === "active";
-
-    usePolling(async () => {
-        await loadData(true);
-    }, {
-        enabled: isPollingEnabled,
-        activeInterval: 5000,
-        backgroundInterval: 30000,
-    });
 
     async function loadData(silent = false) {
         if (!silent) setLoading(true);
