@@ -76,6 +76,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     const editorRef = useRef<EditorView | null>(null);
     const lspRef = useRef<LSPClient | null>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
+    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [lspStatus, setLspStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
@@ -236,127 +237,148 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         // Legacy comment extension removed in favor of createCommentSystem
 
         const createLSPExtensions = (uri: string) => {
-            const hoverExtension = hoverTooltip(async (view, pos, side) => {
+            const hoverExtension = hoverTooltip((view, pos, side) => {
                 if (!lspRef.current || lspStatus !== 'connected') return null;
                 const line = view.state.doc.lineAt(pos);
                 const character = pos - line.from;
 
-                try {
-                    const result = await lspRef.current.sendRequest("textDocument/hover", {
-                        textDocument: { uri },
-                        position: { line: line.number - 1, character }
-                    });
-
-                    if (!result || !result.contents) return null;
-
-                    let signatureMarkdown = "";
-                    let docMarkdown = "";
-
-                    const processMarkedString = (s: any) => {
-                        if (typeof s === 'string') return s;
-                        if (s.language) return `\`\`\`${s.language}\n${s.value}\n\`\`\``;
-                        return s.value || "";
-                    };
-
-                    if (Array.isArray(result.contents)) {
-                        signatureMarkdown = processMarkedString(result.contents[0]);
-                        docMarkdown = result.contents.slice(1).map(processMarkedString).join('\n\n');
-                    } else if (result.contents.kind === "markdown") {
-                        docMarkdown = result.contents.value;
-                    } else {
-                        docMarkdown = processMarkedString(result.contents);
+                return new Promise((resolve) => {
+                    // Clear any existing timeout to effectively debounce
+                    if (hoverTimeoutRef.current) {
+                        clearTimeout(hoverTimeoutRef.current);
                     }
 
-                    if (!signatureMarkdown && !docMarkdown.trim()) return null;
+                    // Set a new timeout
+                    hoverTimeoutRef.current = setTimeout(async () => {
+                        if (!lspRef.current || lspStatus !== 'connected') {
+                            resolve(null);
+                            return;
+                        }
 
-                    return {
-                        pos,
-                        end: pos,
-                        create(view) {
-                            const dom = document.createElement("div");
-                            dom.className = "cm-lsp-tooltip-container group p-0 max-w-2xl bg-white dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-700/50 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95";
-                            const root = createRoot(dom);
+                        try {
+                            const result = await lspRef.current.sendRequest("textDocument/hover", {
+                                textDocument: { uri },
+                                position: { line: line.number - 1, character }
+                            });
 
-                            const TooltipContent = () => {
-                                const [highlighter, setHighlighter] = useState<any>(null);
-                                const isDark = document.documentElement.classList.contains("dark");
-                                useEffect(() => { getHighlighter().then(setHighlighter); }, []);
+                            if (!result || !result.contents) {
+                                resolve(null);
+                                return;
+                            }
 
-                                return (
-                                    <div className="max-h-[400px] overflow-y-auto">
-                                        {signatureMarkdown && (
-                                            <div className="bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2 border-b border-zinc-200 dark:border-zinc-700/30">
-                                                <ReactMarkdown
-                                                    remarkPlugins={[remarkGfm]}
-                                                    components={{
-                                                        code({ node, inline, className, children, ...props }: any) {
-                                                            const lang = /language-(\w+)/.exec(className || "")?.[1] || "typescript";
-                                                            const code = String(children).replace(/\n$/, "");
-                                                            if (!inline && highlighter) {
-                                                                const html = highlighter.codeToHtml(code, { lang, theme: isDark ? 'github-dark' : 'github-light' });
-                                                                return <div dangerouslySetInnerHTML={{ __html: html }} className="text-xs font-mono" />;
-                                                            }
-                                                            return <code className="text-xs font-mono text-blue-600 dark:text-blue-300 font-bold">{children}</code>;
-                                                        }
-                                                    }}
-                                                >
-                                                    {signatureMarkdown}
-                                                </ReactMarkdown>
-                                            </div>
-                                        )}
-                                        <div className="p-4 prose prose-sm prose-zinc dark:prose-invert max-w-none">
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    code({ node, inline, className, children, ...props }: any) {
-                                                        const match = /language-(\w+)/.exec(className || "");
-                                                        const lang = match ? match[1] : "";
-                                                        const code = String(children).replace(/\n$/, "");
-                                                        if (!inline && lang && highlighter) {
-                                                            const html = highlighter.codeToHtml(code, { lang, theme: isDark ? 'github-dark' : 'github-light' });
-                                                            return <div className="shiki-tooltip-code rounded overflow-hidden shadow-inner bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800/50" dangerouslySetInnerHTML={{ __html: html }} />;
-                                                        }
-                                                        return inline ?
-                                                            <code className="bg-zinc-100 dark:bg-zinc-800/80 px-1 py-0.5 rounded text-blue-600 dark:text-blue-300 font-mono text-[0.9em]" {...props}>{children}</code> :
-                                                            <pre className="bg-zinc-50 dark:bg-zinc-950/50 p-3 rounded-md overflow-x-auto border border-zinc-200 dark:border-zinc-800/50" {...props}><code className={className}>{children}</code></pre>;
-                                                    },
-                                                    a({ href, children }: any) {
-                                                        const handleClick = (e: React.MouseEvent) => {
-                                                            e.preventDefault();
-                                                            if (href?.startsWith("file:///")) {
-                                                                const dummyLocation = { uri: href, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } } };
-                                                                handleLSPDefinition(dummyLocation, {
-                                                                    projectName: projectName || "",
-                                                                    repoName: repoName || "",
-                                                                    pullRequestId: pullRequestId,
-                                                                    modifiedFiles: modifiedFiles,
-                                                                }, navigate);
-                                                            } else if (href) {
-                                                                window.open(href, "_blank");
-                                                            }
-                                                        };
-                                                        return (
-                                                            <a href={href} onClick={handleClick} className="text-blue-500 dark:text-blue-400 hover:underline">
-                                                                {children}
-                                                            </a>
-                                                        );
-                                                    }
-                                                }}
-                                            >
-                                                {docMarkdown}
-                                            </ReactMarkdown>
-                                        </div>
-                                    </div>
-                                );
+                            let signatureMarkdown = "";
+                            let docMarkdown = "";
+
+                            const processMarkedString = (s: any) => {
+                                if (typeof s === 'string') return s;
+                                if (s.language) return `\`\`\`${s.language}\n${s.value}\n\`\`\``;
+                                return s.value || "";
                             };
 
-                            root.render(<TooltipContent />);
-                            return { dom, overlap: true };
+                            if (Array.isArray(result.contents)) {
+                                signatureMarkdown = processMarkedString(result.contents[0]);
+                                docMarkdown = result.contents.slice(1).map(processMarkedString).join('\n\n');
+                            } else if (result.contents.kind === "markdown") {
+                                docMarkdown = result.contents.value;
+                            } else {
+                                docMarkdown = processMarkedString(result.contents);
+                            }
+
+                            if (!signatureMarkdown && !docMarkdown.trim()) {
+                                resolve(null);
+                                return;
+                            }
+
+                            resolve({
+                                pos,
+                                end: pos,
+                                create(view) {
+                                    const dom = document.createElement("div");
+                                    dom.className = "cm-lsp-tooltip-container group p-0 max-w-2xl bg-white dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-700/50 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in-95";
+                                    const root = createRoot(dom);
+
+                                    const TooltipContent = () => {
+                                        const [highlighter, setHighlighter] = useState<any>(null);
+                                        const isDark = document.documentElement.classList.contains("dark");
+                                        useEffect(() => { getHighlighter().then(setHighlighter); }, []);
+
+                                        return (
+                                            <div className="max-h-[400px] overflow-y-auto">
+                                                {signatureMarkdown && (
+                                                    <div className="bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2 border-b border-zinc-200 dark:border-zinc-700/30">
+                                                        <ReactMarkdown
+                                                            remarkPlugins={[remarkGfm]}
+                                                            components={{
+                                                                code({ node, inline, className, children, ...props }: any) {
+                                                                    const lang = /language-(\w+)/.exec(className || "")?.[1] || "typescript";
+                                                                    const code = String(children).replace(/\n$/, "");
+                                                                    if (!inline && highlighter) {
+                                                                        const html = highlighter.codeToHtml(code, { lang, theme: isDark ? 'github-dark' : 'github-light' });
+                                                                        return <div dangerouslySetInnerHTML={{ __html: html }} className="text-xs font-mono" />;
+                                                                    }
+                                                                    return <code className="text-xs font-mono text-blue-600 dark:text-blue-300 font-bold">{children}</code>;
+                                                                }
+                                                            }}
+                                                        >
+                                                            {signatureMarkdown}
+                                                        </ReactMarkdown>
+                                                    </div>
+                                                )}
+                                                <div className="p-4 prose prose-sm prose-zinc dark:prose-invert max-w-none">
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm]}
+                                                        components={{
+                                                            code({ node, inline, className, children, ...props }: any) {
+                                                                const match = /language-(\w+)/.exec(className || "");
+                                                                const lang = match ? match[1] : "";
+                                                                const code = String(children).replace(/\n$/, "");
+                                                                if (!inline && lang && highlighter) {
+                                                                    const html = highlighter.codeToHtml(code, { lang, theme: isDark ? 'github-dark' : 'github-light' });
+                                                                    return <div className="shiki-tooltip-code rounded overflow-hidden shadow-inner bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800/50" dangerouslySetInnerHTML={{ __html: html }} />;
+                                                                }
+                                                                return inline ?
+                                                                    <code className="bg-zinc-100 dark:bg-zinc-800/80 px-1 py-0.5 rounded text-blue-600 dark:text-blue-300 font-mono text-[0.9em]" {...props}>{children}</code> :
+                                                                    <pre className="bg-zinc-50 dark:bg-zinc-950/50 p-3 rounded-md overflow-x-auto border border-zinc-200 dark:border-zinc-800/50" {...props}><code className={className}>{children}</code></pre>;
+                                                            },
+                                                            a({ href, children }: any) {
+                                                                const handleClick = (e: React.MouseEvent) => {
+                                                                    e.preventDefault();
+                                                                    if (href?.startsWith("file:///")) {
+                                                                        const dummyLocation = { uri: href, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } } };
+                                                                        handleLSPDefinition(dummyLocation, {
+                                                                            projectName: projectName || "",
+                                                                            repoName: repoName || "",
+                                                                            pullRequestId: pullRequestId,
+                                                                            modifiedFiles: modifiedFiles,
+                                                                        }, navigate);
+                                                                    } else if (href) {
+                                                                        window.open(href, "_blank");
+                                                                    }
+                                                                };
+                                                                return (
+                                                                    <a href={href} onClick={handleClick} className="text-blue-500 dark:text-blue-400 hover:underline">
+                                                                        {children}
+                                                                    </a>
+                                                                );
+                                                            }
+                                                        }}
+                                                    >
+                                                        {docMarkdown}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            </div>
+                                        );
+                                    };
+
+                                    root.render(<TooltipContent />);
+                                    return { dom, overlap: true };
+                                }
+                            });
+                        } catch (e) {
+                            resolve(null);
                         }
-                    };
-                } catch (e) {
-                    return null;
-                }
+                    }, 200); // Debounce delay
+                });
             }, { hoverTime: 300 });
 
             const handleGoToDefinition = async (view: EditorView) => {

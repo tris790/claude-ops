@@ -48,6 +48,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const lspRef = useRef<LSPClient | null>(null);
+    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const isMarkdown = file.path.toLowerCase().endsWith(".md");
 
@@ -174,191 +175,207 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
             viewRef.current.destroy();
         }
 
-        const hoverExtension = hoverTooltip(async (view, pos, side) => {
+        const hoverExtension = hoverTooltip((view, pos, side) => {
             if (!lspRef.current) return null;
             const line = view.state.doc.lineAt(pos);
             const character = pos - line.from;
 
-            try {
-                const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
-                const result = await lspRef.current.sendRequest("textDocument/hover", {
-                    textDocument: { uri: `file://${normalizedPath}` },
-                    position: { line: line.number - 1, character }
-                });
-
-                if (!result || !result.contents) return null;
-
-                let signatureMarkdown = "";
-                let docMarkdown = "";
-
-                const processMarkedString = (s: any) => {
-                    if (typeof s === 'string') return s;
-                    if (s.language) return `\`\`\`${s.language}\n${s.value}\n\`\`\``;
-                    return s.value || "";
-                };
-
-                if (Array.isArray(result.contents)) {
-                    signatureMarkdown = processMarkedString(result.contents[0]);
-                    docMarkdown = result.contents.slice(1).map(processMarkedString).join('\n\n');
-                } else if (result.contents.kind === "markdown") {
-                    docMarkdown = result.contents.value;
-                } else {
-                    docMarkdown = processMarkedString(result.contents);
+            return new Promise((resolve) => {
+                if (hoverTimeoutRef.current) {
+                    clearTimeout(hoverTimeoutRef.current);
                 }
 
-                if (!signatureMarkdown && !docMarkdown.trim()) return null;
-
-                return {
-                    pos,
-                    end: pos,
-                    above: true,
-                    create(view) {
-                        const dom = document.createElement("div");
-                        dom.className = "cm-lsp-tooltip-container group p-0 max-w-2xl bg-white dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-700/50 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden transition-all duration-300 animate-in fade-in zoom-in-95";
-
-                        // Interactive behavior: While the mouse is over the tooltip, we want to keep it.
-                        // However, CM6 hoverTooltip manages the lifecycle by distance.
-                        // By giving the DOM a bit of 'interactive' status or just making it large enough, it helps.
-
-                        const root = createRoot(dom);
-
-                        const TooltipContent = () => {
-                            const [highlighter, setHighlighter] = useState<any>(null);
-                            const [definition, setDefinition] = useState<{ path: string, uri: string } | null>(null);
-                            const isDark = document.documentElement.classList.contains("dark");
-
-                            useEffect(() => {
-                                getHighlighter().then(setHighlighter);
-
-                                // Fetch definition for breadcrumbs
-                                if (lspRef.current) {
-                                    const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
-                                    const line = view.state.doc.lineAt(pos);
-                                    const character = pos - line.from;
-
-                                    lspRef.current.sendRequest("textDocument/definition", {
-                                        textDocument: { uri: `file://${normalizedPath}` },
-                                        position: { line: line.number - 1, character }
-                                    }).then(result => {
-                                        if (!result) return;
-                                        const loc = Array.isArray(result) ? result[0] : result;
-                                        if (loc) {
-                                            const uri = 'uri' in loc ? loc.uri : (loc as any).targetUri;
-                                            if (uri.startsWith('file:///')) {
-                                                setDefinition({
-                                                    uri,
-                                                    path: uri.slice(8)
-                                                });
-                                            }
-                                        }
-                                    }).catch(console.error);
-                                }
-                            }, []);
-
-                            return (
-                                <div className="max-h-[400px] overflow-y-auto">
-                                    {definition && (
-                                        <div className="px-4 py-1.5 bg-zinc-100 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-700/30 flex items-center space-x-1 text-[10px] text-zinc-600 dark:text-zinc-400 font-mono">
-                                            <span className="opacity-50">@</span>
-                                            <button
-                                                onClick={() => {
-                                                    const targetURL = `/repos/${projectName}/${repoName}/blob/${branch}/${definition.path}`;
-                                                    navigate(targetURL);
-                                                }}
-                                                className="hover:text-blue-500 dark:hover:text-blue-400 hover:underline transition-colors truncate max-w-[300px]"
-                                                title={definition.path}
-                                            >
-                                                {definition.path.split('/').pop()}
-                                            </button>
-                                            <span className="opacity-30 px-1">›</span>
-                                            <span className="text-zinc-500 truncate">{definition.path}</span>
-                                        </div>
-                                    )}
-                                    {signatureMarkdown && (
-                                        <div className="bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2 border-b border-zinc-200 dark:border-zinc-700/30">
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    code({ node, inline, className, children, ...props }: any) {
-                                                        const lang = /language-(\w+)/.exec(className || "")?.[1] || "typescript";
-                                                        const code = String(children).replace(/\n$/, "");
-                                                        if (!inline && highlighter) {
-                                                            const html = highlighter.codeToHtml(code, { lang, theme: "github-dark" });
-                                                            // For signature, we keep dark theme or neutral, or adapt if needed. 
-                                                            // Signatures are often small. Let's adapt.
-                                                            const htmlAdaptive = highlighter.codeToHtml(code, { lang, theme: isDark ? 'github-dark' : 'github-light' });
-                                                            return <div dangerouslySetInnerHTML={{ __html: htmlAdaptive }} className="text-xs font-mono" />;
-                                                        }
-                                                        return <code className="text-xs font-mono text-blue-600 dark:text-blue-300 font-bold">{children}</code>;
-                                                    }
-                                                }}
-                                            >
-                                                {signatureMarkdown}
-                                            </ReactMarkdown>
-                                        </div>
-                                    )}
-                                    <div className="p-4 prose prose-sm prose-zinc dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-headings:text-zinc-900 dark:prose-headings:text-zinc-100 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline">
-                                        <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            components={{
-                                                code({ node, inline, className, children, ...props }: any) {
-                                                    const match = /language-(\w+)/.exec(className || "");
-                                                    const lang = match ? match[1] : "";
-                                                    const code = String(children).replace(/\n$/, "");
-
-                                                    if (!inline && lang && highlighter) {
-                                                        const html = highlighter.codeToHtml(code, {
-                                                            lang: lang,
-                                                            theme: isDark ? 'github-dark' : 'github-light'
-                                                        });
-                                                        return <div className="shiki-tooltip-code rounded overflow-hidden shadow-inner bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800/50" dangerouslySetInnerHTML={{ __html: html }} />;
-                                                    }
-
-                                                    return inline ?
-                                                        <code className="bg-zinc-100 dark:bg-zinc-800/80 px-1 py-0.5 rounded text-blue-600 dark:text-blue-300 font-mono text-[0.9em]" {...props}>{children}</code> :
-                                                        <pre className="bg-zinc-50 dark:bg-zinc-950/50 p-3 rounded-md overflow-x-auto border border-zinc-200 dark:border-zinc-800/50" {...props}><code className={className}>{children}</code></pre>;
-                                                },
-                                                a({ href, children }: any) {
-                                                    const handleClick = (e: React.MouseEvent) => {
-                                                        e.preventDefault();
-                                                        if (href?.startsWith("file:///")) {
-                                                            let targetPath = href.slice(8);
-                                                            if (targetPath.startsWith("original/")) targetPath = targetPath.slice(9);
-                                                            else if (targetPath.startsWith("modified/")) targetPath = targetPath.slice(9);
-                                                            if (!targetPath.startsWith("/")) targetPath = "/" + targetPath;
-
-                                                            navigate(`/repos/${projectName}/${repoName}/blob/${branch}${targetPath}`);
-                                                        } else if (href) {
-                                                            window.open(href, "_blank");
-                                                        }
-                                                    };
-                                                    return (
-                                                        <a href={href} onClick={handleClick} className="text-blue-500 dark:text-blue-400 hover:underline">
-                                                            {children}
-                                                        </a>
-                                                    );
-                                                }
-                                            }}
-                                        >
-                                            {docMarkdown}
-                                        </ReactMarkdown>
-                                    </div>
-                                </div>
-                            );
-                        };
-
-                        root.render(<TooltipContent />);
-
-                        return {
-                            dom,
-                            overlap: true
-                        };
+                hoverTimeoutRef.current = setTimeout(async () => {
+                    if (!lspRef.current) {
+                        resolve(null);
+                        return;
                     }
-                };
-            } catch (e) {
-                console.error(e);
-                return null;
-            }
+
+                    try {
+                        const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+                        const result = await lspRef.current.sendRequest("textDocument/hover", {
+                            textDocument: { uri: `file://${normalizedPath}` },
+                            position: { line: line.number - 1, character }
+                        });
+
+                        if (!result || !result.contents) {
+                            resolve(null);
+                            return;
+                        }
+
+                        let signatureMarkdown = "";
+                        let docMarkdown = "";
+
+                        const processMarkedString = (s: any) => {
+                            if (typeof s === 'string') return s;
+                            if (s.language) return `\`\`\`${s.language}\n${s.value}\n\`\`\``;
+                            return s.value || "";
+                        };
+
+                        if (Array.isArray(result.contents)) {
+                            signatureMarkdown = processMarkedString(result.contents[0]);
+                            docMarkdown = result.contents.slice(1).map(processMarkedString).join('\n\n');
+                        } else if (result.contents.kind === "markdown") {
+                            docMarkdown = result.contents.value;
+                        } else {
+                            docMarkdown = processMarkedString(result.contents);
+                        }
+
+                        if (!signatureMarkdown && !docMarkdown.trim()) {
+                            resolve(null);
+                            return;
+                        }
+
+                        resolve({
+                            pos,
+                            end: pos,
+                            above: true,
+                            create(view) {
+                                const dom = document.createElement("div");
+                                dom.className = "cm-lsp-tooltip-container group p-0 max-w-2xl bg-white dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200 dark:border-zinc-700/50 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden transition-all duration-300 animate-in fade-in zoom-in-95";
+                                const root = createRoot(dom);
+                                // ... TooltipContent implementation ...
+                                // Since TooltipContent refers to closure variables like signatureMarkdown, docMarkdown, file, etc.
+                                // We need to inline it or ensure it has access.
+                                // In the Replace logic, I must provide the FULL content if I replace the start.
+                                // It's safer to just replace the logic up to the `create` or `return` if possible, but the `try/catch` wraps it all.
+
+                                // Actually, I can just replace the wrapper and return the object.
+                                // But `TooltipContent` is inside.
+
+                                // Let's reimplement the whole TooltipContent inside the replacement string to be safe and complete.
+
+                                const TooltipContent = () => {
+                                    const [highlighter, setHighlighter] = useState<any>(null);
+                                    const [definition, setDefinition] = useState<{ path: string, uri: string } | null>(null);
+                                    const isDark = document.documentElement.classList.contains("dark");
+
+                                    useEffect(() => {
+                                        getHighlighter().then(setHighlighter);
+
+                                        if (lspRef.current) {
+                                            const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
+                                            const line = view.state.doc.lineAt(pos);
+                                            const character = pos - line.from;
+
+                                            lspRef.current.sendRequest("textDocument/definition", {
+                                                textDocument: { uri: `file://${normalizedPath}` },
+                                                position: { line: line.number - 1, character }
+                                            }).then(result => {
+                                                if (!result) return;
+                                                const loc = Array.isArray(result) ? result[0] : result;
+                                                if (loc) {
+                                                    const uri = 'uri' in loc ? loc.uri : (loc as any).targetUri;
+                                                    if (uri.startsWith('file:///')) {
+                                                        setDefinition({
+                                                            uri,
+                                                            path: uri.slice(8)
+                                                        });
+                                                    }
+                                                }
+                                            }).catch(console.error);
+                                        }
+                                    }, []);
+
+                                    return (
+                                        <div className="max-h-[400px] overflow-y-auto">
+                                            {definition && (
+                                                <div className="px-4 py-1.5 bg-zinc-100 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-700/30 flex items-center space-x-1 text-[10px] text-zinc-600 dark:text-zinc-400 font-mono">
+                                                    <span className="opacity-50">@</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            const targetURL = `/repos/${projectName}/${repoName}/blob/${branch}/${definition.path}`;
+                                                            navigate(targetURL);
+                                                        }}
+                                                        className="hover:text-blue-500 dark:hover:text-blue-400 hover:underline transition-colors truncate max-w-[300px]"
+                                                        title={definition.path}
+                                                    >
+                                                        {definition.path.split('/').pop()}
+                                                    </button>
+                                                    <span className="opacity-30 px-1">›</span>
+                                                    <span className="text-zinc-500 truncate">{definition.path}</span>
+                                                </div>
+                                            )}
+                                            {signatureMarkdown && (
+                                                <div className="bg-zinc-50 dark:bg-zinc-800/50 px-4 py-2 border-b border-zinc-200 dark:border-zinc-700/30">
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm]}
+                                                        components={{
+                                                            code({ node, inline, className, children, ...props }: any) {
+                                                                const lang = /language-(\w+)/.exec(className || "")?.[1] || "typescript";
+                                                                const code = String(children).replace(/\n$/, "");
+                                                                if (!inline && highlighter) {
+                                                                    const html = highlighter.codeToHtml(code, { lang, theme: "github-dark" });
+                                                                    const htmlAdaptive = highlighter.codeToHtml(code, { lang, theme: isDark ? 'github-dark' : 'github-light' });
+                                                                    return <div dangerouslySetInnerHTML={{ __html: htmlAdaptive }} className="text-xs font-mono" />;
+                                                                }
+                                                                return <code className="text-xs font-mono text-blue-600 dark:text-blue-300 font-bold">{children}</code>;
+                                                            }
+                                                        }}
+                                                    >
+                                                        {signatureMarkdown}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            )}
+                                            <div className="p-4 prose prose-sm prose-zinc dark:prose-invert max-w-none prose-p:my-2 prose-pre:my-2 prose-headings:text-zinc-900 dark:prose-headings:text-zinc-100 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        code({ node, inline, className, children, ...props }: any) {
+                                                            const match = /language-(\w+)/.exec(className || "");
+                                                            const lang = match ? match[1] : "";
+                                                            const code = String(children).replace(/\n$/, "");
+
+                                                            if (!inline && lang && highlighter) {
+                                                                const html = highlighter.codeToHtml(code, {
+                                                                    lang: lang,
+                                                                    theme: isDark ? 'github-dark' : 'github-light'
+                                                                });
+                                                                return <div className="shiki-tooltip-code rounded overflow-hidden shadow-inner bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-zinc-800/50" dangerouslySetInnerHTML={{ __html: html }} />;
+                                                            }
+
+                                                            return inline ?
+                                                                <code className="bg-zinc-100 dark:bg-zinc-800/80 px-1 py-0.5 rounded text-blue-600 dark:text-blue-300 font-mono text-[0.9em]" {...props}>{children}</code> :
+                                                                <pre className="bg-zinc-50 dark:bg-zinc-950/50 p-3 rounded-md overflow-x-auto border border-zinc-200 dark:border-zinc-800/50" {...props}><code className={className}>{children}</code></pre>;
+                                                        },
+                                                        a({ href, children }: any) {
+                                                            const handleClick = (e: React.MouseEvent) => {
+                                                                e.preventDefault();
+                                                                if (href?.startsWith("file:///")) {
+                                                                    let targetPath = href.slice(8);
+                                                                    if (targetPath.startsWith("original/")) targetPath = targetPath.slice(9);
+                                                                    else if (targetPath.startsWith("modified/")) targetPath = targetPath.slice(9);
+                                                                    if (!targetPath.startsWith("/")) targetPath = "/" + targetPath;
+
+                                                                    navigate(`/repos/${projectName}/${repoName}/blob/${branch}${targetPath}`);
+                                                                } else if (href) {
+                                                                    window.open(href, "_blank");
+                                                                }
+                                                            };
+                                                            return (
+                                                                <a href={href} onClick={handleClick} className="text-blue-500 dark:text-blue-400 hover:underline">
+                                                                    {children}
+                                                                </a>
+                                                            );
+                                                        }
+                                                    }}
+                                                >
+                                                    {docMarkdown}
+                                                </ReactMarkdown>
+                                            </div>
+                                        </div>
+                                    );
+                                };
+
+                                root.render(<TooltipContent />);
+                                return { dom, overlap: true };
+                            }
+                        });
+                    } catch (e) {
+                        resolve(null);
+                    }
+                }, 200);
+            });
         }, { hoverTime: 300 });
 
         const handleGoToDefinition = async (view: EditorView) => {
@@ -512,7 +529,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                     const toLine = view.state.doc.line(d.range.end.line + 1);
                     const from = Math.min(fromLine.from + d.range.start.character, fromLine.to);
                     const to = Math.min(toLine.from + d.range.end.character, toLine.to);
-
+ 
                     return {
                         from,
                         to,
@@ -521,7 +538,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                         source: d.source
                     };
                 });
-
+ 
                 view.dispatch(setDiagnostics(view.state, diagnostics));
                 */
             });
