@@ -1,2 +1,0 @@
-- tooltip hover should wrap text when line is too long (example const string bla = "very long string here)
-- ctrl + p only searches repo currently. when inside a repo it should search the current repo. when outside a repo.
