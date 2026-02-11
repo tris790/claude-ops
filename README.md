@@ -15,6 +15,3 @@ Backend:
 ```bash
 bun dev
 ```
-
-## General
-- No emojis, icons are fine but emojis are not
