@@ -62,32 +62,32 @@ export const darkThemeExtension = EditorView.theme({
     },
     /* Diff / Merge View Styles - Side-by-side mode */
     "&.cm-merge-a .cm-changedLine": {
-        backgroundColor: "rgba(244, 63, 94, 0.15)", // Red for deletions (side A = original)
+        backgroundColor: "rgba(244, 63, 94, 0.08)", // Red for deletions (side A = original)
     },
     "&.cm-merge-b .cm-changedLine": {
-        backgroundColor: "rgba(34, 197, 94, 0.15)", // Green for additions (side B = modified)
+        backgroundColor: "rgba(34, 197, 94, 0.08)", // Green for additions (side B = modified)
     },
     "&.cm-merge-a .cm-changedText": {
-        backgroundColor: "rgba(244, 63, 94, 0.4)",
+        backgroundColor: "rgba(244, 63, 94, 0.2)",
         color: "#fca5a5",
     },
     "&.cm-merge-b .cm-changedText": {
-        backgroundColor: "rgba(34, 197, 94, 0.4)",
+        backgroundColor: "rgba(34, 197, 94, 0.2)",
         color: "#86efac",
     },
     /* Diff / Merge View Styles - Unified mode */
     ".cm-deletedChunk": {
-        backgroundColor: "rgba(244, 63, 94, 0.15)",
+        backgroundColor: "rgba(244, 63, 94, 0.06)",
     },
     ".cm-deletedChunk .cm-deletedLine": {
-        backgroundColor: "rgba(244, 63, 94, 0.2)",
+        backgroundColor: "rgba(244, 63, 94, 0.1)",
     },
     ".cm-deletedChunk .cm-deletedText": {
-        backgroundColor: "rgba(244, 63, 94, 0.4)",
+        backgroundColor: "rgba(244, 63, 94, 0.2)",
         color: "#fca5a5",
     },
     ".cm-insertedLine": {
-        backgroundColor: "rgba(34, 197, 94, 0.15)",
+        backgroundColor: "rgba(34, 197, 94, 0.08)",
     },
     ".cm-changedLineGutter": {
         backgroundColor: "#ef4444",

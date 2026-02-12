@@ -468,66 +468,133 @@ export const createCommentSystem = (props: CommentSystemProps) => {
     });
 
 
-    // 2. Selection Tooltip (The "Comment" button)
-    const selectionTooltipField = StateField.define<Tooltip | null>({
-        create: () => null,
-        update(tooltip, tr) {
-            if (!tr.selection && !tr.docChanged) return tooltip;
-            const selection = tr.state.selection.main;
-            if (selection.empty) return null;
+    // Effect to signal debounce completion
+    const debounceCompleteEffect = StateEffect.define<void>();
+
+    // 2. Selection Tooltip (The "Comment" button) - with debounce
+    const SELECTION_DEBOUNCE_MS = 400;
+
+    const selectionTooltipField = StateField.define<{ tooltip: Tooltip | null; pendingSelection: { from: number; to: number } | null }>({
+        create: () => ({ tooltip: null, pendingSelection: null }),
+        update(state, tr) {
+            // Handle debounce completion effect
+            for (const effect of tr.effects) {
+                if (effect.is(debounceCompleteEffect)) {
+                    // Show tooltip with pending selection
+                    if (state.pendingSelection) {
+                        const selection = state.pendingSelection;
+                        const tooltip: Tooltip = {
+                            pos: selection.to,
+                            above: true,
+                            strictSide: true,
+                            create(view) {
+                                const dom = document.createElement("div");
+                                dom.className = "cm-comment-tooltip z-50";
+                                const root = createRoot(dom);
+                                root.render(
+                                    <button
+                                        className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-500 text-white rounded-md px-2 py-1 text-xs font-medium shadow-lg transition-all animate-in fade-in zoom-in-95 cursor-pointer border border-blue-400/20"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const from = selection.from;
+                                            const to = selection.to;
+
+                                            const startLine = view.state.doc.lineAt(from);
+                                            const startOffset = from - startLine.from + 1;
+
+                                            const draft: CommentDraft = {
+                                                id: Math.random().toString(36).substring(7),
+                                                from,
+                                                to,
+                                                side: props.side,
+                                                originalLine: startLine.number,
+                                                originalOffset: startOffset,
+                                                modifiedLine: startLine.number,
+                                                modifiedOffset: startOffset
+                                            };
+
+                                            view.dispatch({
+                                                effects: addDraftEffect.of(draft)
+                                            });
+                                        }}
+                                    >
+                                        <MessageSquarePlus className="w-3 h-3" />
+                                        <span>Comment</span>
+                                    </button>
+                                );
+                                return { dom };
+                            }
+                        };
+                        return { tooltip, pendingSelection: null };
+                    }
+                    return { tooltip: null, pendingSelection: null };
+                }
+            }
+
+            // Check current selection
+            const currentSelection = tr.state.selection.main;
+            if (currentSelection.empty) {
+                return { tooltip: null, pendingSelection: null };
+            }
+
+            // If no selection change and we already have a tooltip, keep it
+            if (!tr.selection && !tr.docChanged && state.tooltip) {
+                return state;
+            }
+
+            // Selection changed - start debounce by storing pending selection
+            const pendingSelection = { from: currentSelection.from, to: currentSelection.to };
 
             return {
-                pos: selection.to,
-                above: true,
-                strictSide: true,
-                create(view) {
-                    const dom = document.createElement("div");
-                    dom.className = "cm-comment-tooltip z-50";
-                    const root = createRoot(dom);
-                    root.render(
-                        <button
-                            className="flex items-center space-x-1 bg-blue-600 hover:bg-blue-500 text-white rounded-md px-2 py-1 text-xs font-medium shadow-lg transition-all animate-in fade-in zoom-in-95 cursor-pointer border border-blue-400/20"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const from = selection.from;
-                                const to = selection.to;
-
-                                const startLine = view.state.doc.lineAt(from);
-
-                                // Standardize offsets
-                                const startOffset = from - startLine.from + 1;
-
-                                const draft: CommentDraft = {
-                                    id: Math.random().toString(36).substring(7),
-                                    from,
-                                    to,
-                                    side: props.side,
-                                    originalLine: startLine.number,
-                                    originalOffset: startOffset,
-                                    modifiedLine: startLine.number,
-                                    modifiedOffset: startOffset
-                                };
-
-                                view.dispatch({
-                                    effects: addDraftEffect.of(draft)
-                                });
-                            }}
-                        >
-                            <MessageSquarePlus className="w-3 h-3" />
-                            <span>Comment</span>
-                        </button>
-                    );
-                    return { dom };
-                }
+                tooltip: null,
+                pendingSelection
             };
         },
-        provide: f => showTooltip.from(f)
+        provide: f => showTooltip.from(f, fieldState => fieldState.tooltip)
+    });
+
+    // Plugin to handle debounce timing - tracks timeouts per view
+    const viewTimeouts = new WeakMap<EditorView, ReturnType<typeof setTimeout>>();
+
+    const selectionDebouncePlugin = EditorView.updateListener.of((update) => {
+        const field = update.state.field(selectionTooltipField);
+
+        // If we have a pending selection but no tooltip shown yet, start debounce
+        if (field.pendingSelection && !field.tooltip) {
+            // Clear any existing timeout first
+            const existingTimeout = viewTimeouts.get(update.view);
+            if (existingTimeout) {
+                clearTimeout(existingTimeout);
+            }
+
+            const timeoutId = setTimeout(() => {
+                viewTimeouts.delete(update.view);
+                // Dispatch effect to show tooltip
+                if (update.view) {
+                    update.view.dispatch({
+                        effects: debounceCompleteEffect.of()
+                    });
+                }
+            }, SELECTION_DEBOUNCE_MS);
+
+            viewTimeouts.set(update.view, timeoutId);
+        }
+
+        // Clear timeout if selection became empty or user clicked Comment button (tooltip shown)
+        if (!field.pendingSelection && !field.tooltip) {
+            const existingTimeout = viewTimeouts.get(update.view);
+            if (existingTimeout) {
+                clearTimeout(existingTimeout);
+                viewTimeouts.delete(update.view);
+            }
+        }
     });
 
     return [
         draftStateField,
         commentDecorations,
-        selectionTooltipField
+        selectionTooltipField,
+        selectionDebouncePlugin
     ];
 };

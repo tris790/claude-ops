@@ -8,6 +8,7 @@ import { pipelineRoutes } from "./routes/pipelines";
 import { automationRoutes } from "./routes/automation";
 import { settingsRoutes } from "./routes/settings";
 import { searchRoutes } from "./routes/search";
+import { lspRoutes } from "./routes/lsp";
 import { lspService } from "./services/lsp";
 import { gitService } from "./services/git";
 
@@ -40,6 +41,8 @@ const server = serve<WebSocketData>({
     ...settingsRoutes,
     // Search Routes
     ...searchRoutes,
+    // LSP REST Routes
+    ...lspRoutes,
 
 
     "/api/hello": {

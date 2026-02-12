@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, memo } from "react";
 import { FileCode, FilePlus, FileEdit, FileMinus, CheckSquare, Square, ChevronRight, ChevronDown, Folder } from "lucide-react";
 
 interface FileChange {
@@ -23,7 +23,7 @@ interface TreeNode {
     change?: FileChange;
 }
 
-export const FileTree: React.FC<FileTreeProps> = ({
+export const FileTree: React.FC<FileTreeProps> = memo(({
     changes,
     selectedPath,
     onSelect,
@@ -172,7 +172,9 @@ export const FileTree: React.FC<FileTreeProps> = ({
             </div>
         </div>
     );
-};
+});
+
+FileTree.displayName = "FileTree";
 
 function ChangeIcon({ type }: { type: string }) {
     switch (type) {

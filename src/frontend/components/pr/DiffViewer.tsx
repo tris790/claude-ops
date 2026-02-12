@@ -16,13 +16,15 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getEditorTheme } from "../../styles/code-themes";
 import { getFileContent } from "../../api/repos";
-import { Loader2, MessageSquarePlus, CheckSquare, Square } from "lucide-react";
+import { getLspInstallJob, getLspStatus, startLspInstall } from "../../api/lsp";
+import { Loader2, MessageSquarePlus, CheckSquare, Square, Wrench } from "lucide-react";
 import { LSPClient } from "../../utils/lsp-client";
 import { getHighlighter } from "../../utils/shiki";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { createCommentSystem } from "./DiffExtensions";
 import { handleLSPDefinition } from "../../features/lsp/navigation";
+import { getLspLanguageFromPath } from "../../features/lsp/language-map";
 import { type LSPLocation } from "../../components/lsp/ReferencesPanel";
 import { highlightSelectionMatches } from "@codemirror/search";
 
@@ -79,7 +81,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [lspStatus, setLspStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+    const [lspStatus, setLspStatus] = useState<"disconnected" | "checking" | "missing" | "installing" | "connecting" | "connected" | "error">("disconnected");
+    const [lspMessage, setLspMessage] = useState<string | null>(null);
+    const [lspCanInstall, setLspCanInstall] = useState(false);
+    const [lspRefreshNonce, setLspRefreshNonce] = useState(0);
     const [diffMode, setDiffMode] = useState<DiffMode>("side-by-side");
     const [splitRatio, setSplitRatio] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY_SPLIT);
@@ -89,6 +94,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
 
     const [contents, setContents] = useState<{ original: string; modified: string } | null>(null);
+    const lspLanguage = getLspLanguageFromPath(filePath);
 
     const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains("dark"));
 
@@ -124,62 +130,149 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
+    const handleInstallLsp = async () => {
+        if (!projectName || !repoName || !lspLanguage || !lspCanInstall) return;
+
+        setLspStatus("installing");
+        setLspMessage(`Installing ${lspLanguage} language server...`);
+
+        try {
+            const { jobId } = await startLspInstall(projectName, repoName, [lspLanguage]);
+
+            for (let attempt = 0; attempt < 600; attempt++) {
+                const job = await getLspInstallJob(jobId);
+                const runningStep = job.steps.find((step) => step.status === "running");
+                const pendingStep = job.steps.find((step) => step.status === "pending");
+                const currentStep = runningStep || pendingStep || null;
+
+                if (currentStep) {
+                    setLspMessage(`${currentStep.language}: ${currentStep.message}`);
+                }
+
+                if (job.status === "completed") {
+                    setLspMessage("LSP installation complete");
+                    setLspRefreshNonce((value) => value + 1);
+                    return;
+                }
+
+                if (job.status === "failed") {
+                    setLspStatus("error");
+                    setLspMessage(job.error || "LSP installation failed");
+                    return;
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+
+            setLspStatus("error");
+            setLspMessage("LSP installation timed out");
+        } catch (installError) {
+            setLspStatus("error");
+            setLspMessage(installError instanceof Error ? installError.message : "LSP installation failed");
+        }
+    };
+
     // LSP Connection Effect
     useEffect(() => {
-        if (!isCloned || !projectName || !repoName || !filePath || loading || !contents) {
-            setLspStatus("disconnected");
-            return;
+        let cancelled = false;
+        let detachLogListener: (() => void) | null = null;
+
+        if (lspRef.current) {
+            lspRef.current.disconnect();
+            lspRef.current = null;
         }
 
-        const ext = filePath.split('.').pop()?.toLowerCase();
-        let language = "";
-        if (ext === 'ts' || ext === 'js') language = 'typescript';
-        else if (ext === 'tsx' || ext === 'jsx') language = 'typescriptreact';
-        else if (ext === 'go') language = 'go';
-        else if (ext === 'py') language = 'python';
-        else if (ext === 'c' || ext === 'h') language = 'c';
-        else if (ext === 'cpp' || ext === 'hpp' || ext === 'cc') language = 'cpp';
-        else if (ext === 'cs') language = 'csharp';
-
-        if (!language) return;
-
-        setLspStatus("connecting");
-        const client = new LSPClient(projectName!, repoName!, language);
-        lspRef.current = client;
-
-        client.connect().then(() => {
-            setLspStatus("connected");
-
-            const normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
-
-            client.sendNotification('textDocument/didOpen', {
-                textDocument: {
-                    uri: `file:///original${normalizedPath}`,
-                    languageId: language,
-                    version: 1,
-                    text: contents!.original
-                }
-            });
-
-            client.sendNotification('textDocument/didOpen', {
-                textDocument: {
-                    uri: `file://${normalizedPath}`, // Use real path for modified side
-                    languageId: language,
-                    version: 1,
-                    text: contents!.modified
-                }
-            });
-        }).catch(err => {
-            console.error("[DiffViewer] LSP Connection Failed", err);
+        if (!isCloned || !projectName || !repoName || !filePath || loading || !contents || !lspLanguage) {
             setLspStatus("disconnected");
-        });
+            setLspMessage(null);
+            setLspCanInstall(false);
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        const connect = async () => {
+            setLspStatus("checking");
+            setLspMessage(null);
+
+            try {
+                const status = await getLspStatus(projectName, repoName, lspLanguage);
+                if (cancelled) return;
+                setLspCanInstall(status.canInstall);
+
+                if (!status.installed) {
+                    setLspStatus("missing");
+                    setLspMessage(status.missingReason || status.installUnavailableReason || "Language server is not installed");
+                    return;
+                }
+
+                setLspMessage(null);
+            } catch (statusError) {
+                if (cancelled) return;
+                setLspStatus("error");
+                setLspCanInstall(false);
+                setLspMessage(statusError instanceof Error ? statusError.message : "Failed to check LSP status");
+                return;
+            }
+
+            const client = new LSPClient(projectName, repoName, lspLanguage);
+            lspRef.current = client;
+            setLspStatus("connecting");
+
+            try {
+                await client.connect();
+                if (cancelled) {
+                    client.disconnect();
+                    return;
+                }
+
+                setLspStatus("connected");
+                detachLogListener = client.on("window/logMessage", (params: any) => {
+                    const message = typeof params?.message === "string" ? params.message : "";
+                    if (!message) return;
+                    if (typeof params?.type === "number" && params.type <= 1) {
+                        setLspStatus("error");
+                        setLspMessage(message);
+                    }
+                });
+                const normalizedPath = filePath.startsWith("/") ? filePath : `/${filePath}`;
+
+                client.sendNotification("textDocument/didOpen", {
+                    textDocument: {
+                        uri: `file:///original${normalizedPath}`,
+                        languageId: lspLanguage,
+                        version: 1,
+                        text: contents.original,
+                    },
+                });
+
+                client.sendNotification("textDocument/didOpen", {
+                    textDocument: {
+                        uri: `file://${normalizedPath}`,
+                        languageId: lspLanguage,
+                        version: 1,
+                        text: contents.modified,
+                    },
+                });
+            } catch (connectError) {
+                if (cancelled) return;
+                console.error("[DiffViewer] LSP Connection Failed", connectError);
+                setLspStatus("error");
+                setLspMessage(connectError instanceof Error ? connectError.message : "Failed to connect to language server");
+            }
+        };
+
+        void connect();
 
         return () => {
-            client.disconnect();
-            lspRef.current = null;
-            setLspStatus("disconnected");
+            cancelled = true;
+            detachLogListener?.();
+            if (lspRef.current) {
+                lspRef.current.disconnect();
+                lspRef.current = null;
+            }
         };
-    }, [filePath, projectName, repoName, isCloned, loading, contents]);
+    }, [filePath, projectName, repoName, isCloned, loading, lspLanguage, lspRefreshNonce]);
 
     useEffect(() => {
         let isMounted = true;
@@ -375,6 +468,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                                 }
                             });
                         } catch (e) {
+                            console.error("[LSP] Hover request failed", e);
                             resolve(null);
                         }
                     }, 200); // Debounce delay
@@ -690,24 +784,68 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     // Optimization: Use a ref for current splitRatio in mouseUp? 
     // Strict mode safety: Let's stick to simple deps.
 
+    const LSP_STATUS_LABELS: Record<typeof lspStatus, string> = {
+        connected: "LSP Ready",
+        connecting: "LSP Connecting",
+        checking: "LSP Checking",
+        installing: "LSP Installing",
+        missing: "LSP Missing",
+        error: "LSP Error",
+        disconnected: "LSP Inactive",
+    };
+
+    const LSP_STATUS_CLASSES: Record<typeof lspStatus, string> = {
+        connected: "border-green-200 dark:border-green-800 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400",
+        connecting: "border-yellow-200 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400",
+        checking: "border-yellow-200 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400",
+        installing: "border-blue-200 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
+        missing: "border-rose-200 dark:border-rose-800 bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400",
+        error: "border-rose-200 dark:border-rose-800 bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400",
+        disconnected: "border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500",
+    };
+
+    const LSP_DOT_CLASSES: Record<typeof lspStatus, string> = {
+        connected: "bg-green-500",
+        connecting: "bg-yellow-500",
+        checking: "bg-yellow-500",
+        installing: "bg-blue-500",
+        missing: "bg-rose-500",
+        error: "bg-rose-500",
+        disconnected: "bg-zinc-500",
+    };
+
+    const lspStatusLabel = LSP_STATUS_LABELS[lspStatus];
+    const lspStatusClass = LSP_STATUS_CLASSES[lspStatus];
+    const lspDotClass = LSP_DOT_CLASSES[lspStatus];
+
+    const canShowInstallButton =
+        Boolean(isCloned && projectName && repoName && lspLanguage && lspCanInstall && (lspStatus === "missing" || lspStatus === "error" || lspStatus === "installing"));
 
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-zinc-950 overflow-hidden relative">
             <div className="flex items-center justify-between px-4 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
-                <div className="flex items-center space-x-3 text-xs">
-                    <span className="text-zinc-500 font-mono truncate max-w-[300px]">{filePath}</span>
-                    <div className={`flex items-center space-x-1 text-[10px] px-2 py-0.5 rounded border ${lspStatus === 'connected' ? 'border-green-200 dark:border-green-800 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' :
-                        lspStatus === 'connecting' ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400' :
-                            'border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
-                        }`}>
-                        <div className={`w-1 h-1 rounded-full ${lspStatus === 'connected' ? 'bg-green-500' :
-                            lspStatus === 'connecting' ? 'bg-yellow-500' : 'bg-zinc-500'
-                            }`} />
-                        <span className="font-medium uppercase tracking-wider">
-                            {lspStatus === 'connected' ? 'LSP Ready' : lspStatus === 'connecting' ? 'LSP Connecting' : 'LSP Inactive'}
-                        </span>
+                <div className="flex items-center space-x-3 text-xs min-w-0">
+                    <div className={`flex items-center space-x-1 text-[10px] px-2 py-0.5 rounded border shrink-0 ${lspStatusClass}`}>
+                        {lspStatus === "installing"
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <div className={`w-1 h-1 rounded-full ${lspDotClass}`} />}
+                        <span className="font-medium uppercase tracking-wider">{lspStatusLabel}</span>
                     </div>
+                    <span className="text-zinc-500 font-mono whitespace-nowrap">{filePath}</span>
+                    {canShowInstallButton && (
+                        <button
+                            type="button"
+                            onClick={() => { void handleInstallLsp(); }}
+                            disabled={lspStatus === "installing"}
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-200/70 dark:hover:bg-blue-900/40 disabled:opacity-60"
+                        >
+                            {lspStatus === "installing"
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <Wrench className="w-3 h-3" />}
+                            <span className="font-medium uppercase tracking-wider">Install LSP</span>
+                        </button>
+                    )}
                 </div>
                 <div className="flex items-center space-x-1 p-0.5 bg-zinc-100 dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800">
                     <button
@@ -730,6 +868,11 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                     </button>
                 </div>
             </div>
+            {lspMessage && (lspStatus === "missing" || lspStatus === "installing" || lspStatus === "error") && (
+                <div className="px-3 py-2 text-xs border-b border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900 shrink-0">
+                    {lspMessage}
+                </div>
+            )}
             {loading && (
                 <div className="flex-1 flex items-center justify-center">
                     <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
@@ -811,17 +954,17 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
                 /* Diff highlighting - Light Mode Defaults */
                 .cm-merge-a .cm-changedLine {
-                    background-color: rgba(239, 68, 68, 0.1) !important;
+                    background-color: rgba(239, 68, 68, 0.05) !important;
                 }
                 .cm-merge-b .cm-changedLine {
-                    background-color: rgba(34, 197, 94, 0.1) !important;
+                    background-color: rgba(34, 197, 94, 0.05) !important;
                 }
                 .cm-merge-a .cm-changedText {
-                    background-color: rgba(239, 68, 68, 0.3) !important;
+                    background-color: rgba(239, 68, 68, 0.15) !important;
                     color: #b91c1c !important;
                 }
                 .cm-merge-b .cm-changedText {
-                    background-color: rgba(34, 197, 94, 0.3) !important;
+                    background-color: rgba(34, 197, 94, 0.15) !important;
                     color: #15803d !important;
                 }
 
@@ -835,41 +978,41 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                 
                 /* Unified mode */
                 .cm-deletedChunk {
-                    background-color: rgba(239, 68, 68, 0.05) !important;
+                    background-color: rgba(239, 68, 68, 0.03) !important;
                 }
                 .cm-deletedChunk .cm-deletedLine {
-                    background-color: rgba(239, 68, 68, 0.15) !important;
+                    background-color: rgba(239, 68, 68, 0.08) !important;
                 }
                 .cm-deletedChunk .cm-deletedText {
-                    background-color: rgba(239, 68, 68, 0.3) !important;
+                    background-color: rgba(239, 68, 68, 0.15) !important;
                 }
                 .cm-insertedLine {
-                    background-color: rgba(34, 197, 94, 0.15) !important;
+                    background-color: rgba(34, 197, 94, 0.08) !important;
                 }
 
                 /* Dark Mode Overrides */
                 .dark .cm-merge-a .cm-changedLine {
-                    background-color: rgba(239, 68, 68, 0.15) !important;
+                    background-color: rgba(239, 68, 68, 0.08) !important;
                 }
                 .dark .cm-merge-b .cm-changedLine {
-                    background-color: rgba(34, 197, 94, 0.15) !important;
+                    background-color: rgba(34, 197, 94, 0.08) !important;
                 }
                 .dark .cm-merge-a .cm-changedText {
-                    background-color: rgba(239, 68, 68, 0.4) !important;
+                    background-color: rgba(239, 68, 68, 0.2) !important;
                     color: #fca5a5 !important;
                 }
                 .dark .cm-merge-b .cm-changedText {
-                    background-color: rgba(34, 197, 94, 0.4) !important;
+                    background-color: rgba(34, 197, 94, 0.2) !important;
                     color: #86efac !important;
                 }
                 .dark .cm-deletedChunk {
-                    background-color: rgba(239, 68, 68, 0.1) !important;
+                    background-color: rgba(239, 68, 68, 0.06) !important;
                 }
                 .dark .cm-deletedChunk .cm-deletedLine {
-                    background-color: rgba(239, 68, 68, 0.2) !important;
+                    background-color: rgba(239, 68, 68, 0.1) !important;
                 }
                 .dark .cm-deletedChunk .cm-deletedText {
-                    background-color: rgba(239, 68, 68, 0.4) !important;
+                    background-color: rgba(239, 68, 68, 0.2) !important;
                 }
             `}</style>
         </div>

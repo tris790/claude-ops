@@ -1,4 +1,4 @@
-const REQUEST_TIMEOUT = 5000;
+const REQUEST_TIMEOUT = 25000;
 
 export interface LSPMessage {
     jsonrpc: "2.0";
@@ -139,4 +139,3 @@ export class LSPClient {
         }
     }
 }
-

@@ -26,50 +26,77 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
 }) => {
     const [size, setSize] = useLocalStorage(storageKey, defaultSize);
     const [isResizing, setIsResizing] = useState(false);
-    const requestRef = useRef<number | undefined>(undefined);
+    const [isDragging, setIsDragging] = useState(false);
+
+    // Use refs for smooth resize without React re-renders
+    const panelRef = useRef<HTMLDivElement>(null);
+    const rafRef = useRef<number | null>(null);
+    const currentSizeRef = useRef(size);
     const startPosRef = useRef(0);
     const startSizeRef = useRef(size);
 
     const isHorizontal = direction === "horizontal";
 
+    // Keep refs in sync
+    useEffect(() => {
+        currentSizeRef.current = size;
+    }, [size]);
+
+    const applySize = useCallback((newSize: number) => {
+        const clampedSize = maxSize
+            ? Math.max(minSize, Math.min(newSize, maxSize))
+            : Math.max(minSize, newSize);
+
+        if (panelRef.current) {
+            panelRef.current.style.width = isHorizontal ? `${clampedSize}px` : "";
+            panelRef.current.style.height = !isHorizontal ? `${clampedSize}px` : "";
+        }
+
+        currentSizeRef.current = clampedSize;
+    }, [isHorizontal, minSize, maxSize]);
+
     const startResizing = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
         startPosRef.current = isHorizontal ? e.clientX : e.clientY;
-        startSizeRef.current = size;
+        startSizeRef.current = currentSizeRef.current;
         setIsResizing(true);
-    }, [isHorizontal, size]);
+        setIsDragging(true);
+    }, [isHorizontal]);
 
     useEffect(() => {
-        if (!isResizing) return;
+        if (!isDragging) return;
 
         const handleMouseMove = (e: MouseEvent) => {
-            if (requestRef.current) return;
+            if (rafRef.current) return;
 
-            requestRef.current = requestAnimationFrame(() => {
+            rafRef.current = requestAnimationFrame(() => {
                 const currentPos = isHorizontal ? e.clientX : e.clientY;
                 const delta = currentPos - startPosRef.current;
-                
-                // For horizontal left panel, dragging right increases size
-                // For vertical bottom panel, dragging up increases size
-                const newSize = isHorizontal 
+
+                const newSize = isHorizontal
                     ? startSizeRef.current + delta
                     : startSizeRef.current - delta;
 
-                const clampedSize = maxSize 
-                    ? Math.max(minSize, Math.min(newSize, maxSize))
-                    : Math.max(minSize, newSize);
-
-                setSize(clampedSize);
-                onResize?.(clampedSize);
-                requestRef.current = undefined;
+                applySize(newSize);
+                rafRef.current = null;
             });
         };
 
         const handleMouseUp = () => {
-            setIsResizing(false);
+            setIsDragging(false);
+
+            // Commit final size to React state (triggers single re-render)
+            setSize(currentSizeRef.current);
+            onResize?.(currentSizeRef.current);
+
+            // Cleanup RAF
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current);
+                rafRef.current = null;
+            }
         };
 
-        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mousemove", handleMouseMove, { passive: true });
         window.addEventListener("mouseup", handleMouseUp);
         document.body.style.cursor = isHorizontal ? "col-resize" : "row-resize";
         document.body.style.userSelect = "none";
@@ -80,10 +107,10 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
             document.body.style.cursor = "";
             document.body.style.userSelect = "";
         };
-    }, [isResizing, isHorizontal, minSize, maxSize, setSize, onResize]);
+    }, [isDragging, isHorizontal, minSize, maxSize, setSize, onResize, applySize]);
 
-    const sizeStyle = isHorizontal 
-        ? { width: `${size}px` } 
+    const sizeStyle = isHorizontal
+        ? { width: `${size}px` }
         : { height: `${size}px` };
 
     const resizerStyles = isHorizontal
@@ -96,6 +123,7 @@ export const ResizablePanel: React.FC<ResizablePanelProps> = ({
 
     return (
         <div
+            ref={panelRef}
             className={`relative flex ${isHorizontal ? "flex-row" : "flex-col"} ${className}`}
             style={sizeStyle}
         >

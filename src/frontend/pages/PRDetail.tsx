@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { getPullRequest, getPullRequestThreads, votePullRequest, getPullRequestChanges, getPullRequestCommits, createPullRequestThread, getPullRequestIterations, updatePullRequestThread, updatePullRequestComment, deletePullRequestComment, updatePullRequest } from "../api/prs";
 import { getCurrentUser } from "../api/auth";
@@ -67,6 +67,7 @@ export function PRDetail() {
     const [descriptionDraft, setDescriptionDraft] = useState("");
     const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
     const [applyingFixId, setApplyingFixId] = useState<string | null>(null);
+    const sidebarRef = useRef<HTMLDivElement>(null);
 
     // LSP References State
     const [references, setReferences] = useState<LSPLocation[]>([]);
@@ -841,6 +842,7 @@ export function PRDetail() {
 
                             {!isTreeCollapsed && (
                                 <div
+                                    ref={sidebarRef}
                                     className="flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 flex flex-col"
                                     style={{ width: treeWidth }}
                                 >
@@ -875,29 +877,12 @@ export function PRDetail() {
                             )}
 
                             {!isTreeCollapsed && (
-                                <div
-                                    className="w-1 cursor-col-resize hover:bg-sapphire-500/50 transition-colors active:bg-sapphire-500 z-10 shrink-0 bg-transparent"
-                                    onMouseDown={(e) => {
-                                        const startX = e.pageX;
-                                        const startWidth = treeWidth;
-
-                                        function onMouseMove(e: MouseEvent) {
-                                            const delta = e.pageX - startX;
-                                            const newWidth = Math.max(150, Math.min(600, startWidth + delta));
-                                            setTreeWidth(newWidth);
-                                            localStorage.setItem("pr-tree-width", newWidth.toString());
-                                        }
-
-                                        function onMouseUp() {
-                                            window.removeEventListener("mousemove", onMouseMove);
-                                            window.removeEventListener("mouseup", onMouseUp);
-                                            document.body.style.cursor = "default";
-                                        }
-
-                                        window.addEventListener("mousemove", onMouseMove);
-                                        window.addEventListener("mouseup", onMouseUp);
-                                        document.body.style.cursor = "col-resize";
-                                    }}
+                                <TreeResizer
+                                    sidebarRef={sidebarRef}
+                                    treeWidth={treeWidth}
+                                    onResize={setTreeWidth}
+                                    minWidth={150}
+                                    maxWidth={600}
                                 />
                             )}
                             <div className={`flex-1 min-w-0 bg-white dark:bg-zinc-950 ${isTreeCollapsed ? 'ml-10' : ''}`}>
@@ -1009,4 +994,83 @@ function VoteBadge({ vote }: { vote: number }) {
     if (vote > 0) return <div className="h-5 w-5 rounded-full bg-green-500/20 flex items-center justify-center"><Check className="h-3 w-3 text-green-500" /></div>;
     if (vote < 0) return <div className="h-5 w-5 rounded-full bg-red-500/20 flex items-center justify-center"><Minus className="h-3 w-3 text-red-500" /></div>;
     return <div className="h-5 w-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] text-zinc-600">...</div>;
+}
+
+// Optimized tree resizer that uses direct DOM manipulation during drag
+// to avoid React re-renders on every mousemove
+interface TreeResizerProps {
+    sidebarRef: React.RefObject<HTMLDivElement>;
+    treeWidth: number;
+    onResize: (width: number) => void;
+    minWidth: number;
+    maxWidth: number;
+}
+
+function TreeResizer({ sidebarRef, treeWidth, onResize, minWidth, maxWidth }: TreeResizerProps) {
+    const [isDragging, setIsDragging] = useState(false);
+    const rafRef = useRef<number | null>(null);
+    const startXRef = useRef(0);
+    const startWidthRef = useRef(treeWidth);
+
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        startXRef.current = e.pageX;
+        startWidthRef.current = treeWidth;
+        setIsDragging(true);
+        document.body.style.cursor = "col-resize";
+        document.body.style.userSelect = "none";
+    }, [treeWidth]);
+
+    useEffect(() => {
+        if (!isDragging) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            if (rafRef.current) return;
+
+            rafRef.current = requestAnimationFrame(() => {
+                const delta = e.pageX - startXRef.current;
+                const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidthRef.current + delta));
+
+                // Apply directly to DOM - no React re-render of parent
+                if (sidebarRef.current) {
+                    sidebarRef.current.style.width = `${newWidth}px`;
+                }
+
+                rafRef.current = null;
+            });
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+
+            // Get final width from DOM and commit to React state once
+            if (sidebarRef.current) {
+                const finalWidth = parseInt(sidebarRef.current.style.width, 10) || treeWidth;
+                onResize(finalWidth);
+                localStorage.setItem("pr-tree-width", finalWidth.toString());
+            }
+
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current);
+                rafRef.current = null;
+            }
+        };
+
+        window.addEventListener("mousemove", handleMouseMove, { passive: true });
+        window.addEventListener("mouseup", handleMouseUp);
+
+        return () => {
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, [isDragging, minWidth, maxWidth, onResize, sidebarRef, treeWidth]);
+
+    return (
+        <div
+            className={`w-1 cursor-col-resize hover:bg-sapphire-500/50 transition-colors z-10 shrink-0 bg-transparent ${isDragging ? "bg-sapphire-500" : ""}`}
+            onMouseDown={handleMouseDown}
+        />
+    );
 }

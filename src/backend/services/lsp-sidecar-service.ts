@@ -1,8 +1,9 @@
-import { join, resolve } from "path";
+import { join, relative, resolve } from "path";
 import { readdir } from "node:fs/promises";
-import { homedir } from "node:os";
+import type { Dirent } from "node:fs";
 import { pathToFileURL } from "url";
 import type { Subprocess, FileSink } from "bun";
+import { normalizeLspLanguage, resolveLspCommand } from "./lsp-tools";
 
 interface PendingClientRequest {
     sessionId: string;
@@ -39,6 +40,7 @@ export interface LSPInstance {
     breakerOpenUntil: number;
     initTimer: ReturnType<typeof setTimeout> | null;
     isShuttingDown: boolean;
+    reportedSessionErrors: Set<string>;
 }
 
 const MAX_LSP_PROCESSES = 3;
@@ -46,6 +48,19 @@ const LSP_TTL_MS = 5 * 60 * 1000;
 const EVICTION_INTERVAL_MS = 60 * 1000;
 const CIRCUIT_BREAKER_TIMEOUT_MS = 10_000;
 const CONSECUTIVE_TIMEOUT_THRESHOLD = 3;
+const CSHARP_WORKSPACE_SEARCH_MAX_DEPTH = 6;
+const CSHARP_WORKSPACE_SEARCH_MAX_DIRS = 500;
+const CSHARP_WORKSPACE_IGNORED_DIRS = new Set([
+    ".git",
+    ".hg",
+    ".svn",
+    ".vs",
+    ".vscode",
+    "node_modules",
+    "bin",
+    "obj",
+    "packages",
+]);
 
 const DEFAULT_OPTIONS: SidecarOptions = {
     requestTimeoutMs: 6000,
@@ -80,7 +95,7 @@ export class LSPSidecarService {
     }
 
     public async openSession(sessionId: string, rootPath: string, language: string) {
-        const normalizedLanguage = this.normalizeLanguage(language);
+        const normalizedLanguage = normalizeLspLanguage(language) ?? language;
         const key = this.getInstanceKey(rootPath, normalizedLanguage);
         let instance = this.instances.get(key);
 
@@ -147,9 +162,13 @@ export class LSPSidecarService {
                 instance.pendingRequests.delete(internalId);
             }
 
+            const timeoutMs = instance.language === "csharp"
+                ? this.options.requestTimeoutMs * 4
+                : this.options.requestTimeoutMs;
+
             const timer = setTimeout(() => {
                 this.onRequestTimeout(key, internalId);
-            }, this.options.requestTimeoutMs);
+            }, timeoutMs);
 
             instance.pendingRequests.set(internalId, {
                 sessionId,
@@ -194,7 +213,7 @@ export class LSPSidecarService {
         const language = await this.detectLanguage(rootPath);
         if (!language) return;
 
-        const normalizedLanguage = this.normalizeLanguage(language);
+        const normalizedLanguage = normalizeLspLanguage(language) ?? language;
         const key = this.getInstanceKey(rootPath, normalizedLanguage);
         if (this.instances.has(key)) return;
 
@@ -366,12 +385,6 @@ export class LSPSidecarService {
         return "";
     }
 
-    private normalizeLanguage(language: string) {
-        if (language === "typescriptreact") return "typescript";
-        if (language === "javascriptreact") return "javascript";
-        return language;
-    }
-
     private getInstanceKey(rootPath: string, language: string) {
         return `${rootPath}::${language}`;
     }
@@ -454,126 +467,76 @@ export class LSPSidecarService {
         this.forwardRawToProcess(instance, key, JSON.stringify(message));
     }
 
-    private async findExtensionBin(publisherAndName: string, binPath: string): Promise<string | null> {
-        const home = homedir();
-        if (!home) return null;
-
-        const extensionsDir = join(home, ".vscode/extensions");
-        try {
-            const entries = await readdir(extensionsDir);
-            const match = entries.find((entry) => entry.startsWith(publisherAndName));
-            if (!match) return null;
-
-            const fullPath = join(extensionsDir, match, binPath);
-            if (await Bun.file(fullPath).exists()) return fullPath;
-        } catch {
-        }
-
-        return null;
+    private getWorkspaceFolder(rootPath: string) {
+        const rootUri = pathToFileURL(rootPath).toString();
+        const uri = rootUri.endsWith("/") ? rootUri : `${rootUri}/`;
+        const name = rootPath.split(/[\\/]/).filter(Boolean).pop() || "root";
+        return { name, uri };
     }
 
-    private async resolveLSPCommand(language: string): Promise<string[]> {
-        if (language === "typescript" || language === "javascript") {
-            const projectRoot = process.cwd();
-            const potentialPaths = [
-                resolve(projectRoot, "node_modules/typescript-language-server/lib/cli.js"),
-                resolve(projectRoot, "node_modules/typescript-language-server/lib/cli.mjs"),
-                resolve(projectRoot, "node_modules/.bin/typescript-language-server"),
-            ];
+    private rankWorkspacePath(rootPath: string, candidate: string) {
+        const rel = relative(rootPath, candidate).replace(/\\/g, "/");
+        const depth = rel.split("/").length;
+        return { depth, rel };
+    }
 
-            for (const path of potentialPaths) {
-                if (await Bun.file(path).exists()) {
-                    return ["node", path, "--stdio"];
-                }
-            }
+    private pickWorkspacePath(rootPath: string, candidates: string[]) {
+        if (!candidates.length) return null;
+        const sorted = [...candidates].sort((a, b) => {
+            const rankA = this.rankWorkspacePath(rootPath, a);
+            const rankB = this.rankWorkspacePath(rootPath, b);
+            if (rankA.depth !== rankB.depth) return rankA.depth - rankB.depth;
+            if (rankA.rel.length !== rankB.rel.length) return rankA.rel.length - rankB.rel.length;
+            return rankA.rel.localeCompare(rankB.rel);
+        });
+        return sorted[0] || null;
+    }
 
-            const bin = Bun.which("typescript-language-server");
-            if (bin) return [bin, "--stdio"];
+    private async findCSharpWorkspaceTarget(rootPath: string) {
+        const solutionCandidates: string[] = [];
+        const projectCandidates: string[] = [];
+        const queue: Array<{ dir: string; depth: number }> = [{ dir: rootPath, depth: 0 }];
+        let visitedDirs = 0;
 
-            const vscodePaths = [
-                "/opt/visual-studio-code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                "/usr/share/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                "/usr/lib/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                "C:/Program Files/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                join(homedir(), "AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib/tsserver.js"),
-            ];
+        while (queue.length) {
+            const current = queue.shift();
+            if (!current) break;
+            if (visitedDirs >= CSHARP_WORKSPACE_SEARCH_MAX_DIRS) break;
+            visitedDirs += 1;
 
-            for (const path of vscodePaths) {
-                if (await Bun.file(path).exists()) {
-                    return ["bun", "run", path];
-                }
-            }
-        }
-
-        if (language === "go") {
-            const bin = Bun.which("gopls");
-            if (bin) return [bin];
-
-            const extBin = await this.findExtensionBin("golang.go", "bin/gopls");
-            if (extBin) return [extBin];
-        }
-
-        if (language === "python") {
-            const bin = Bun.which("pylsp");
-            if (bin) return [bin];
-        }
-
-        if (language === "c" || language === "cpp") {
-            const args = [
-                "--background-index",
-                "--clang-tidy",
-                "--completion-style=detailed",
-                "--header-insertion=iwyu",
-                "-j=4",
-            ];
-
-            const bin = Bun.which("clangd");
-            if (bin) return [bin, ...args];
-            if (await Bun.file("/usr/bin/clangd").exists()) return ["/usr/bin/clangd", ...args];
-            if (await Bun.file("C:/Program Files/LLVM/bin/clangd.exe").exists()) return ["C:/Program Files/LLVM/bin/clangd.exe", ...args];
-        }
-
-        if (language === "csharp") {
-            const home = homedir();
-            const extensionsDir = join(home, ".vscode/extensions");
-
+            let entries: Dirent[];
             try {
-                const entries = await readdir(extensionsDir);
-                const csharpExts = entries.filter((entry) => entry.startsWith("ms-dotnettools.csharp-")).sort().reverse();
-
-                for (const ext of csharpExts) {
-                    const roslynDir = join(extensionsDir, ext, ".roslyn");
-                    const logDir = join(home, ".claude-ops", "logs", "roslyn");
-                    const roslynArgs = ["--stdio", "--logLevel", "Warning", "--extensionLogDirectory", logDir];
-
-                    const exePath = join(roslynDir, "Microsoft.CodeAnalysis.LanguageServer.exe");
-                    if (await Bun.file(exePath).exists()) {
-                        return [exePath, ...roslynArgs];
-                    }
-
-                    const dllPath = join(roslynDir, "Microsoft.CodeAnalysis.LanguageServer.dll");
-                    if (await Bun.file(dllPath).exists()) {
-                        const dotnet = Bun.which("dotnet") || (await Bun.file("/usr/bin/dotnet").exists() ? "/usr/bin/dotnet" : null);
-                        if (dotnet) {
-                            return [dotnet, dllPath, ...roslynArgs];
-                        }
-                    }
-                }
+                entries = await readdir(current.dir, { withFileTypes: true, encoding: "utf8" });
             } catch {
+                continue;
             }
 
-            const csharpLs = Bun.which("csharp-ls");
-            if (csharpLs) return [csharpLs];
-
-            const omnisharp = Bun.which("OmniSharp");
-            if (omnisharp) return [omnisharp, "-lsp"];
+            for (const entry of entries) {
+                const fullPath = join(current.dir, entry.name);
+                if (entry.isDirectory()) {
+                    if (current.depth >= CSHARP_WORKSPACE_SEARCH_MAX_DEPTH) continue;
+                    if (CSHARP_WORKSPACE_IGNORED_DIRS.has(entry.name)) continue;
+                    queue.push({ dir: fullPath, depth: current.depth + 1 });
+                    continue;
+                }
+                if (!entry.isFile()) continue;
+                if (entry.name.endsWith(".sln")) {
+                    solutionCandidates.push(fullPath);
+                    continue;
+                }
+                if (entry.name.endsWith(".csproj")) {
+                    projectCandidates.push(fullPath);
+                }
+            }
         }
 
-        throw new Error(`Language server for ${language} not found. Please install proper LSP support.`);
+        const preferredSolution = this.pickWorkspacePath(rootPath, solutionCandidates);
+        if (preferredSolution) return preferredSolution;
+        return this.pickWorkspacePath(rootPath, projectCandidates);
     }
 
     private async spawnServer(rootPath: string, language: string): Promise<LSPInstance> {
-        const cmd = await this.resolveLSPCommand(language);
+        const cmd = (await resolveLspCommand(rootPath, language)).command;
 
         if (this.instances.size >= MAX_LSP_PROCESSES) {
             this.evictLRU();
@@ -607,6 +570,7 @@ export class LSPSidecarService {
             breakerOpenUntil: 0,
             initTimer: null,
             isShuttingDown: false,
+            reportedSessionErrors: new Set(),
         };
 
         instance.initTimer = setTimeout(() => {
@@ -619,8 +583,8 @@ export class LSPSidecarService {
             }
         }, this.options.instanceInitTimeoutMs);
 
-        const rootUri = pathToFileURL(rootPath).toString();
-        const rootUriWithSlash = rootUri.endsWith("/") ? rootUri : `${rootUri}/`;
+        const workspaceFolder = this.getWorkspaceFolder(rootPath);
+        const rootUriWithSlash = workspaceFolder.uri;
 
         const initMsg = {
             jsonrpc: "2.0",
@@ -630,12 +594,7 @@ export class LSPSidecarService {
                 processId: lspProcess.pid,
                 rootPath,
                 rootUri: rootUriWithSlash,
-                workspaceFolders: [
-                    {
-                        name: "root",
-                        uri: rootUriWithSlash,
-                    },
-                ],
+                workspaceFolders: [workspaceFolder],
                 capabilities: {
                     textDocument: {
                         hover: { contentFormat: ["markdown", "plaintext"] },
@@ -712,18 +671,15 @@ export class LSPSidecarService {
 
     private async openCSharpSolution(instance: LSPInstance, key: string) {
         try {
-            const entries = await readdir(instance.rootPath);
-            const slnFile = entries.find((entry) => entry.endsWith(".sln"));
-            if (slnFile) {
-                const slnPath = join(instance.rootPath, slnFile);
-                const slnUri = pathToFileURL(slnPath).toString();
-                this.sendToInstance(instance, key, {
-                    jsonrpc: "2.0",
-                    id: "internal-solution-open",
-                    method: "solution/open",
-                    params: { solution: slnUri },
-                });
-            }
+            const workspaceTarget = await this.findCSharpWorkspaceTarget(instance.rootPath);
+            if (!workspaceTarget) return;
+
+            this.sendToInstance(instance, key, {
+                jsonrpc: "2.0",
+                id: "internal-solution-open",
+                method: "solution/open",
+                params: { solution: pathToFileURL(workspaceTarget).toString() },
+            });
         } catch {
         }
     }
@@ -870,7 +826,7 @@ export class LSPSidecarService {
                     this.sendToInstance(instance, key, {
                         jsonrpc: "2.0",
                         id: payload.id,
-                        result: [],
+                        result: [this.getWorkspaceFolder(instance.rootPath)],
                     });
                     continue;
                 }
@@ -908,17 +864,60 @@ export class LSPSidecarService {
         const stderr = instance.process.stderr as unknown as ReadableStream<Uint8Array>;
         const reader = stderr.getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
 
         try {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                const text = decoder.decode(value);
-                if (!text.includes("[Informational]")) {
-                    console.error(`[LSP STDERR] ${text.slice(0, 200)}`);
+                buffer += decoder.decode(value, { stream: true });
+
+                while (true) {
+                    const newlineIndex = buffer.indexOf("\n");
+                    if (newlineIndex === -1) break;
+
+                    const line = buffer.slice(0, newlineIndex).trim();
+                    buffer = buffer.slice(newlineIndex + 1);
+                    if (!line) continue;
+
+                    this.maybeReportStderrIssue(instance, line);
+                    if (!line.includes("[Informational]")) {
+                        console.error(`[LSP STDERR] ${line.slice(0, 400)}`);
+                    }
+                }
+            }
+
+            const tail = buffer.trim();
+            if (tail) {
+                this.maybeReportStderrIssue(instance, tail);
+                if (!tail.includes("[Informational]")) {
+                    console.error(`[LSP STDERR] ${tail.slice(0, 400)}`);
                 }
             }
         } catch {
+        }
+    }
+
+    private maybeReportStderrIssue(instance: LSPInstance, line: string) {
+        if (instance.language !== "csharp") return;
+
+        const normalized = line.toLowerCase();
+        const isLegacyMsbuildFailure =
+            normalized.includes("mono msbuild could not be found") ||
+            normalized.includes("msbuild failed when processing the file") ||
+            normalized.includes("reference assemblies for .netframework");
+
+        if (!isLegacyMsbuildFailure) return;
+
+        const key = "csharp-legacy-msbuild";
+        if (instance.reportedSessionErrors.has(key)) return;
+        instance.reportedSessionErrors.add(key);
+
+        for (const sessionId of instance.clients) {
+            this.callbacks.onSessionError(
+                sessionId,
+                "C# IntelliSense unavailable: csharp-ls could not load this project. This repository appears to use legacy .NET Framework/MSBuild. Install Mono/MSBuild and .NET Framework targeting packs, or use an SDK-style project.",
+            );
         }
     }
 }

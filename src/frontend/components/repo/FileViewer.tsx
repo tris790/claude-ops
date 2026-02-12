@@ -14,6 +14,7 @@ import { linter, type Diagnostic, setDiagnostics } from "@codemirror/lint";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getFileContent, type GitItem } from "../../api/repos";
+import { getLspInstallJob, getLspStatus, startLspInstall } from "../../api/lsp";
 import { LSPClient } from "../../utils/lsp-client";
 import { useNavigate } from "react-router-dom";
 import { getHighlighter } from "../../utils/shiki";
@@ -21,8 +22,10 @@ import { cpp } from "@codemirror/lang-cpp";
 import { go } from "@codemirror/lang-go";
 import { csharp } from "@replit/codemirror-lang-csharp";
 import { handleLSPDefinition } from "../../features/lsp/navigation";
+import { getLspLanguageFromPath } from "../../features/lsp/language-map";
 import { type LSPLocation } from "../../components/lsp/ReferencesPanel";
 import { highlightSelectionMatches } from "@codemirror/search";
+import { Loader2, Wrench } from "lucide-react";
 
 interface FileViewerProps {
     repoId: string;
@@ -43,7 +46,10 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
     const [viewMode, setViewMode] = useState<"code" | "markdown">("code");
     const [isDarkMode, setIsDarkMode] = useState(document.documentElement.classList.contains("dark"));
 
-    const [lspStatus, setLspStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+    const [lspStatus, setLspStatus] = useState<"disconnected" | "checking" | "missing" | "installing" | "connecting" | "connected" | "error">("disconnected");
+    const [lspMessage, setLspMessage] = useState<string | null>(null);
+    const [lspCanInstall, setLspCanInstall] = useState(false);
+    const [lspRefreshNonce, setLspRefreshNonce] = useState(0);
 
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
@@ -51,6 +57,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
     const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const isMarkdown = file.path.toLowerCase().endsWith(".md");
+    const lspLanguage = getLspLanguageFromPath(file.path);
 
     // Listen for dark mode changes
     useEffect(() => {
@@ -107,64 +114,141 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
             });
     }, [repoId, file.path, branch]);
 
+    const handleInstallLsp = async () => {
+        if (!projectName || !repoName || !lspLanguage || !lspCanInstall) return;
+
+        setLspStatus("installing");
+        setLspMessage(`Installing ${lspLanguage} language server...`);
+
+        try {
+            const { jobId } = await startLspInstall(projectName, repoName, [lspLanguage]);
+
+            for (let attempt = 0; attempt < 600; attempt++) {
+                const job = await getLspInstallJob(jobId);
+                const runningStep = job.steps.find((step) => step.status === "running");
+                const pendingStep = job.steps.find((step) => step.status === "pending");
+                const currentStep = runningStep || pendingStep || null;
+
+                if (currentStep) {
+                    setLspMessage(`${currentStep.language}: ${currentStep.message}`);
+                }
+
+                if (job.status === "completed") {
+                    setLspMessage("LSP installation complete");
+                    setLspRefreshNonce((value) => value + 1);
+                    return;
+                }
+
+                if (job.status === "failed") {
+                    setLspStatus("error");
+                    setLspMessage(job.error || "LSP installation failed");
+                    return;
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+
+            setLspStatus("error");
+            setLspMessage("LSP installation timed out");
+        } catch (installError) {
+            setLspStatus("error");
+            setLspMessage(installError instanceof Error ? installError.message : "LSP installation failed");
+        }
+    };
+
     // LSP Connection Effect
     useEffect(() => {
-        console.log("[FileViewer] LSP Effect Triggered", { isCloned, projectName, repoName, path: file.path, viewMode, loading });
+        let cancelled = false;
+        let detachLogListener: (() => void) | null = null;
+        console.log("[FileViewer] LSP Effect Triggered", { isCloned, projectName, repoName, path: file.path, viewMode, loading, lspLanguage });
 
-        if (!isCloned || !projectName || !repoName || !file.path || viewMode !== "code" || loading) {
+        if (lspRef.current) {
+            lspRef.current.disconnect();
+            lspRef.current = null;
+        }
+
+        if (!isCloned || !projectName || !repoName || !file.path || viewMode !== "code" || loading || !lspLanguage) {
             setLspStatus("disconnected");
-            return;
+            setLspMessage(null);
+            setLspCanInstall(false);
+            return () => {
+                cancelled = true;
+            };
         }
 
-        const ext = file.path.split('.').pop()?.toLowerCase();
-        let language = "";
-        if (ext === 'ts' || ext === 'js') language = 'typescript';
-        else if (ext === 'tsx' || ext === 'jsx') language = 'typescriptreact';
-        else if (ext === 'go') language = 'go';
-        else if (ext === 'py') language = 'python';
-        else if (ext === 'c' || ext === 'h') language = 'c';
-        else if (ext === 'cpp' || ext === 'hpp' || ext === 'cc') language = 'cpp';
-        else if (ext === 'cs') language = 'csharp';
+        const connect = async () => {
+            setLspStatus("checking");
+            setLspMessage(null);
 
-        if (!language) {
-            console.log("[FileViewer] No mapping for extension", ext);
-            return;
-        }
+            try {
+                const status = await getLspStatus(projectName, repoName, lspLanguage);
+                if (cancelled) return;
+                setLspCanInstall(status.canInstall);
 
-        setLspStatus("connecting");
-        const client = new LSPClient(projectName!, repoName!, language);
-        lspRef.current = client;
-
-        client.connect().then(() => {
-            console.log("[FileViewer] LSP Connected");
-            setLspStatus("connected");
-
-            // Initialize
-            // Note: In a real LSP scenario, we send 'initialize' request with capabilities
-            // For this phase, we assume the backend handles the lifecycle or is simpler
-
-            // Notify opened file so the server treats it as open (and in-memory)
-            // Ensure path starts with / for file URI
-            const normalizedPath = file.path.startsWith('/') ? file.path : `/${file.path}`;
-            client.sendNotification('textDocument/didOpen', {
-                textDocument: {
-                    uri: `file://${normalizedPath}`,
-                    languageId: language,
-                    version: 1,
-                    text: content
+                if (!status.installed) {
+                    setLspStatus("missing");
+                    setLspMessage(status.missingReason || status.installUnavailableReason || "Language server is not installed");
+                    return;
                 }
-            });
-        }).catch(err => {
-            console.error("[FileViewer] LSP Connection Failed", err);
-            setLspStatus("disconnected");
-        });
+
+                setLspMessage(null);
+            } catch (statusError) {
+                if (cancelled) return;
+                setLspStatus("error");
+                setLspCanInstall(false);
+                setLspMessage(statusError instanceof Error ? statusError.message : "Failed to check LSP status");
+                return;
+            }
+
+            const client = new LSPClient(projectName, repoName, lspLanguage);
+            lspRef.current = client;
+            setLspStatus("connecting");
+
+            try {
+                await client.connect();
+                if (cancelled) {
+                    client.disconnect();
+                    return;
+                }
+
+                setLspStatus("connected");
+                detachLogListener = client.on("window/logMessage", (params: any) => {
+                    const message = typeof params?.message === "string" ? params.message : "";
+                    if (!message) return;
+                    if (typeof params?.type === "number" && params.type <= 1) {
+                        setLspStatus("error");
+                        setLspMessage(message);
+                    }
+                });
+
+                const normalizedPath = file.path.startsWith("/") ? file.path : `/${file.path}`;
+                client.sendNotification("textDocument/didOpen", {
+                    textDocument: {
+                        uri: `file://${normalizedPath}`,
+                        languageId: lspLanguage,
+                        version: 1,
+                        text: content,
+                    },
+                });
+            } catch (connectError) {
+                if (cancelled) return;
+                console.error("[FileViewer] LSP Connection Failed", connectError);
+                setLspStatus("error");
+                setLspMessage(connectError instanceof Error ? connectError.message : "Failed to connect to language server");
+            }
+        };
+
+        void connect();
 
         return () => {
-            client.disconnect();
-            lspRef.current = null;
-            setLspStatus("disconnected");
+            cancelled = true;
+            detachLogListener?.();
+            if (lspRef.current) {
+                lspRef.current.disconnect();
+                lspRef.current = null;
+            }
         };
-    }, [repoId, file.path, projectName, repoName, isCloned, viewMode, loading, content]);
+    }, [repoId, file.path, projectName, repoName, isCloned, viewMode, loading, lspLanguage, lspRefreshNonce]);
 
 
     useEffect(() => {
@@ -176,7 +260,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         }
 
         const hoverExtension = hoverTooltip((view, pos, side) => {
-            if (!lspRef.current) return null;
+            if (!lspRef.current || lspStatus !== "connected") return null;
             const line = view.state.doc.lineAt(pos);
             const character = pos - line.from;
 
@@ -186,7 +270,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                 }
 
                 hoverTimeoutRef.current = setTimeout(async () => {
-                    if (!lspRef.current) {
+                    if (!lspRef.current || lspStatus !== "connected") {
                         resolve(null);
                         return;
                     }
@@ -372,6 +456,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
                             }
                         });
                     } catch (e) {
+                        console.error("[LSP] Hover request failed", e);
                         resolve(null);
                     }
                 }, 200);
@@ -379,7 +464,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         }, { hoverTime: 300 });
 
         const handleGoToDefinition = async (view: EditorView) => {
-            if (!lspRef.current) return false;
+            if (!lspRef.current || lspStatus !== "connected") return false;
             const pos = view.state.selection.main.head;
             const line = view.state.doc.lineAt(pos);
             const character = pos - line.from;
@@ -405,7 +490,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         };
 
         const handleFindReferences = async (view: EditorView) => {
-            if (!lspRef.current || !onFindReferences) return false;
+            if (!lspRef.current || lspStatus !== "connected" || !onFindReferences) return false;
             const pos = view.state.selection.main.head;
             const line = view.state.doc.lineAt(pos);
             const character = pos - line.from;
@@ -516,7 +601,7 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         viewRef.current = view;
 
         // Setup Diagnostics Listener
-        if (lspRef.current) {
+        if (lspRef.current && lspStatus === "connected") {
             lspRef.current.on('textDocument/publishDiagnostics', (params: any) => {
                 console.log("[LSP] Received Diagnostics", params);
                 if (!viewRef.current) return;
@@ -570,6 +655,43 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
         }
     }, [scrollToLine, loading, viewMode]);
 
+    const LSP_STATUS_LABELS: Record<typeof lspStatus, string> = {
+        connected: "LSP Ready",
+        connecting: "LSP Connecting",
+        checking: "LSP Checking",
+        installing: "LSP Installing",
+        missing: "LSP Missing",
+        error: "LSP Error",
+        disconnected: "LSP Inactive",
+    };
+
+    const LSP_STATUS_CLASSES: Record<typeof lspStatus, string> = {
+        connected: "border-green-200 dark:border-green-800 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400",
+        connecting: "border-yellow-200 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400",
+        checking: "border-yellow-200 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400",
+        installing: "border-blue-200 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
+        missing: "border-rose-200 dark:border-rose-800 bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400",
+        error: "border-rose-200 dark:border-rose-800 bg-rose-100 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400",
+        disconnected: "border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500",
+    };
+
+    const LSP_DOT_CLASSES: Record<typeof lspStatus, string> = {
+        connected: "bg-green-500",
+        connecting: "bg-yellow-500",
+        checking: "bg-yellow-500",
+        installing: "bg-blue-500",
+        missing: "bg-rose-500",
+        error: "bg-rose-500",
+        disconnected: "bg-zinc-500",
+    };
+
+    const lspStatusLabel = LSP_STATUS_LABELS[lspStatus];
+    const lspStatusClass = LSP_STATUS_CLASSES[lspStatus];
+    const lspDotClass = LSP_DOT_CLASSES[lspStatus];
+
+    const canShowInstallButton =
+        Boolean(isCloned && projectName && repoName && lspLanguage && lspCanInstall && (lspStatus === "missing" || lspStatus === "error" || lspStatus === "installing"));
+
     if (loading) return <div className="p-8 text-center text-zinc-500">Loading content...</div>;
     if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
 
@@ -578,15 +700,27 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
             <div className="flex items-center justify-between px-4 py-2 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
                 <div className="flex items-center space-x-2">
                     {viewMode === "code" && (
-                        <div className={`flex items-center space-x-1 text-xs px-2 py-1 rounded border ${lspStatus === 'connected' ? 'border-green-200 dark:border-green-800 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400' :
-                            lspStatus === 'connecting' ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400' :
-                                'border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
-                            }`}>
-                            <div className={`w-1.5 h-1.5 rounded-full ${lspStatus === 'connected' ? 'bg-green-500' :
-                                lspStatus === 'connecting' ? 'bg-yellow-500' : 'bg-zinc-500'
-                                }`} />
-                            <span>{lspStatus === 'connected' ? 'LSP Ready' : lspStatus === 'connecting' ? 'LSP Connecting' : 'LSP Inactive'}</span>
-                        </div>
+                        <>
+                            <div className={`flex items-center space-x-1 text-xs px-2 py-1 rounded border ${lspStatusClass}`}>
+                                {lspStatus === "installing"
+                                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                                    : <div className={`w-1.5 h-1.5 rounded-full ${lspDotClass}`} />}
+                                <span>{lspStatusLabel}</span>
+                            </div>
+                            {canShowInstallButton && (
+                                <button
+                                    type="button"
+                                    onClick={() => { void handleInstallLsp(); }}
+                                    disabled={lspStatus === "installing"}
+                                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-blue-200 dark:border-blue-800 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-200/70 dark:hover:bg-blue-900/40 disabled:opacity-60"
+                                >
+                                    {lspStatus === "installing"
+                                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                                        : <Wrench className="w-3 h-3" />}
+                                    <span>Install LSP</span>
+                                </button>
+                            )}
+                        </>
                     )}
                 </div>
                 <div className="flex space-x-2 bg-zinc-200 dark:bg-zinc-800 rounded p-1">
@@ -607,7 +741,14 @@ export const FileViewer: React.FC<FileViewerProps> = ({ repoId, file, projectNam
 
             <div className="flex-1 overflow-auto">
                 {viewMode === "code" ? (
-                    <div ref={editorRef} className="h-full text-base" />
+                    <div className="h-full flex flex-col">
+                        {lspMessage && (lspStatus === "missing" || lspStatus === "installing" || lspStatus === "error") && (
+                            <div className="px-3 py-2 text-xs border-b border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-900">
+                                {lspMessage}
+                            </div>
+                        )}
+                        <div ref={editorRef} className="h-full text-base" />
+                    </div>
                 ) : (
                     <div className="prose prose-zinc dark:prose-invert max-w-none p-8">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
