@@ -66,7 +66,6 @@ class CommentDraftWidget extends WidgetType {
                 return;
             }
 
-            // Construction thread context
             const threadContext = {
                 filePath: this.props.filePath,
                 rightFileStart: this.props.side === 'modified' ? { line: this.draft.modifiedLine, offset: this.draft.modifiedOffset } : undefined,
@@ -83,12 +82,10 @@ class CommentDraftWidget extends WidgetType {
                     threadContext
                 );
 
-                // Access view to dispatch remove effect
                 view.dispatch({
                     effects: removeDraftEffect.of(this.draft.id)
                 });
 
-                // Trigger refresh
                 this.props.onCommentPosted?.();
             } catch (err: any) {
                 alert("Failed to save comment: " + err.message);
@@ -101,12 +98,24 @@ class CommentDraftWidget extends WidgetType {
             });
         };
 
+        const llmContext = this.props.projectName && this.props.repoName && this.props.sourceBranch
+            ? {
+                projectName: this.props.projectName,
+                repoName: this.props.repoName,
+                sourceBranch: this.props.sourceBranch,
+                filePath: this.props.filePath,
+                startLine: this.draft.modifiedLine,
+                endLine: this.draft.modifiedLine
+            }
+            : null;
+
         root.render(
             <div className="relative">
                 <CommentDialog
                     draftKey={draftKey}
                     onSubmit={handleSave}
                     onCancel={handleCancel}
+                    llmContext={llmContext}
                 />
             </div>
         );

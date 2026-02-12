@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Loader2, Send, X } from "lucide-react";
+import { Loader2, Send, X, Sparkles } from "lucide-react";
+import { runAutomation } from "../../api/automation";
 
 interface CommentDialogProps {
     draftKey: string;
@@ -9,6 +10,14 @@ interface CommentDialogProps {
     onSubmit: (content: string) => Promise<void>;
     onCancel: () => void;
     position?: { x: number; y: number } | null;
+    llmContext?: {
+        projectName: string;
+        repoName: string;
+        sourceBranch: string;
+        filePath: string;
+        startLine: number;
+        endLine: number;
+    } | null;
 }
 
 export const CommentDialog: React.FC<CommentDialogProps> = ({
@@ -16,11 +25,13 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
     initialValue = "",
     onSubmit,
     onCancel,
-    position
+    position,
+    llmContext
 }) => {
     const [content, setContent] = useState(initialValue);
     const [isPreview, setIsPreview] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isApplyingFix, setIsApplyingFix] = useState(false);
 
     useEffect(() => {
         const saved = localStorage.getItem(draftKey);
@@ -40,11 +51,40 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
         setIsSubmitting(true);
         try {
             await onSubmit(content);
-            localStorage.removeItem(draftKey); // Clear draft on success
+            localStorage.removeItem(draftKey);
         } catch (error) {
             console.error("Failed to submit comment", error);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleApplyFix = async () => {
+        if (!content.trim() || !llmContext) return;
+        setIsApplyingFix(true);
+        try {
+            const context = {
+                file_path: llmContext.filePath.startsWith('/') ? llmContext.filePath.substring(1) : llmContext.filePath,
+                branch: llmContext.sourceBranch,
+                comment: content,
+                code_context: `File: ${llmContext.filePath}, Lines: ${llmContext.startLine}-${llmContext.endLine}`,
+                projectName: llmContext.projectName,
+                repoName: llmContext.repoName
+            };
+
+            const res = await runAutomation("apply_fix", context);
+
+            if (res.success) {
+                localStorage.removeItem(draftKey);
+                onCancel();
+            } else {
+                alert("Failed to apply fix: " + (res.error || "Unknown error"));
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert("Failed to apply fix: " + err.message);
+        } finally {
+            setIsApplyingFix(false);
         }
     };
 
@@ -102,14 +142,29 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
                 <div className="flex items-center space-x-2">
                     <button
                         onClick={onCancel}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || isApplyingFix}
                         className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 font-medium transition-colors"
                     >
                         Cancel
                     </button>
+                    {llmContext && (
+                        <button
+                            onClick={handleApplyFix}
+                            disabled={isApplyingFix || isSubmitting || !content.trim()}
+                            className="flex items-center space-x-1.5 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 disabled:opacity-50 disabled:cursor-not-allowed text-purple-400 rounded-md text-xs font-medium transition-all border border-purple-500/30"
+                            title="Apply fix with AI"
+                        >
+                            {isApplyingFix ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <Sparkles className="w-3.5 h-3.5" />
+                            )}
+                            <span>Apply Fix</span>
+                        </button>
+                    )}
                     <button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !content.trim()}
+                        disabled={isSubmitting || isApplyingFix || !content.trim()}
                         className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-xs font-medium transition-all shadow-sm"
                     >
                         {isSubmitting ? (
