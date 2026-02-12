@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { X, FileCode, ChevronRight, Loader2, Search } from "lucide-react";
 import { getFileContent } from "../../api/repos";
+import { useLocalStorage } from "../../hooks/useLocalStorage";
 
 export interface LSPLocation {
     uri: string;
@@ -24,8 +25,10 @@ interface ReferencesPanelProps {
     onSelect: (location: LSPLocation) => void;
     onClose: () => void;
     isLoading?: boolean;
-    initialHeight?: number;
 }
+
+const DEFAULT_HEIGHT = 300;
+const STORAGE_KEY = "references-panel-height";
 
 export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
     references,
@@ -34,10 +37,10 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
     projectName,
     onSelect,
     onClose,
-    isLoading = false,
-    initialHeight = 300
+    isLoading = false
 }) => {
-    const [height, setHeight] = useState(initialHeight);
+    const [storedHeight, setStoredHeight] = useLocalStorage(STORAGE_KEY, DEFAULT_HEIGHT);
+    const [height, setHeight] = useState(storedHeight);
     const [isResizing, setIsResizing] = useState(false);
     const [groupedRefs, setGroupedRefs] = useState<Map<string, ReferenceItem[]>>(new Map());
     const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
@@ -112,14 +115,19 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
     };
 
     useEffect(() => {
-        if (!isResizing) return;
+        if (!isResizing) {
+            // Save height to localStorage when resizing ends
+            setStoredHeight(height);
+            return;
+        }
 
         const handleMouseMove = (e: MouseEvent) => {
             if (requestRef.current) return;
 
             requestRef.current = requestAnimationFrame(() => {
                 const newHeight = window.innerHeight - e.clientY;
-                setHeight(Math.max(100, Math.min(newHeight, window.innerHeight - 200)));
+                const clampedHeight = Math.max(100, Math.min(newHeight, window.innerHeight - 200));
+                setHeight(clampedHeight);
                 requestRef.current = undefined;
             });
         };
@@ -139,7 +147,7 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
         };
-    }, [isResizing]);
+    }, [isResizing, height, setStoredHeight]);
 
     const panelContent = useMemo(() => {
         if (isLoading) {

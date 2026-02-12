@@ -7,6 +7,7 @@ import { getRepositories, getBranches, type GitItem, type GitRepository } from "
 import { ReferencesPanel, type LSPLocation } from "../components/lsp/ReferencesPanel";
 import { handleLSPDefinition } from "../features/lsp/navigation";
 import { MultiSelect } from "../components/ui/MultiSelect";
+import { ResizablePanel } from "../components/ui/ResizablePanel";
 
 export function RepoBrowser() {
     const { project, repo, "*": splat } = useParams<{ project: string; repo: string; "*": string }>();
@@ -118,8 +119,15 @@ export function RepoBrowser() {
         <div className="flex flex-col h-full bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 w-full ml-0">
             <Breadcrumbs project={project!} repo={repo!} path={selectedFile?.path} />
             <div className="flex-1 flex overflow-hidden">
-                <div className="w-[300px] border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 flex flex-col shrink-0">
-                    <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 space-y-2">
+                <ResizablePanel
+                    direction="horizontal"
+                    defaultSize={300}
+                    minSize={60}
+                    maxSize={500}
+                    storageKey="repo-browser-file-tree-width"
+                    className="border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 flex flex-col shrink-0"
+                >
+                    <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 space-y-2 shrink-0">
                         <MultiSelect
                             multiple={false}
                             options={allRepos.map(r => ({ label: r.name, value: r.id, count: r.project.name === project ? undefined : 0 }))}
@@ -145,7 +153,7 @@ export function RepoBrowser() {
                         activePath={selectedFile?.path}
                         branch={currentBranch}
                     />
-                </div>
+                </ResizablePanel>
                 <div className="flex-1 bg-white dark:bg-zinc-950/50 flex flex-col overflow-hidden">
                     {selectedFile ? (
                         <div className="flex-1 flex flex-col h-full overflow-hidden">

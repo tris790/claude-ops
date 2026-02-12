@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { cn } from "../utils/cn";
 import {
     GitBranch,
@@ -13,13 +13,14 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { CommandPalette } from "../components/CommandPalette";
+import { useLocalStorage } from "../hooks/useLocalStorage";
 
 interface MainLayoutProps {
     children: React.ReactNode;
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorage("sidebar-collapsed", false);
 
     return (
         <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">

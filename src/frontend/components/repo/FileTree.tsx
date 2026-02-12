@@ -80,17 +80,20 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ repoId, item, depth = 0, on
         <div>
             <div
                 ref={rowRef}
-                className={`flex items-center py-1 px-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer text-sm select-none transition-colors ${isActive ? "bg-zinc-200 dark:bg-zinc-800" : ""}`}
+                className={`flex items-center py-1 px-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer text-sm select-none transition-colors min-w-0 ${isActive ? "bg-zinc-200 dark:bg-zinc-800" : ""}`}
                 style={{ paddingLeft: `${depth * 16 + 8}px` }}
                 onClick={handleToggle}
             >
-                <div className="mr-1 text-zinc-400 dark:text-zinc-500 w-4 flex justify-center">
+                <div className="mr-1 text-zinc-400 dark:text-zinc-500 w-4 flex justify-center shrink-0">
                     {isFolder && (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                 </div>
-                <div className="mr-2">
+                <div className="mr-2 shrink-0">
                     {isFolder ? <Folder size={14} className="text-blue-500 dark:text-blue-400" /> : <File size={14} className="text-zinc-400 dark:text-zinc-500" />}
                 </div>
-                <span className={isFolder ? "text-zinc-900 dark:text-zinc-200" : "text-zinc-700 dark:text-zinc-300"}>
+                <span 
+                    className={`truncate ${isFolder ? "text-zinc-900 dark:text-zinc-200" : "text-zinc-700 dark:text-zinc-300"}`}
+                    title={name}
+                >
                     {name}
                 </span>
             </div>
@@ -147,7 +150,7 @@ export const FileTree = ({ repoId, onSelect, activePath, branch }: { repoId: str
     );
 
     return (
-        <div className="h-full overflow-y-auto py-2">
+        <div className="h-full overflow-auto py-2">
             {rootItems.map(item => (
                 <FileTreeNode
                     key={item.path}
