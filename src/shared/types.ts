@@ -1,3 +1,12 @@
+export interface LspSettings {
+    requestTimeoutMs: number;
+    maxQueueBytes: number;
+    instanceInitTimeoutMs: number;
+    circuitBreaker: {
+        enabled: boolean;
+    };
+}
+
 export interface Settings {
     theme: 'dark' | 'light';
     repoCloneDirectory: string;
@@ -5,6 +14,7 @@ export interface Settings {
         prompt: string;
         placeholders: string[];
     }>;
+    lsp: LspSettings;
 }
 
 export interface EnvConfig {

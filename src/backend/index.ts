@@ -51,6 +51,12 @@ const server = serve<WebSocketData>({
       },
     },
 
+    "/api/health/lsp": {
+      async GET() {
+        return Response.json(lspService.getHealth());
+      },
+    },
+
     "/api/lsp": {
       async GET(req: Request, server: Server<WebSocketData>) {
         const url = new URL(req.url);

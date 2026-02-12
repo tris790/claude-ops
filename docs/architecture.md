@@ -85,6 +85,7 @@
    - Repository metadata tracking
 
 3. **LSP Bridge**: Manages language server connections
+   - Runs in an isolated sidecar process
    - Spawns LSP servers on demand
    - Routes LSP requests from frontend
    - Handles multiple language servers

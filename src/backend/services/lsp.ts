@@ -1,778 +1,362 @@
-import { join, resolve } from "path";
-import { readdir } from "node:fs/promises";
-import { homedir } from "node:os";
-import { pathToFileURL } from "url";
-import type { Subprocess, ServerWebSocket, FileSink } from "bun";
+import type { ServerWebSocket, Subprocess, FileSink } from "bun";
+import { getSettings } from "./settings";
+import type { MainToLspSidecarMessage, LspSidecarToMainMessage, LspSidecarStats } from "./lsp-bridge-protocol";
 
-export interface LSPInstance {
-    process: Subprocess<"pipe", "pipe", "pipe">;
-    language: string;
+type SidecarStatus = "stopped" | "starting" | "healthy" | "degraded" | "restarting";
+
+interface SessionState {
+    ws: ServerWebSocket<any>;
     rootPath: string;
-    clients: Set<ServerWebSocket<any>>;
-    buffer: string;
-    isInitialized: boolean;
-    pendingNotifications: any[];
-    /**
-     * Persistence State Machine:
-     * - **Active**: `clients.size > 0`. Process is in use. `lastUsed` updated on activity.
-     * - **Idle**: `clients.size === 0`. Keeping alive for `LSP_TTL_MS`.
-     * - **Killed**: 
-     *   - After `LSP_TTL_MS` in Idle state (Eviction Check).
-     *   - Or if `instances.size > MAX_LSP_PROCESSES` (LRU Eviction).
-     */
-    lastUsed: number;
+    language: string;
 }
 
-const MAX_LSP_PROCESSES = 3;
-const LSP_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const EVICTION_INTERVAL_MS = 60 * 1000; // Check every minute
+interface LspHealth {
+    status: SidecarStatus;
+    pid: number | null;
+    restarts: number;
+    lastHeartbeatAt: number | null;
+    activeSessions: number;
+    stats: LspSidecarStats;
+}
+
+const HEARTBEAT_TIMEOUT_MS = 12_000;
+const HEARTBEAT_CHECK_INTERVAL_MS = 2_000;
+const RESTART_BACKOFF_MS = [1000, 2000, 5000, 10000, 30000];
 
 export class LSPService {
-    private instances: Map<string, LSPInstance> = new Map();
+    private sidecar: Subprocess<"pipe", "pipe", "pipe"> | null = null;
+    private status: SidecarStatus = "stopped";
+    private lastHeartbeatAt = 0;
+    private sidecarPid: number | null = null;
+    private restartCount = 0;
+    private restartAttempt = 0;
+    private restarting = false;
+    private spawnPromise: Promise<void> | null = null;
+    private sessionBySocket = new WeakMap<ServerWebSocket<any>, string>();
+    private sessions = new Map<string, SessionState>();
+    private warmupQueue = new Set<string>();
+    private lastStats: LspSidecarStats = {
+        activeInstances: 0,
+        activeSessions: 0,
+        pendingRequests: 0,
+        timestamp: 0,
+    };
 
     constructor() {
-        // Check for idle processes periodically
-        setInterval(() => this.checkEviction(), EVICTION_INTERVAL_MS);
+        setInterval(() => this.checkHealth(), HEARTBEAT_CHECK_INTERVAL_MS);
     }
 
-    private checkEviction() {
-        const now = Date.now();
-        for (const [key, instance] of this.instances.entries()) {
-            // If process is idle (no clients) and has exceeded TTL
-            if (instance.clients.size === 0 && (now - instance.lastUsed > LSP_TTL_MS)) {
-                console.log(`[LSP] Evicting idle server for ${key} (idle for ${Math.round((now - instance.lastUsed) / 60000)}m)`);
-                this.killInstance(key, instance);
-            }
+    handleConnection(ws: ServerWebSocket<any>, rootPath: string, language: string) {
+        const sessionId = crypto.randomUUID();
+        this.sessionBySocket.set(ws, sessionId);
+        this.sessions.set(sessionId, { ws, rootPath, language });
+
+        this.ensureSidecar();
+        if (this.status === "healthy") {
+            this.sendToSidecar({ type: "open", sessionId, rootPath, language });
         }
     }
 
-    private evictLRU() {
-        let OldestKey: string | null = null;
-        let oldestTime = Infinity;
+    handleMessage(ws: ServerWebSocket<any>, _rootPath: string, _language: string, message: string | Buffer) {
+        const sessionId = this.sessionBySocket.get(ws);
+        if (!sessionId) return;
 
-        for (const [key, instance] of this.instances.entries()) {
-            // Prefer evicting idle processes first
-            if (instance.clients.size === 0 && instance.lastUsed < oldestTime) {
-                oldestTime = instance.lastUsed;
-                OldestKey = key;
-            }
-        }
+        this.ensureSidecar();
 
-        // If no idle processes, find the oldest active one (though ideally we shouldn't kill active ones, 
-        // but simple LRU implies strictly capping size)
-        // However, killing an active LSP is bad UX. 
-        // Let's refine: Only kill if we really have to. 
-        // If all are active, maybe we allow going over limit slightly or we kill the LRU one anyway.
-        // For this task, "LRU Cap: Max 3 concurrent LSP processes. If spawning a 4th, kill the one with the oldest lastUsed."
-        // implies hard limit.
-        if (!OldestKey) {
-            for (const [key, instance] of this.instances.entries()) {
-                if (instance.lastUsed < oldestTime) {
-                    oldestTime = instance.lastUsed;
-                    OldestKey = key;
-                }
-            }
-        }
-
-        if (OldestKey) {
-            const instance = this.instances.get(OldestKey);
-            if (instance) {
-                console.log(`[LSP] Evicting LRU server ${OldestKey} to make room`);
-                this.killInstance(OldestKey, instance);
-            }
-        }
-    }
-
-    private killInstance(key: string, instance: LSPInstance) {
-        try {
-            instance.process.kill();
-        } catch (e) {
-            console.error(`[LSP] Failed to kill process ${key}:`, e);
-        }
-        this.instances.delete(key);
-        console.log(`[LSP] Killed server for ${key}`);
-    }
-
-    private async findExtensionBin(publisherAndName: string, binPath: string): Promise<string | null> {
-        const home = homedir();
-        if (!home) return null;
-
-        const extensionsDir = join(home, ".vscode/extensions");
-        try {
-            if (!await Bun.file(extensionsDir).size) { // Basic check if dir exists/is readable
-                // Actually Bun.file().exists() works for files, for dirs we can try readdir
-            }
-
-            const entries = await readdir(extensionsDir);
-            // Find directory starting with publisherAndName
-            // e.g. ms-dotnettools.csharp-1.25.0
-            const match = entries.find(e => e.startsWith(publisherAndName));
-            if (match) {
-                const fullPath = join(extensionsDir, match, binPath);
-                if (await Bun.file(fullPath).exists()) {
-                    return fullPath;
-                }
-            }
-        } catch (e) {
-            // ignore
-        }
-        return null;
-    }
-
-    private getInstanceKey(rootPath: string, language: string) {
-        return `${rootPath}::${language}`;
-    }
-
-    async handleConnection(ws: ServerWebSocket<any>, rootPath: string, language: string) {
-        const normalizedLanguage = (language === 'typescriptreact' || language === 'javascriptreact') ? language.replace('react', '') : language;
-        const key = this.getInstanceKey(rootPath, normalizedLanguage);
-        let instance = this.instances.get(key);
-
-        if (!instance) {
-            try {
-                instance = await this.spawnServer(rootPath, language);
-                this.instances.set(key, instance);
-            } catch (e) {
-                console.error(`[LSP] Failed to spawn server:`, e);
-                ws.send(JSON.stringify({ error: `Failed to spawn language server: ${e instanceof Error ? e.message : String(e)}` }));
-                ws.close();
-                return;
-            }
-        }
-
-        instance.clients.add(ws);
-        instance.lastUsed = Date.now();
-        console.log(`[LSP] Client connected to ${language} server for ${rootPath}`);
-    }
-
-    handleMessage(ws: ServerWebSocket<any>, rootPath: string, language: string, message: string | Buffer) {
-        const normalizedLanguage = (language === 'typescriptreact' || language === 'javascriptreact') ? language.replace('react', '') : language;
-        const key = this.getInstanceKey(rootPath, normalizedLanguage);
-        const instance = this.instances.get(key);
-        if (!instance) {
-            console.warn(`[LSP] Received message for non-existent server: ${key}`);
+        const payload = typeof message === "string" ? message : message.toString();
+        if (this.status !== "healthy") {
+            this.failFastRequest(ws, payload, "LSP backend unavailable");
             return;
         }
 
-        instance.lastUsed = Date.now();
+        const sent = this.sendToSidecar({ type: "message", sessionId, payload });
+        if (!sent) {
+            this.failFastRequest(ws, payload, "LSP backend unavailable");
+        }
+    }
 
-        const json = typeof message === 'string' ? message : message.toString();
-        let payload: any;
-        try {
-            payload = JSON.parse(json);
+    handleClose(ws: ServerWebSocket<any>, _rootPath: string, _language: string) {
+        const sessionId = this.sessionBySocket.get(ws);
+        if (!sessionId) return;
 
-            // Rewrite URIs from client to server (bridge rootPath)
-            this.rewriteURIs(payload, (uri) => {
-                if (uri.startsWith('file:///')) {
-                    const relativePath = uri.slice(8);
-                    // Standardize: ensure we don't have multiple slashes if relativePath already starts with one
-                    const targetPath = join(rootPath, relativePath.startsWith('/') ? relativePath.slice(1) : relativePath);
-                    return pathToFileURL(targetPath).toString();
-                }
-                return uri;
-            });
-        } catch (e) {
-            this.forwardToProcess(instance, json);
+        this.sessionBySocket.delete(ws);
+        this.sessions.delete(sessionId);
+
+        if (this.status === "healthy") {
+            this.sendToSidecar({ type: "close", sessionId });
+        }
+    }
+
+    async warmup(rootPath: string) {
+        this.ensureSidecar();
+        if (this.status === "healthy") {
+            this.sendToSidecar({ type: "warmup", rootPath });
             return;
         }
 
-        if (!instance.isInitialized && payload.method !== 'initialize') {
-            console.log(`[LSP] Buffering message: ${payload.method}`);
-            instance.pendingNotifications.push(payload);
-        } else {
-            console.log(`[LSP] >> ${payload.method || ('id:' + payload.id)}`);
-            this.forwardToProcess(instance, JSON.stringify(payload));
-        }
+        this.warmupQueue.add(rootPath);
     }
 
-    private forwardToProcess(instance: LSPInstance, json: string) {
-        const length = Buffer.byteLength(json, 'utf-8');
-        const packet = `Content-Length: ${length}\r\n\r\n${json}`;
-
-        if (instance.process.stdin) {
-            const stdin = instance.process.stdin as unknown as FileSink;
-            stdin.write(packet);
-            stdin.flush();
-        }
-    }
-
-    private rewriteURIs(obj: any, rewriter: (uri: string) => string) {
-        if (!obj || typeof obj !== 'object') return;
-
-        for (const key in obj) {
-            if (key === 'uri' && typeof obj[key] === 'string') {
-                obj[key] = rewriter(obj[key]);
-            } else if (key === 'targetUri' && typeof obj[key] === 'string') {
-                obj[key] = rewriter(obj[key]);
-            } else if (typeof obj[key] === 'object') {
-                this.rewriteURIs(obj[key], rewriter);
-            }
-        }
-    }
-
-    handleClose(ws: ServerWebSocket<any>, rootPath: string, language: string) {
-        const normalizedLanguage = (language === 'typescriptreact' || language === 'javascriptreact') ? language.replace('react', '') : language;
-        const key = this.getInstanceKey(rootPath, normalizedLanguage);
-        const instance = this.instances.get(key);
-        if (instance) {
-            instance.clients.delete(ws);
-            if (instance.clients.size === 0) {
-                // Do not kill immediately. Mark as last used now.
-                instance.lastUsed = Date.now();
-                console.log(`[LSP] Last client disconnected from ${language}/${rootPath}. Process kept alive (TTL: ${LSP_TTL_MS / 60000}m).`);
-            }
-        }
-    }
-
-    private async resolveLSPCommand(language: string): Promise<string[]> {
-        // Tier 1: System Path (Preferred if installed intentionally)
-        if (language === 'typescript' || language === 'javascript' || language === 'typescriptreact' || language === 'javascriptreact') {
-            // Tier 0: Local node_modules (Best for dev/self-contained)
-            // Process CWD is expected to be the app root
-            const projectRoot = process.cwd();
-            // Try to find the actual JS entry point which is safer for 'node' command across platforms
-            const potentialPaths = [
-                resolve(projectRoot, "node_modules/typescript-language-server/lib/cli.js"),
-                resolve(projectRoot, "node_modules/typescript-language-server/lib/cli.mjs"),
-                resolve(projectRoot, "node_modules/.bin/typescript-language-server")
-            ];
-
-            for (const p of potentialPaths) {
-                if (await Bun.file(p).exists()) {
-                    console.log(`[LSP] Found local typescript-language-server at ${p}`);
-                    return ["node", p, "--stdio"];
-                }
-            }
-
-            const bin = Bun.which("typescript-language-server");
-            if (bin) return [bin, "--stdio"];
-
-            // Tier 2: VS Code Bundled (tsserver)
-            // Note: tsserver speaks a proprietary protocol, not standard LSP.
-            // However, for the purpose of this task, we will attempt to launch it.
-            // In a real scenario, we'd need a protocol adapter (like typescript-language-server).
-            const vscodePaths = [
-                // Linux
-                "/opt/visual-studio-code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                "/usr/share/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                "/usr/lib/code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                // Windows (System)
-                "C:/Program Files/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib/tsserver.js",
-                // Windows (User)
-                join(homedir(), "AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib/tsserver.js")
-            ];
-
-            for (const p of vscodePaths) {
-                // Check if file exists using Bun.file (async check)
-                // Note: Bun.file(p).exists() returns a Promise<boolean>
-                if (await Bun.file(p).exists()) {
-                    console.log(`[LSP] Found VS Code tsserver at ${p}`);
-                    // We run it with bun
-                    return ["bun", "run", p];
-                }
-            }
-        } else if (language === 'go') {
-            const bin = Bun.which("gopls");
-            if (bin) return [bin];
-
-            // Check for VS Code extension
-            // ~/.vscode/extensions/golang.go-*/bin/gopls
-            const extBin = await this.findExtensionBin("golang.go", "bin/gopls");
-            if (extBin) return [extBin];
-
-        } else if (language === 'python') {
-            const bin = Bun.which("pylsp");
-            if (bin) return [bin];
-        } else if (language === 'c' || language === 'cpp') {
-            const bin = Bun.which("clangd");
-            const args = [
-                "--background-index",
-                "--clang-tidy",
-                "--completion-style=detailed",
-                "--header-insertion=iwyu",
-                "-j=4"
-            ];
-            if (bin) return [bin, ...args];
-            // Linux common paths
-            if (await Bun.file("/usr/bin/clangd").exists()) return ["/usr/bin/clangd", ...args];
-            // Windows common paths
-            if (await Bun.file("C:/Program Files/LLVM/bin/clangd.exe").exists()) return ["C:/Program Files/LLVM/bin/clangd.exe", ...args];
-        } else if (language === 'csharp') {
-            // Priority 1: Modern Roslyn (C# Dev Kit / C# Extension)
-            // It uses Microsoft.CodeAnalysis.LanguageServer.dll/.exe
-            const home = homedir();
-            const extensionsDir = join(home, ".vscode/extensions");
-
-            try {
-                const entries = await readdir(extensionsDir);
-                // Find latest C# extension (includes platform suffix like -win32-x64)
-                const csharpExts = entries.filter(e => e.startsWith("ms-dotnettools.csharp-")).sort().reverse();
-
-                for (const ext of csharpExts) {
-                    const roslynDir = join(extensionsDir, ext, ".roslyn");
-
-                    // Roslyn requires --logLevel and --extensionLogDirectory
-                    const logDir = join(home, ".claude-ops", "logs", "roslyn");
-                    const roslynArgs = ["--stdio", "--logLevel", "Warning", "--extensionLogDirectory", logDir];
-
-                    // On Windows, prefer the native EXE (no dotnet required)
-                    const exePath = join(roslynDir, "Microsoft.CodeAnalysis.LanguageServer.exe");
-                    if (await Bun.file(exePath).exists()) {
-                        console.log(`[LSP] Found Roslyn Language Server EXE at ${exePath}`);
-                        return [exePath, ...roslynArgs];
-                    }
-
-                    // Fallback to DLL with dotnet
-                    const dllPath = join(roslynDir, "Microsoft.CodeAnalysis.LanguageServer.dll");
-                    if (await Bun.file(dllPath).exists()) {
-                        const dotnet = Bun.which("dotnet") || (await Bun.file("/usr/bin/dotnet").exists() ? "/usr/bin/dotnet" : null);
-                        if (dotnet) {
-                            console.log(`[LSP] Found Roslyn Language Server DLL at ${dllPath}`);
-                            return [dotnet, dllPath, ...roslynArgs];
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn("[LSP] Error reading VS Code extensions:", e);
-            }
-
-            // Try csharp-ls if available
-            const csharpLs = Bun.which("csharp-ls");
-            if (csharpLs) return [csharpLs];
-
-            // Fallback to OmniSharp
-            const omnisharp = Bun.which("OmniSharp");
-            if (omnisharp) return [omnisharp, "-lsp"];
-        }
-
-        throw new Error(`Language server for ${language} not found. Please install proper LSP support.`);
-    }
-
-    private async spawnServer(rootPath: string, language: string): Promise<LSPInstance> {
-        let cmd: string[];
-        try {
-            cmd = await this.resolveLSPCommand(language);
-        } catch (e: any) {
-            console.error(e.message);
-            // Return dummy process-like object or throw?
-            // Throwing allows the frontend to receive the error msg
-            throw e;
-        }
-
-        console.log(`[LSP] Spawning ${language} server`);
-        console.log(`[LSP] Root Path: ${rootPath}`);
-        console.log(`[LSP] Command: ${cmd.join(' ')}`);
-
-        const hasTsConfig = await Bun.file(join(rootPath, "tsconfig.json")).exists();
-        console.log(`[LSP] tsconfig.json found: ${hasTsConfig}`);
-
-        // Enforce max processes
-        if (this.instances.size >= MAX_LSP_PROCESSES) {
-            this.evictLRU();
-        }
-
-        const lspProcess = Bun.spawn(cmd, {
-            cwd: rootPath,
-            stdin: "pipe",
-            stdout: "pipe",
-            stderr: "pipe",
-            env: {
-                ...process.env,
-                NODE_OPTIONS: "--max-old-space-size=4096"
-            }
-        });
-
-        const instance: LSPInstance = {
-            process: lspProcess as Subprocess<"pipe", "pipe", "pipe">,
-            language,
-            rootPath,
-            clients: new Set(),
-            buffer: "",
-            isInitialized: false,
-            pendingNotifications: [],
-            lastUsed: Date.now()
+    getHealth(): LspHealth {
+        return {
+            status: this.status,
+            pid: this.sidecarPid,
+            restarts: this.restartCount,
+            lastHeartbeatAt: this.lastHeartbeatAt || null,
+            activeSessions: this.sessions.size,
+            stats: this.lastStats,
         };
-
-        // Start processing stdout
-        this.processOutput(instance);
-
-        // Log stderr
-        this.logStderr(instance);
-
-        const rootUri = pathToFileURL(rootPath).toString();
-        const rootUriWithSlash = rootUri.endsWith('/') ? rootUri : rootUri + '/';
-
-        // Send 'initialize'
-        const initMsg = {
-            jsonrpc: "2.0",
-            id: "internal-init",
-            method: "initialize",
-            params: {
-                processId: lspProcess.pid,
-                rootPath: rootPath,
-                rootUri: rootUriWithSlash,
-                workspaceFolders: [
-                    {
-                        name: "root",
-                        uri: rootUriWithSlash
-                    }
-                ],
-                capabilities: {
-                    textDocument: {
-                        hover: {
-                            contentFormat: ["markdown", "plaintext"]
-                        },
-                        publishDiagnostics: {
-                            relatedInformation: true
-                        },
-                        definition: {
-                            dynamicRegistration: true,
-                            linkSupport: true
-                        },
-                        typeDefinition: {
-                            dynamicRegistration: true,
-                            linkSupport: true
-                        },
-                        implementation: {
-                            dynamicRegistration: true,
-                            linkSupport: true
-                        },
-                        references: {
-                            dynamicRegistration: true
-                        },
-                        documentSymbol: {
-                            dynamicRegistration: true,
-                            hierarchicalDocumentSymbolSupport: true
-                        },
-                        codeAction: {
-                            dynamicRegistration: true,
-                            codeActionLiteralSupport: {
-                                codeActionKind: {
-                                    valueSet: ["", "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports"]
-                                }
-                            }
-                        },
-                        rename: {
-                            dynamicRegistration: true,
-                            prepareSupport: true
-                        },
-                        signatureHelp: {
-                            dynamicRegistration: true,
-                            signatureInformation: {
-                                documentationFormat: ["markdown", "plaintext"]
-                            }
-                        },
-                        completion: {
-                            dynamicRegistration: true,
-                            completionItem: {
-                                snippetSupport: true,
-                                commitCharactersSupport: true,
-                                documentationFormat: ["markdown", "plaintext"],
-                                deprecatedSupport: true,
-                                preselectSupport: true
-                            },
-                            contextSupport: true
-                        }
-                    },
-                    workspace: {
-                        workspaceFolders: true,
-                        configuration: true,
-                        didChangeConfiguration: {
-                            dynamicRegistration: true
-                        },
-                        didChangeWatchedFiles: {
-                            dynamicRegistration: true
-                        },
-                        symbol: {
-                            dynamicRegistration: true,
-                            symbolKind: {
-                                valueSet: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26]
-                            }
-                        },
-                        executeCommand: {
-                            dynamicRegistration: true
-                        }
-                    }
-                },
-                initializationOptions: {
-                    preferences: {
-                        includePackageJsonAutoImports: "auto",
-                        importModuleSpecifierPreference: "non-relative",
-                        includeExternalModuleExports: true,
-                        includeInsertArgumentPlaceholders: true
-                    },
-                    tsserver: {
-                        logVerbosity: "normal",
-                        path: await (async () => {
-                            const projectTs = resolve(rootPath, "node_modules/typescript/lib/tsserver.js");
-                            if (await Bun.file(projectTs).exists()) return projectTs;
-                            const appTs = resolve(process.cwd(), "node_modules/typescript/lib/tsserver.js");
-                            if (await Bun.file(appTs).exists()) return appTs;
-                            return "tsserver"; // Fallback to system path
-                        })()
-                    }
-                }
-            }
-        };
-
-        this.sendToInstance(instance, initMsg);
-
-        return instance;
     }
 
-    private sendToInstance(instance: LSPInstance, message: any) {
-        if (instance.process.stdin) {
-            const json = JSON.stringify(message);
-            const length = Buffer.byteLength(json, 'utf-8');
-            const packet = `Content-Length: ${length}\r\n\r\n${json}`;
-            const stdin = instance.process.stdin as unknown as FileSink;
-            stdin.write(packet);
-            stdin.flush();
-        }
-    }
-
-    private async openCSharpSolution(instance: LSPInstance) {
+    private failFastRequest(ws: ServerWebSocket<any>, payload: string, message: string) {
         try {
-            const entries = await readdir(instance.rootPath);
-            const slnFile = entries.find(e => e.endsWith('.sln'));
-
-            if (slnFile) {
-                const slnPath = join(instance.rootPath, slnFile);
-                const slnUri = pathToFileURL(slnPath).toString();
-                console.log(`[LSP] Opening C# solution: ${slnPath}`);
-
-                this.sendToInstance(instance, {
+            const parsed = JSON.parse(payload);
+            if (parsed && parsed.id !== undefined && parsed.method) {
+                ws.send(JSON.stringify({
                     jsonrpc: "2.0",
-                    id: "internal-solution-open",
-                    method: "solution/open",
-                    params: { solution: slnUri }
-                });
-            } else {
-                // Try to find a .csproj file instead
-                const csprojFile = entries.find(e => e.endsWith('.csproj'));
-                if (csprojFile) {
-                    console.log(`[LSP] No .sln found, but found ${csprojFile} - Roslyn may auto-discover it`);
-                } else {
-                    console.warn(`[LSP] No .sln or .csproj found in ${instance.rootPath}`);
-                }
+                    id: parsed.id,
+                    error: {
+                        code: -32001,
+                        message,
+                    },
+                }));
             }
-        } catch (e) {
-            console.error(`[LSP] Error opening C# solution:`, e);
+        } catch {
         }
     }
 
-    private async processOutput(instance: LSPInstance) {
-        if (!instance.process.stdout) return;
+    private ensureSidecar() {
+        if (this.status === "healthy" || this.status === "starting" || this.status === "restarting") return;
+        if (this.spawnPromise) return;
 
-        const stdout = instance.process.stdout as unknown as ReadableStream;
-        const reader = stdout.getReader();
+        this.spawnPromise = this.startSidecar().finally(() => {
+            this.spawnPromise = null;
+        });
+    }
+
+    private async startSidecar() {
+        this.status = "starting";
+
+        try {
+            const settings = await getSettings().catch(() => null);
+            const lsp = settings?.lsp;
+
+            const proc = Bun.spawn([process.execPath, "src/backend/lsp-sidecar.ts"], {
+                cwd: process.cwd(),
+                stdin: "pipe",
+                stdout: "pipe",
+                stderr: "pipe",
+                env: {
+                    ...process.env,
+                    LSP_REQUEST_TIMEOUT_MS: String(lsp?.requestTimeoutMs ?? 6000),
+                    LSP_MAX_QUEUE_BYTES: String(lsp?.maxQueueBytes ?? 1024 * 1024),
+                    LSP_INSTANCE_INIT_TIMEOUT_MS: String(lsp?.instanceInitTimeoutMs ?? 15000),
+                    LSP_CIRCUIT_BREAKER_ENABLED: String(lsp?.circuitBreaker?.enabled ?? true),
+                },
+            });
+
+            this.sidecar = proc as Subprocess<"pipe", "pipe", "pipe">;
+            this.sidecarPid = proc.pid;
+
+            void this.readSidecarStdout(this.sidecar);
+            void this.readSidecarStderr(this.sidecar);
+            void proc.exited.then(() => this.handleSidecarExit(proc as Subprocess<"pipe", "pipe", "pipe">));
+        } catch {
+            this.status = "degraded";
+            this.scheduleRestart("sidecar spawn failed");
+        }
+    }
+
+    private sendToSidecar(message: MainToLspSidecarMessage): boolean {
+        if (!this.sidecar || this.status !== "healthy" || !this.sidecar.stdin) return false;
+
+        try {
+            const stdin = this.sidecar.stdin as unknown as FileSink;
+            stdin.write(`${JSON.stringify(message)}\n`);
+            return true;
+        } catch {
+            this.status = "degraded";
+            this.scheduleRestart("sidecar write failure");
+            return false;
+        }
+    }
+
+    private async readSidecarStdout(proc: Subprocess<"pipe", "pipe", "pipe">) {
+        if (!proc.stdout) return;
+
+        const reader = (proc.stdout as unknown as ReadableStream<Uint8Array>).getReader();
         const decoder = new TextDecoder();
+        let buffer = "";
 
         try {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                // console.log(`[LSP] STDOUT Chunk: ${chunk.length} bytes`);
-                instance.buffer += chunk;
-                this.processBuffer(instance);
+                buffer += decoder.decode(value, { stream: true });
+                while (true) {
+                    const newlineIndex = buffer.indexOf("\n");
+                    if (newlineIndex === -1) break;
+
+                    const line = buffer.slice(0, newlineIndex).trim();
+                    buffer = buffer.slice(newlineIndex + 1);
+                    if (!line) continue;
+
+                    let parsed: LspSidecarToMainMessage;
+                    try {
+                        parsed = JSON.parse(line) as LspSidecarToMainMessage;
+                    } catch {
+                        continue;
+                    }
+
+                    this.handleSidecarMessage(parsed);
+                }
             }
-        } catch (e) {
-            console.error(`[LSP] Error reading stdout for ${instance.language}`, e);
+        } catch {
         }
     }
 
-    private processBuffer(instance: LSPInstance) {
-        while (true) {
-            // Find the start of the headers (case-insensitive search)
-            const lowBuffer = instance.buffer.toLowerCase();
-            const headerStartIndex = lowBuffer.indexOf("content-length:");
+    private async readSidecarStderr(proc: Subprocess<"pipe", "pipe", "pipe">) {
+        if (!proc.stderr) return;
 
-            if (headerStartIndex === -1) {
-                // If we have a lot of data but no header, maybe it's noise?
-                if (instance.buffer.length > 1000) {
-                    console.log(`[LSP] Discarding ${instance.buffer.length} bytes of non-LSP data from stdout`);
-                    instance.buffer = "";
-                }
-                break;
-            }
-
-            // If there's garbage before the header, discard it
-            if (headerStartIndex > 0) {
-                const junk = instance.buffer.slice(0, headerStartIndex);
-                if (junk.trim()) {
-                    console.log(`[LSP] Discarded noise before header: ${junk.slice(0, 50)}...`);
-                }
-                instance.buffer = instance.buffer.slice(headerStartIndex);
-            }
-
-            // Find the end of the headers (\r\n\r\n)
-            const headerEndIndex = instance.buffer.indexOf("\r\n\r\n");
-            if (headerEndIndex === -1) break;
-
-            // Extract headers
-            const headers = instance.buffer.slice(0, headerEndIndex);
-            const contentLengthMatch = headers.match(/content-length:\s*(\d+)/i);
-
-            if (!contentLengthMatch) {
-                // Should not happen if we found Content-Length, but skip to be safe
-                instance.buffer = instance.buffer.slice(headerEndIndex + 4);
-                continue;
-            }
-
-            const contentLength = parseInt(contentLengthMatch[1] || "0", 10);
-            const totalHeaderSize = headerEndIndex + 4;
-
-            // If we have the full message
-            if (instance.buffer.length >= totalHeaderSize + contentLength) {
-                // Extract message body
-                const message = instance.buffer.slice(totalHeaderSize, totalHeaderSize + contentLength);
-
-                // Remove everything processed
-                instance.buffer = instance.buffer.slice(totalHeaderSize + contentLength);
-
-                let payload: any;
-                try {
-                    payload = JSON.parse(message);
-                    if (payload.method !== 'textDocument/publishDiagnostics' && payload.method !== 'window/logMessage') {
-                        console.log(`[LSP] << ${payload.method || ('id:' + payload.id)}`);
-                    }
-
-                    // Internal initialization handling
-                    if (payload.id === "internal-init" && !instance.isInitialized) {
-                        console.log(`[LSP] Server initialized successfully`);
-                        // instance.isInitialized = true; // DO NOT set here yet, wait for replay
-                        this.sendToInstance(instance, {
-                            jsonrpc: "2.0",
-                            method: "initialized",
-                            params: {}
-                        });
-
-                        // For C# projects, open the solution file
-                        if (instance.language === 'csharp') {
-                            this.openCSharpSolution(instance);
-                        }
-
-                        // Notify configuration change to trigger indexing
-                        this.sendToInstance(instance, {
-                            jsonrpc: "2.0",
-                            method: "workspace/didChangeConfiguration",
-                            params: {
-                                settings: {
-                                    typescript: {
-                                        tsserver: {
-                                            logVerbosity: "normal"
-                                        }
-                                    },
-                                    javascript: {
-                                        tsserver: {
-                                            logVerbosity: "normal"
-                                        }
-                                    }
-                                }
-                            }
-                        });
-
-                        // Reduced delay for replaying buffered messages, but set initialized AFTER
-                        // For C#, use a longer delay to allow solution loading
-                        const delay = instance.language === 'csharp' ? 3000 : 1000;
-                        setTimeout(() => {
-                            for (const msg of instance.pendingNotifications) {
-                                console.log(`[LSP] Replay buffered message: ${msg.method || 'request'}`);
-                                this.forwardToProcess(instance, JSON.stringify(msg));
-                            }
-                            instance.pendingNotifications = [];
-                            instance.isInitialized = true; // NOW it is ready for new messages
-                            console.log(`[LSP] Server ready and buffered messages replayed`);
-                        }, delay);
-                    }
-
-                    this.rewriteURIs(payload, (uri) => {
-                        const rootUrl = pathToFileURL(instance.rootPath).toString();
-                        const rootUrlPrefix = rootUrl.endsWith('/') ? rootUrl : rootUrl + '/';
-
-                        if (uri.startsWith(rootUrlPrefix)) {
-                            const rel = uri.slice(rootUrlPrefix.length);
-                            return `file:///${rel}`;
-                        } else if (uri.startsWith(rootUrl)) {
-                            // Fallback for exact root match or missing trailing slash in comparison
-                            const rel = uri.slice(rootUrl.length);
-                            const normalizedRel = rel.startsWith('/') ? rel.slice(1) : rel;
-                            return `file:///${normalizedRel}`;
-                        }
-                        return uri;
-                    });
-
-                    const finalMessage = JSON.stringify(payload);
-                    for (const client of instance.clients) {
-                        client.send(finalMessage);
-                    }
-                } catch (e) {
-                    console.error(`[LSP] Failed to parse/forward message: ${e}`);
-                    // Fallback to forwarding raw message if it wasn't JSON but somehow valid LSP
-                }
-            } else {
-                break; // Wait for more data
-            }
-        }
-    }
-
-    private async logStderr(instance: LSPInstance) {
-        if (!instance.process.stderr) return;
-        const stderr = instance.process.stderr as unknown as ReadableStream;
-        const reader = stderr.getReader();
+        const reader = (proc.stderr as unknown as ReadableStream<Uint8Array>).getReader();
         const decoder = new TextDecoder();
+
         try {
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 const text = decoder.decode(value);
-                // Log stderr for debugging (filter out verbose messages)
-                if (!text.includes('[Informational]')) {
-                    console.error(`[LSP STDERR]`, text.slice(0, 200));
+                if (text.trim()) {
+                    console.error(`[LSP Sidecar] ${text.trimEnd()}`);
                 }
             }
-        } catch (e) {
-            // ignore
+        } catch {
         }
     }
-    public async warmup(rootPath: string) {
-        // Simple heuristic to detect language
-        let language = "";
 
-        try {
-            if (await Bun.file(join(rootPath, "package.json")).exists()) {
-                language = "typescript";
-            } else if (await Bun.file(join(rootPath, "go.mod")).exists()) {
-                language = "go";
-            } else if (await Bun.file(join(rootPath, "requirements.txt")).exists() || await Bun.file(join(rootPath, "pyproject.toml")).exists()) {
-                language = "python";
-            } else if (await Bun.file(join(rootPath, "CMakeLists.txt")).exists()) {
-                language = "cpp";
-            } else {
-                // Check for C# projects (.csproj or .sln files)
-                const entries = await readdir(rootPath);
-                if (entries.some(e => e.endsWith(".csproj") || e.endsWith(".sln"))) {
-                    language = "csharp";
-                }
+    private handleSidecarMessage(message: LspSidecarToMainMessage) {
+        switch (message.type) {
+            case "ready": {
+                this.status = "healthy";
+                this.sidecarPid = message.pid;
+                this.lastHeartbeatAt = Date.now();
+                this.restartAttempt = 0;
+                this.syncSessions();
+                this.flushWarmups();
+                return;
             }
-        } catch (e) {
-            // ignore fs errors
+            case "heartbeat": {
+                this.lastHeartbeatAt = message.ts;
+                this.lastStats = {
+                    activeInstances: message.activeInstances,
+                    activeSessions: message.activeSessions,
+                    pendingRequests: message.pendingRequests,
+                    timestamp: message.ts,
+                };
+                if (this.status !== "healthy") this.status = "healthy";
+                return;
+            }
+            case "deliver": {
+                const session = this.sessions.get(message.sessionId);
+                if (!session) return;
+                try {
+                    session.ws.send(message.payload);
+                } catch {
+                }
+                return;
+            }
+            case "session-error": {
+                const session = this.sessions.get(message.sessionId);
+                if (!session) return;
+                try {
+                    session.ws.send(JSON.stringify({
+                        jsonrpc: "2.0",
+                        method: "window/logMessage",
+                        params: { type: 1, message: message.error },
+                    }));
+                } catch {
+                }
+                return;
+            }
+            case "stats": {
+                this.lastStats = message.data;
+                return;
+            }
+            case "fatal": {
+                this.status = "degraded";
+                this.scheduleRestart(`sidecar fatal: ${message.error}`);
+            }
+        }
+    }
+
+    private syncSessions() {
+        if (this.status !== "healthy") return;
+
+        for (const [sessionId, session] of this.sessions.entries()) {
+            this.sendToSidecar({
+                type: "open",
+                sessionId,
+                rootPath: session.rootPath,
+                language: session.language,
+            });
+        }
+    }
+
+    private flushWarmups() {
+        if (this.status !== "healthy") return;
+
+        for (const rootPath of this.warmupQueue) {
+            this.sendToSidecar({ type: "warmup", rootPath });
+        }
+        this.warmupQueue.clear();
+    }
+
+    private checkHealth() {
+        if (this.status !== "healthy") return;
+        const now = Date.now();
+        if (!this.lastHeartbeatAt || now - this.lastHeartbeatAt <= HEARTBEAT_TIMEOUT_MS) return;
+
+        this.status = "degraded";
+        this.scheduleRestart("sidecar heartbeat timeout");
+    }
+
+    private scheduleRestart(_reason: string) {
+        if (this.restarting) return;
+
+        this.restarting = true;
+        this.status = "restarting";
+        this.restartCount += 1;
+
+        const delay = RESTART_BACKOFF_MS[Math.min(this.restartAttempt, RESTART_BACKOFF_MS.length - 1)] || 30000;
+        this.restartAttempt += 1;
+
+        const proc = this.sidecar;
+        this.sidecar = null;
+        this.sidecarPid = null;
+
+        if (proc) {
+            try {
+                proc.kill();
+            } catch {
+            }
         }
 
-        if (!language) return;
+        setTimeout(() => {
+            this.restarting = false;
+            this.status = "degraded";
+            this.ensureSidecar();
+        }, delay);
+    }
 
-        const key = this.getInstanceKey(rootPath, language);
-        if (this.instances.has(key)) return; // Already running
+    private handleSidecarExit(proc: Subprocess<"pipe", "pipe", "pipe">) {
+        if (this.sidecar !== proc) return;
+        this.sidecar = null;
+        this.sidecarPid = null;
 
-        try {
-            console.log(`[LSP] Warming up ${language} server for ${rootPath}`);
-            const instance = await this.spawnServer(rootPath, language);
-            this.instances.set(key, instance);
-        } catch (e) {
-            // Be silent on warmup failure, it's an optimization
-            console.warn(`[LSP] Failed to warm up server for ${rootPath}:`, e);
+        if (this.status !== "stopped") {
+            this.status = "degraded";
+            this.scheduleRestart("sidecar exited");
         }
     }
 }

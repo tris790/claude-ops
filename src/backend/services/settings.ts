@@ -13,6 +13,14 @@ export const extractPlaceholders = (prompt: string): string[] => {
 export const DEFAULT_SETTINGS: Settings = {
     theme: 'dark',
     repoCloneDirectory: join(process.cwd(), ".repos"),
+    lsp: {
+        requestTimeoutMs: 6000,
+        maxQueueBytes: 1024 * 1024,
+        instanceInitTimeoutMs: 15000,
+        circuitBreaker: {
+            enabled: true
+        }
+    },
     aiCommandPrompts: {
         'generate_pr_description': {
             prompt: 'claude "Write a PR description for changes between {{target_branch}} and {{source_branch}}."',
@@ -56,6 +64,15 @@ export async function getSettings(): Promise<Settings> {
                     ...json.aiCommandPrompts
                 };
             }
+
+            merged.lsp = {
+                ...DEFAULT_SETTINGS.lsp,
+                ...json.lsp,
+                circuitBreaker: {
+                    ...DEFAULT_SETTINGS.lsp.circuitBreaker,
+                    ...json.lsp?.circuitBreaker
+                }
+            };
 
             // Ensure all prompts have placeholders
             if (merged.aiCommandPrompts) {

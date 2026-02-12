@@ -626,6 +626,7 @@ none
 ### Phase 2: Enhanced Code Review
 - Local clone management
 - Full LSP integration
+- LSP fault isolation (sidecar process, circuit breaker, watchdog restart, backpressure limits)
 - Real-time updates
 
 ### Phase 3: Extended Features
