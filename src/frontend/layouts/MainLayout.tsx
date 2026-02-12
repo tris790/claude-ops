@@ -9,18 +9,35 @@ import {
     Command,
     Search,
     ListTodo,
-    Activity
+    Activity,
+    FolderGit
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { CommandPalette } from "../components/CommandPalette";
 import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useRepoContext } from "../contexts/RepoContext";
 
 interface MainLayoutProps {
     children: React.ReactNode;
 }
 
+function getLanguageDisplayName(language: string | null): string {
+    if (!language) return "Plain Text";
+    const displayNames: Record<string, string> = {
+        typescript: "TypeScript",
+        typescriptreact: "TypeScript React",
+        go: "Go",
+        python: "Python",
+        c: "C",
+        cpp: "C++",
+        csharp: "C#",
+    };
+    return displayNames[language] || language.charAt(0).toUpperCase() + language.slice(1);
+}
+
 export function MainLayout({ children }: MainLayoutProps) {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorage("sidebar-collapsed", false);
+    const { project, repo, branch, language } = useRepoContext();
 
     return (
         <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 overflow-hidden font-sans">
@@ -95,15 +112,23 @@ export function MainLayout({ children }: MainLayoutProps) {
                             <div className="w-2 h-2 rounded-full bg-emerald-500" />
                             <span>Connected</span>
                         </span>
-                        <span className="hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer flex items-center gap-1 transition-colors">
-                            <GitBranch className="h-3 w-3" />
-                            <span>main</span>
-                        </span>
+                        {repo && (
+                            <span className="flex items-center gap-1 transition-colors">
+                                <FolderGit className="h-3 w-3" />
+                                <span>{project}/{repo}</span>
+                            </span>
+                        )}
+                        {branch && (
+                            <span className="hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer flex items-center gap-1 transition-colors">
+                                <GitBranch className="h-3 w-3" />
+                                <span>{branch}</span>
+                            </span>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-4">
                         <span>UTF-8</span>
-                        <span>TypeScript React</span>
+                        {language && <span>{getLanguageDisplayName(language)}</span>}
                     </div>
                 </footer>
             </div>

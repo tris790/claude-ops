@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useTransition } from "react";
 import { useSearchParams, Link } from "react-router-dom";
+import { useRepoContext } from "../contexts/RepoContext";
 import { Search, FileCode, Folder, Loader2, Filter, ChevronRight, ChevronDown, X } from "lucide-react";
 import { VariableSizeList as List } from "react-window";
 
@@ -47,6 +48,13 @@ function useContainerSize() {
 }
 
 export function SearchPage() {
+    const { clearContext } = useRepoContext();
+
+    // Clear repo context when on search page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
+
     const [searchParams, setSearchParams] = useSearchParams();
     const activeSearch = searchParams.get("q") || "";
 

@@ -17,6 +17,7 @@ import {
     Terminal
 } from "lucide-react";
 import { QueuePipelineModal } from "../components/pipeline/QueuePipelineModal";
+import { useRepoContext } from "../contexts/RepoContext";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Badge } from "../components/ui/Badge";
@@ -199,7 +200,13 @@ const PipelineRow = React.memo(({ index, style, data }: { index: number, style: 
 PipelineRow.displayName = "PipelineRow";
 
 export function PipelineList() {
+    const { clearContext } = useRepoContext();
     const navigate = useNavigate();
+
+    // Clear repo context when on pipelines page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
     const containerRef = useRef<HTMLDivElement>(null);
     const listRef = useRef<VariableSizeList>(null);
     const { height: windowHeight } = useWindowDimensions();

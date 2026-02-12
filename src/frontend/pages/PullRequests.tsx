@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
 import { usePullRequestCache } from "../hooks/usePullRequestCache";
+import { useRepoContext } from "../contexts/RepoContext";
 import {
     GitPullRequest,
     CheckCircle2,
@@ -31,6 +32,12 @@ function useWindowWidth() {
 
 export function PullRequests() {
     const navigate = useNavigate();
+    const { clearContext } = useRepoContext();
+
+    // Clear repo context when on PRs page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
     const [searchQuery, setSearchQuery] = useState("");
 
     // -- Filtering State with Persistence --

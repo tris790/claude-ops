@@ -11,6 +11,7 @@ import { Button } from "../components/ui/Button";
 import { MultiSelect, type MultiSelectOption } from "../components/ui/MultiSelect";
 import { RecencyService } from "../services/recency";
 import { cn } from "../utils/cn";
+import { useRepoContext } from "../contexts/RepoContext";
 
 // Helper for window size
 function useWindowWidth() {
@@ -28,6 +29,7 @@ export function RepoList() {
     const [search, setSearch] = useState("");
     const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
     const [isProjectFilterOpen, setIsProjectFilterOpen] = useState(false);
+    const { clearContext } = useRepoContext();
 
     // Track loading state for specific actions by repo ID
     const [actionLoading, setActionLoading] = useState<Record<string, string>>({});
@@ -42,6 +44,11 @@ export function RepoList() {
             setContainerWidth(containerRef.current.clientWidth);
         }
     }, [windowWidth, loading]);
+
+    // Clear repo context when on repo list page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
 
     const handleClone = async (e: React.MouseEvent, repo: GitRepository) => {
         e.preventDefault();

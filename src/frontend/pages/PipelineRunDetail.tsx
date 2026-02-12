@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getRun, getRunTimeline, getLogContent } from "../api/pipelines";
+import { useRepoContext } from "../contexts/RepoContext";
 import {
     ArrowLeft,
     Clock,
@@ -17,6 +18,7 @@ import {
 export function PipelineRunDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { clearContext } = useRepoContext();
     const [run, setRun] = useState<any>(null);
     const [timeline, setTimeline] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -24,6 +26,11 @@ export function PipelineRunDetail() {
     const [logs, setLogs] = useState<string>("");
     const [loadingLogs, setLoadingLogs] = useState(false);
     const logEndRef = useRef<HTMLDivElement>(null);
+
+    // Clear repo context when on pipeline run detail page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
 
     useEffect(() => {
         if (id) {

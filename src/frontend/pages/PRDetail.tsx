@@ -38,6 +38,7 @@ import { CommentDialog } from "../components/pr/CommentDialog";
 import { ReferencesPanel, type LSPLocation } from "../components/lsp/ReferencesPanel";
 import { handleLSPDefinition } from "../features/lsp/navigation";
 import { runAutomation } from "../api/automation";
+import { useRepoContext } from "../contexts/RepoContext";
 
 export function PRDetail() {
     const { id } = useParams();
@@ -68,6 +69,7 @@ export function PRDetail() {
     const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
     const [applyingFixId, setApplyingFixId] = useState<string | null>(null);
     const sidebarRef = useRef<HTMLDivElement>(null);
+    const { clearContext } = useRepoContext();
 
     // LSP References State
     const [references, setReferences] = useState<LSPLocation[]>([]);
@@ -113,6 +115,10 @@ export function PRDetail() {
         }
     }, [id]);
 
+    // Clear repo context when on PR detail page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
 
     async function loadData(silent = false) {
         if (!silent) setLoading(true);

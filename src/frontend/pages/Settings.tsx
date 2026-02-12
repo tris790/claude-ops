@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../hooks/useSettings';
+import { useRepoContext } from '../contexts/RepoContext';
 import { useDebounce } from '../hooks/useDebounce';
 import { Plus, Trash2, FolderOpen, Moon, Sun, Wand2, Check, Info } from 'lucide-react';
 import type { Settings } from '../../shared/types';
@@ -96,8 +97,14 @@ function PromptItem({ name, data, info, onUpdate, onRemove }: {
 
 export function SettingsPage() {
     const { settings, isLoading, updateSettings } = useSettings();
+    const { clearContext } = useRepoContext();
     const [localSettings, setLocalSettings] = useState<Settings | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+
+    // Clear repo context when on settings page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
 
     // Sync local state when settings initialize
     useEffect(() => {

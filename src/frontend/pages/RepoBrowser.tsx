@@ -8,6 +8,8 @@ import { ReferencesPanel, type LSPLocation } from "../components/lsp/ReferencesP
 import { handleLSPDefinition } from "../features/lsp/navigation";
 import { MultiSelect } from "../components/ui/MultiSelect";
 import { ResizablePanel } from "../components/ui/ResizablePanel";
+import { useRepoContext } from "../contexts/RepoContext";
+import { getLspLanguageFromPath } from "../features/lsp/language-map";
 
 export function RepoBrowser() {
     const { project, repo, "*": splat } = useParams<{ project: string; repo: string; "*": string }>();
@@ -28,8 +30,13 @@ export function RepoBrowser() {
     const [referencesLoading, setReferencesLoading] = useState(false);
     const [showReferences, setShowReferences] = useState(false);
 
+    const { setContext, clearContext } = useRepoContext();
+
     useEffect(() => {
-        if (!project || !repo) return;
+        if (!project || !repo) {
+            clearContext();
+            return;
+        }
 
         getRepositories()
             .then(repos => {
@@ -50,7 +57,7 @@ export function RepoBrowser() {
                 setError(err.message || "Failed to load repository details");
             })
             .finally(() => setLoading(false));
-    }, [project, repo]);
+    }, [project, repo, clearContext]);
 
     const { currentBranch, filePath } = useMemo(() => {
         if (!splat || !gitRepo) return { currentBranch: (gitRepo?.defaultBranch || "main").replace("refs/heads/", ""), filePath: "" };
@@ -76,6 +83,20 @@ export function RepoBrowser() {
         const parts = normalizedSplat.split("/");
         return { currentBranch: parts[0] || "main", filePath: parts.slice(1).join("/") };
     }, [splat, branches, gitRepo]);
+
+    // Update context when repo/branch/file changes
+    useEffect(() => {
+        if (project && repo && currentBranch) {
+            const language = selectedFile ? getLspLanguageFromPath(selectedFile.path) : null;
+            setContext({
+                project,
+                repo,
+                branch: currentBranch,
+                file: selectedFile?.path || null,
+                language,
+            });
+        }
+    }, [project, repo, currentBranch, selectedFile, setContext]);
 
     // Sync state from URL
     useEffect(() => {

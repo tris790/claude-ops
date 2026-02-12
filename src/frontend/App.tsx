@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { RepoProvider } from "./contexts/RepoContext";
 import { MainLayout } from "./layouts/MainLayout";
 import { SetupPage } from "./pages/SetupPage";
 
@@ -27,7 +28,7 @@ function AppRoutes() {
       <Route path="/setup" element={<SetupPage />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route element={<MainLayout><Outlet /></MainLayout>}>
+      <Route element={<RepoProvider><MainLayout><Outlet /></MainLayout></RepoProvider>}>
           <Route path="/repos" element={<RepoList />} />
           <Route path="/repos/:project/:repo" element={<RepoBrowser />} />
           <Route path="/repos/:project/:repo/blob/*" element={<RepoBrowser />} />

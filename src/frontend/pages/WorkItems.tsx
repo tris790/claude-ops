@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FixedSizeList as List } from "react-window";
 import { useWorkItemCache } from "../hooks/useWorkItemCache";
+import { useRepoContext } from "../contexts/RepoContext";
 import {
     CheckCircle2,
     Circle,
@@ -29,7 +30,13 @@ function useWindowWidth() {
 
 export function WorkItems() {
     const navigate = useNavigate();
+    const { clearContext } = useRepoContext();
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Clear repo context when on work items page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
 
     // Cache Hook
     const { items, loading, filterItems } = useWorkItemCache();

@@ -19,6 +19,7 @@ import {
 import { MultiSelect } from "../components/ui/MultiSelect";
 import { runAutomation } from "../api/automation";
 import { getRepositories } from "../api/repos";
+import { useRepoContext } from "../contexts/RepoContext";
 
 export function WorkItemDetail() {
     const { id } = useParams();
@@ -34,6 +35,12 @@ export function WorkItemDetail() {
     const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
     const [isEditingDesc, setIsEditingDesc] = useState(false);
     const [descContent, setDescContent] = useState("");
+    const { clearContext } = useRepoContext();
+
+    // Clear repo context when on work item detail page
+    useEffect(() => {
+        clearContext();
+    }, [clearContext]);
 
     useEffect(() => {
         if (id) loadItem(parseInt(id));
