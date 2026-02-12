@@ -191,6 +191,7 @@ export function RepoBrowser() {
                         repoId={gitRepo.id}
                         repoName={gitRepo.name}
                         projectName={gitRepo.project.name}
+                        version={currentBranch}
                         isLoading={referencesLoading}
                         onClose={() => setShowReferences(false)}
                         onSelect={(loc: LSPLocation) => {

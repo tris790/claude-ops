@@ -25,6 +25,7 @@ interface ReferencesPanelProps {
     onSelect: (location: LSPLocation) => void;
     onClose: () => void;
     isLoading?: boolean;
+    version?: string;
 }
 
 const DEFAULT_HEIGHT = 300;
@@ -37,7 +38,8 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
     projectName,
     onSelect,
     onClose,
-    isLoading = false
+    isLoading = false,
+    version = "main"
 }) => {
     const [storedHeight, setStoredHeight] = useLocalStorage(STORAGE_KEY, DEFAULT_HEIGHT);
     const [height, setHeight] = useState(storedHeight);
@@ -70,7 +72,7 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
         if (references.length > 0 && references.length < 100) {
             fetchContexts(group);
         }
-    }, [references]);
+    }, [references, version]);
 
     async function fetchContexts(group: Map<string, ReferenceItem[]>) {
         setLoadingContexts(true);
@@ -79,7 +81,7 @@ export const ReferencesPanel: React.FC<ReferencesPanelProps> = ({
         // Fetch files one by one (or in parallel)
         await Promise.all(paths.map(async (path) => {
             try {
-                const content = await getFileContent(repoId, path, "main"); // Fallback to main
+                const content = await getFileContent(repoId, path, version);
                 const lines = content.split('\n');
 
                 const items = group.get(path);

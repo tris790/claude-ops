@@ -942,6 +942,7 @@ export function PRDetail() {
                                     repoId={pr.repository.id}
                                     repoName={pr.repository.name}
                                     projectName={pr.repository.project.name}
+                                    version={modifiedVersion}
                                     isLoading={referencesLoading}
                                     onClose={() => setShowReferences(false)}
                                     onSelect={(loc: LSPLocation) => {

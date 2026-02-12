@@ -237,20 +237,20 @@ export function PullRequests() {
                             searchPlaceholder="Search authors..."
                         />
                         <MultiSelect
-                            options={options.projects}
-                            selected={selectedProjects}
-                            onChange={setSelectedProjects}
-                            placeholder="Project"
-                            className="w-32 md:w-40"
-                            searchPlaceholder="Search projects..."
-                        />
-                        <MultiSelect
                             options={options.repos}
                             selected={selectedRepos}
                             onChange={setSelectedRepos}
                             placeholder="Repo"
                             className="w-32 md:w-40"
                             searchPlaceholder="Search repositories..."
+                        />
+                        <MultiSelect
+                            options={options.projects}
+                            selected={selectedProjects}
+                            onChange={setSelectedProjects}
+                            placeholder="Project"
+                            className="w-32 md:w-40"
+                            searchPlaceholder="Search projects..."
                         />
                         <MultiSelect
                             options={options.statuses}
